@@ -44,6 +44,7 @@ import {
     Box3,
     DirectionalLight,
     Frustum,
+    GridHelper,
     type Intersection,
     Line,
     LineSegments,
@@ -287,6 +288,7 @@ export class ThreeView extends Observable implements IView {
         super.disposeInternal();
         this._gizmo.dispose();
         this._resizeObserver.disconnect();
+        this._grid?.dispose();
     }
 
     close(): void {
@@ -488,6 +490,37 @@ export class ThreeView extends Observable implements IView {
         this.setProperty("workplane", value);
     }
 
+    private _grid?: GridHelper;
+    get showGrid(): boolean {
+        return this.getPrivateValue("showGrid", true);
+    }
+    set showGrid(value: boolean) {
+        this.setProperty("showGrid", value, () => this.update());
+    }
+
+    /**
+     * The ground grid lives outside `visualShapes`, so picking and Fit never see it, and it
+     * joins the shared scene only for this view's own frame: another view of the same
+     * document keeps its own setting. Captures (`toImage`) render without it.
+     */
+    private renderGrid(): GridHelper | undefined {
+        if (!this.showGrid) return undefined;
+        if (this._grid === undefined) {
+            this._grid = new GridHelper(500, 50, 0x8a8a8a, 0x8a8a8a);
+            this._grid.rotation.x = Math.PI / 2;
+            const materials = Array.isArray(this._grid.material)
+                ? this._grid.material
+                : [this._grid.material];
+            for (const material of materials) {
+                material.transparent = true;
+                material.opacity = 0.28;
+                material.depthWrite = false;
+            }
+        }
+        this._scene.add(this._grid);
+        return this._grid;
+    }
+
     private _sectionPlane?: Plane;
     get sectionPlane(): Plane | undefined {
         return this._sectionPlane;
@@ -528,7 +561,9 @@ export class ThreeView extends Observable implements IView {
         if (!this._needsUpdate) return;
 
         this.syncCameraDependentState();
+        const grid = this.renderGrid();
         this._renderer.render(this._scene, this.camera);
+        if (grid !== undefined) this._scene.remove(grid);
         this._cssRenderer.render(this._scene, this.camera);
         this._gizmo?.update();
 

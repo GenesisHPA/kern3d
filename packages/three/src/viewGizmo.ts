@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { CAMERA_FLY_DURATION, type IViewGizmo, XYZ } from "@chili3d/core";
+import { CAMERA_FLY_DURATION, I18n, type I18nKeys, type IViewGizmo, XYZ } from "@chili3d/core";
 import { Matrix4, Vector3 } from "three";
 import type { CameraController } from "./cameraController";
 import type { ThreeView } from "./threeView";
@@ -9,52 +9,100 @@ import type { ThreeView } from "./threeView";
 const MOUSE_LEFT = 1;
 
 const options = {
+    /** Canvas pixels; the element shows it at `displayScale`, so it stays sharp on HiDPI. */
     size: 200,
-    padding: 16,
-    bubbleSizePrimary: 18,
-    bubbleSizeSeconday: 10,
-    showSecondary: true,
-    lineWidth: 2,
-    fontSize: "24px",
-    fontFamily: "arial",
-    fontColor: "#151515",
-    fontYAdjust: 0,
+    displayScale: 0.8,
+    /** Canvas pixels per cube half-edge. */
+    cubeScale: 47,
+    cornerPickRadius: 11,
+    fontFamily: "system-ui, sans-serif",
     colors: {
-        x: ["#f73c3c", "#942424"],
-        y: ["#6ccb26", "#417a17"],
-        z: ["#178cf0", "#0e5490"],
+        face: "#dfe3e8",
+        faceEdge: "#7d848d",
+        text: "#2d3136",
+        hover: "#6aa8ff",
+        x: "#e5484d",
+        y: "#30a46c",
+        z: "#3e8ef7",
     },
 };
 
-export interface Axis {
-    axis: string;
-    direction: Vector3;
-    size: number;
-    position: Vector3;
-    color: string[];
-    lineWidth?: number;
-    label?: string;
+/** One clickable face of the cube: its outward normal, and the axes its label is laid out on. */
+export interface CubeFace {
+    readonly key: string;
+    readonly label: I18nKeys;
+    readonly normal: Vector3;
+    /** The label's reading direction on the face. */
+    readonly right: Vector3;
+    /** The camera's up vector when this face is looked at head-on. */
+    readonly up: Vector3;
 }
 
+/** A pick target under the pointer: a face (look straight at it) or a corner (isometric). */
+export type CubeTarget = { kind: "face"; face: CubeFace } | { kind: "corner"; direction: Vector3 };
+
+const FACES: readonly CubeFace[] = [
+    { key: "top", label: "viewCube.top", normal: v(0, 0, 1), right: v(1, 0, 0), up: v(0, 1, 0) },
+    { key: "bottom", label: "viewCube.bottom", normal: v(0, 0, -1), right: v(1, 0, 0), up: v(0, -1, 0) },
+    { key: "front", label: "viewCube.front", normal: v(0, -1, 0), right: v(1, 0, 0), up: v(0, 0, 1) },
+    { key: "back", label: "viewCube.back", normal: v(0, 1, 0), right: v(-1, 0, 0), up: v(0, 0, 1) },
+    { key: "right", label: "viewCube.right", normal: v(1, 0, 0), right: v(0, 1, 0), up: v(0, 0, 1) },
+    { key: "left", label: "viewCube.left", normal: v(-1, 0, 0), right: v(0, -1, 0), up: v(0, 0, 1) },
+];
+
+const CORNERS: readonly Vector3[] = [-1, 1].flatMap((x) =>
+    [-1, 1].flatMap((y) => [-1, 1].map((z) => v(x, y, z))),
+);
+
+/** Where the home button flies to: front-right-top, Z up. */
+const HOME_DIRECTION = v(1, -1, 1).normalize();
+
+function v(x: number, y: number, z: number) {
+    return new Vector3(x, y, z);
+}
+
+interface Point2 {
+    x: number;
+    y: number;
+}
+
+function insidePolygon(p: Point2, polygon: Point2[]): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const a = polygon[i];
+        const b = polygon[j];
+        if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+/**
+ * The view cube in the canvas corner: a cube turned with the camera, whose faces fly the view
+ * straight onto that side and whose corners fly it to the isometric view from there, with a home
+ * button for the default framing and an axis triad along the cube's edges. Dragging it orbits.
+ */
 export class ViewGizmo extends HTMLElement implements IViewGizmo {
-    private readonly _axes: Axis[];
-    private readonly _center: Vector3;
     private readonly _canvas: HTMLCanvasElement;
     private readonly _context: CanvasRenderingContext2D;
+    private readonly _home: HTMLElement;
     readonly cameraController: CameraController;
     private _canClick: boolean = true;
-    private _selectedAxis?: Axis;
+    private _hovered?: CubeTarget;
     private _mouse?: Vector3;
+    /** World → view rotation of the last frame; the pick test reads the frame the user sees. */
+    private _toView = new Matrix4();
 
     constructor(readonly view: ThreeView) {
         super();
         this.cameraController = view.cameraController;
-        this._axes = this._initAxes();
-        this._center = new Vector3(options.size * 0.5, options.size * 0.5, 0);
         this._canvas = this._initCanvas();
         this._context = this._canvas.getContext("2d")!;
+        this._home = this._initHome();
         this._initStyle();
     }
+
     setDom(dom: HTMLElement): void {
         this.remove();
         dom.appendChild(this);
@@ -64,12 +112,15 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         this.remove();
     }
 
+    get hovered(): CubeTarget | undefined {
+        return this._hovered;
+    }
+
     private _initStyle() {
         this.style.zIndex = "999";
         this.style.position = "absolute";
-        this.style.top = "20px";
-        this.style.right = "20px";
-        this.style.borderRadius = "100%";
+        this.style.top = "8px";
+        this.style.right = "8px";
         this.style.cursor = "pointer";
         this.style.userSelect = "none";
         this.style.webkitUserSelect = "none";
@@ -79,68 +130,47 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         const canvas = document.createElement("canvas");
         canvas.width = options.size;
         canvas.height = options.size;
-        canvas.style.width = `${options.size * 0.5}px`;
-        canvas.style.height = `${options.size * 0.5}px`;
+        canvas.style.width = `${options.size * options.displayScale}px`;
+        canvas.style.height = `${options.size * options.displayScale}px`;
+        canvas.style.display = "block";
         this.append(canvas);
         return canvas;
     }
 
-    private _initAxes() {
-        return [
-            {
-                axis: "x",
-                direction: new Vector3(1, 0, 0),
-                position: new Vector3(),
-                size: options.bubbleSizePrimary,
-                color: options.colors.x,
-                lineWidth: options.lineWidth,
-                label: "X",
-            },
-            {
-                axis: "y",
-                direction: new Vector3(0, 1, 0),
-                position: new Vector3(),
-                size: options.bubbleSizePrimary,
-                color: options.colors.y,
-                lineWidth: options.lineWidth,
-                label: "Y",
-            },
-            {
-                axis: "z",
-                direction: new Vector3(0, 0, 1),
-                position: new Vector3(),
-                size: options.bubbleSizePrimary,
-                color: options.colors.z,
-                lineWidth: options.lineWidth,
-                label: "Z",
-            },
-            {
-                axis: "-x",
-                direction: new Vector3(-1, 0, 0),
-                position: new Vector3(),
-                size: options.bubbleSizeSeconday,
-                color: options.colors.x,
-            },
-            {
-                axis: "-y",
-                direction: new Vector3(0, -1, 0),
-                position: new Vector3(),
-                size: options.bubbleSizeSeconday,
-                color: options.colors.y,
-            },
-            {
-                axis: "-z",
-                direction: new Vector3(0, 0, -1),
-                position: new Vector3(),
-                size: options.bubbleSizeSeconday,
-                color: options.colors.z,
-            },
-        ];
+    private _initHome() {
+        const home = document.createElement("div");
+        home.setAttribute("role", "button");
+        home.dataset["viewcube"] = "home";
+        I18n.set(home, "title", "viewCube.home");
+        home.innerHTML =
+            '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
+            '<path d="M8 2 1.5 7.5h2V14h3.5v-4h2v4h3.5V7.5h2z" fill="currentColor"/></svg>';
+        Object.assign(home.style, {
+            position: "absolute",
+            top: "0px",
+            left: "0px",
+            width: "22px",
+            height: "22px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "4px",
+            color: "var(--foreground-secondary-color, #888)",
+        });
+        home.addEventListener("pointerenter", () => {
+            home.style.backgroundColor = "var(--hover-background-color, rgba(128,128,128,.25))";
+        });
+        home.addEventListener("pointerleave", () => {
+            home.style.backgroundColor = "transparent";
+        });
+        home.addEventListener("pointerdown", (e) => e.stopPropagation());
+        home.addEventListener("click", this._onHomeClick);
+        this.append(home);
+        return home;
     }
 
     connectedCallback() {
         this._canvas.addEventListener("pointermove", this._onPointerMove);
-        this._canvas.addEventListener("pointerenter", this._onPointerEnter);
         this._canvas.addEventListener("pointerout", this._onPointerOut);
         this._canvas.addEventListener("click", this._onClick);
         this._canvas.addEventListener("pointerdown", this._onPointerDown);
@@ -149,7 +179,6 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
 
     disconnectedCallback() {
         this._canvas.removeEventListener("pointermove", this._onPointerMove);
-        this._canvas.removeEventListener("pointerenter", this._onPointerEnter);
         this._canvas.removeEventListener("pointerout", this._onPointerOut);
         this._canvas.removeEventListener("click", this._onClick);
         this._canvas.removeEventListener("pointerdown", this._onPointerDown);
@@ -163,7 +192,8 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
             this._canClick = false;
         }
         const rect = this._canvas.getBoundingClientRect();
-        this._mouse = new Vector3(e.clientX - rect.left, e.clientY - rect.top, 0).multiplyScalar(2);
+        const scale = 1 / options.displayScale;
+        this._mouse = new Vector3((e.clientX - rect.left) * scale, (e.clientY - rect.top) * scale, 0);
         this.view.update();
     };
 
@@ -181,12 +211,7 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
     private readonly _onPointerOut = (e: PointerEvent) => {
         e.stopPropagation();
         this._mouse = undefined;
-        this.style.backgroundColor = "transparent";
-    };
-
-    private readonly _onPointerEnter = (e: PointerEvent) => {
-        e.stopPropagation();
-        this.style.backgroundColor = "rgba(66, 66, 66, .9)";
+        this.view.update();
     };
 
     private readonly _onClick = (e: MouseEvent) => {
@@ -195,21 +220,30 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
             this._canClick = true;
             return;
         }
-        if (this._selectedAxis) {
-            const distance = this.cameraController.camera.position.distanceTo(this.cameraController.target);
-            const position = this._selectedAxis.direction
-                .clone()
-                .multiplyScalar(distance)
-                .add(this.cameraController.target);
-            let up = new XYZ({ x: 0, y: 0, z: 1 });
-            if (this._selectedAxis.axis === "z") up = new XYZ({ x: 0, y: 1, z: 0 });
-            else if (this._selectedAxis.axis === "-z") up = new XYZ({ x: 0, y: -1, z: 0 });
-            this.cameraController.lookAt(position, this.cameraController.target, up, {
-                duration: CAMERA_FLY_DURATION,
-            });
-            this.view.update();
+        const target = this._hovered;
+        if (target === undefined) return;
+        if (target.kind === "face") {
+            this.flyTo(target.face.normal, target.face.up);
+        } else {
+            this.flyTo(target.direction.clone().normalize(), v(0, 0, 1));
         }
     };
+
+    private readonly _onHomeClick = (e: MouseEvent) => {
+        e.stopPropagation();
+        this.flyTo(HOME_DIRECTION, v(0, 0, 1));
+        this.cameraController.fitContent?.({ duration: CAMERA_FLY_DURATION });
+        this.view.update();
+    };
+
+    private flyTo(direction: Vector3, up: Vector3) {
+        const distance = this.cameraController.camera.position.distanceTo(this.cameraController.target);
+        const position = direction.clone().multiplyScalar(distance).add(this.cameraController.target);
+        this.cameraController.lookAt(position, this.cameraController.target, new XYZ(up), {
+            duration: CAMERA_FLY_DURATION,
+        });
+        this.view.update();
+    }
 
     clear() {
         this._context.clearRect(0, 0, this._canvas.width, this._canvas.height);
@@ -217,86 +251,153 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
 
     update() {
         this.clear();
-        const invRotMat = new Matrix4().makeRotationFromEuler(this.cameraController.camera.rotation).invert();
-        this._axes.forEach((axis) => {
-            axis.position = this.getBubblePosition(axis.direction.clone().applyMatrix4(invRotMat));
-        });
-        this._axes.sort((a, b) => a.position.z - b.position.z);
-        this.setSelectedAxis(this._axes);
-        this.drawAxes(this._axes);
+        this._toView = new Matrix4().makeRotationFromEuler(this.cameraController.camera.rotation).invert();
+        this._hovered = this._mouse && this._canClick ? this.pick(this._mouse) : undefined;
+        this.drawAxes();
+        for (const face of this.visibleFaces()) this.drawFace(face);
+        this.drawHoveredCorner();
     }
 
-    private setSelectedAxis(axes: Axis[]) {
-        this._selectedAxis = undefined;
-        if (this._mouse && this._canClick) {
-            let closestDist = Infinity;
-            for (const axis of axes) {
-                const distance = this._mouse.distanceTo(axis.position);
-                if (distance < closestDist && distance < axis.size) {
-                    closestDist = distance;
-                    this._selectedAxis = axis;
-                }
+    /** Canvas position of a cube-space point (half-edge 1) — y down, z toward the viewer. */
+    project(point: Vector3): Vector3 {
+        const p = point.clone().applyMatrix4(this._toView);
+        const c = options.size / 2;
+        return new Vector3(c + p.x * options.cubeScale, c - p.y * options.cubeScale, p.z);
+    }
+
+    private visibleFaces(): CubeFace[] {
+        return FACES.filter((face) => face.normal.clone().applyMatrix4(this._toView).z > 1e-3);
+    }
+
+    private faceCorners(face: CubeFace): Vector3[] {
+        const up = face.up;
+        const right = face.right;
+        return [
+            [-1, -1],
+            [1, -1],
+            [1, 1],
+            [-1, 1],
+        ].map(([r, u]) =>
+            this.project(
+                face.normal.clone().add(right.clone().multiplyScalar(r)).add(up.clone().multiplyScalar(u)),
+            ),
+        );
+    }
+
+    /** A corner wins over the face it sits on, so the isometric views stay reachable. */
+    pick(mouse: Vector3): CubeTarget | undefined {
+        let best: Vector3 | undefined;
+        let bestDistance = options.cornerPickRadius;
+        for (const corner of CORNERS) {
+            const p = this.project(corner);
+            if (p.z < 0) continue;
+            const distance = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = corner;
             }
         }
+        if (best !== undefined) return { kind: "corner", direction: best.clone() };
+        const face = this.visibleFaces().find((f) => insidePolygon(mouse, this.faceCorners(f)));
+        return face === undefined ? undefined : { kind: "face", face };
     }
 
-    drawAxes(axes: Axis[]) {
-        for (const axis of axes) {
-            const color = this.getAxisColor(axis);
-            this.drawCircle(axis.position, axis.size, color);
-            this.drawLine(this._center, axis.position, color, axis.lineWidth);
-            this.drawLabel(axis);
+    private drawFace(face: CubeFace) {
+        const ctx = this._context;
+        const corners = this.faceCorners(face);
+        const hovered = this._hovered?.kind === "face" && this._hovered.face === face;
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (const p of corners.slice(1)) ctx.lineTo(p.x, p.y);
+        ctx.closePath();
+        ctx.fillStyle = hovered ? options.colors.hover : options.colors.face;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = options.colors.faceEdge;
+        ctx.stroke();
+        this.drawLabel(face);
+    }
+
+    /**
+     * The label is drawn in the face's own plane: the 2D transform maps the face's right/down
+     * directions onto their projections, so it foreshortens with the cube.
+     */
+    private drawLabel(face: CubeFace) {
+        const ctx = this._context;
+        const center = this.project(face.normal);
+        const [right, down] = this.readableAxes(face, center);
+        const text = I18n.translate(face.label).toUpperCase();
+        ctx.save();
+        // Face units are scaled by 100 so the font is a normal pixel size, not a fraction of one.
+        const k = 0.01;
+        ctx.setTransform(right.x * k, right.y * k, down.x * k, down.y * k, center.x, center.y);
+        ctx.font = `600 34px ${options.fontFamily}`;
+        const width = ctx.measureText(text).width;
+        if (width > 172) ctx.font = `600 ${Math.floor((34 * 172) / width)}px ${options.fontFamily}`;
+        ctx.fillStyle = options.colors.text;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+    }
+
+    /**
+     * The label's right and down directions on screen: of the face's four quarter turns, the one
+     * that reads most upright, so the top face is not lettered upside down from behind.
+     */
+    private readableAxes(face: CubeFace, center: Vector3): [Vector3, Vector3] {
+        let best: [Vector3, Vector3] | undefined;
+        let bestScore = -Infinity;
+        let right = face.right.clone();
+        let up = face.up.clone();
+        for (let turn = 0; turn < 4; turn++) {
+            const r = this.project(face.normal.clone().add(right)).sub(center);
+            const d = this.project(face.normal.clone().sub(up)).sub(center);
+            const score = r.x + d.y;
+            if (score > bestScore + 1e-6) {
+                bestScore = score;
+                best = [r, d];
+            }
+            [right, up] = [up.clone(), right.clone().negate()];
         }
+        return best!;
     }
 
-    private getAxisColor(axis: Axis) {
-        let color;
-        if (this._selectedAxis === axis) {
-            color = "#FFFFFF";
-        } else if (axis.position.z >= -0.01) {
-            color = axis.color[0];
-        } else {
-            color = axis.color[1];
+    private drawHoveredCorner() {
+        if (this._hovered?.kind !== "corner") return;
+        const p = this.project(this._hovered.direction);
+        const ctx = this._context;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 8, 0, 2 * Math.PI, false);
+        ctx.fillStyle = options.colors.hover;
+        ctx.fill();
+    }
+
+    /** X/Y/Z along the cube's edges out of its (-x, -y, -z) corner, drawn under the faces. */
+    private drawAxes() {
+        const ctx = this._context;
+        const origin = v(-1, -1, -1);
+        const start = this.project(origin);
+        const axes: [Vector3, string, string][] = [
+            [v(1, 0, 0), "X", options.colors.x],
+            [v(0, 1, 0), "Y", options.colors.y],
+            [v(0, 0, 1), "Z", options.colors.z],
+        ];
+        ctx.font = `bold 20px ${options.fontFamily}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (const [direction, label, color] of axes) {
+            const end = this.project(origin.clone().add(direction.clone().multiplyScalar(2.2)));
+            const tip = this.project(origin.clone().add(direction.clone().multiplyScalar(2.45)));
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+            ctx.fillStyle = color;
+            ctx.fillText(label, tip.x, tip.y);
         }
-        return color;
-    }
-
-    private drawCircle(p: Vector3, radius = 10, color = "#FF0000") {
-        this._context.beginPath();
-        this._context.arc(p.x, p.y, radius, 0, 2 * Math.PI, false);
-        this._context.fillStyle = color;
-        this._context.fill();
-        this._context.closePath();
-    }
-
-    private drawLine(p1: Vector3, p2: Vector3, color: string, width?: number) {
-        if (width) {
-            this._context.beginPath();
-            this._context.moveTo(p1.x, p1.y);
-            this._context.lineTo(p2.x, p2.y);
-            this._context.lineWidth = width;
-            this._context.strokeStyle = color;
-            this._context.stroke();
-            this._context.closePath();
-        }
-    }
-
-    private drawLabel(axis: Axis) {
-        if (axis.label) {
-            this._context.font = [options.fontSize, options.fontFamily].join(" ");
-            this._context.fillStyle = options.fontColor;
-            this._context.textBaseline = "middle";
-            this._context.textAlign = "center";
-            this._context.fillText(axis.label, axis.position.x, axis.position.y + options.fontYAdjust);
-        }
-    }
-
-    private getBubblePosition(vector: Vector3) {
-        return new Vector3(
-            vector.x * (this._center.x - options.bubbleSizePrimary / 2 - options.padding) + this._center.x,
-            this._center.y - vector.y * (this._center.y - options.bubbleSizePrimary / 2 - options.padding),
-            vector.z,
-        );
     }
 }
 
