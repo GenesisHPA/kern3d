@@ -29,6 +29,7 @@ import {
     verifiedFaceAncestors,
 } from "./historyCompletion";
 import type { ProfileRef } from "./profileRef";
+import type { ThreadForm } from "./threadStandards";
 import type { VertexRef } from "./vertexRef";
 
 export interface FeatureBase {
@@ -71,6 +72,7 @@ export type FeatureData =
     | SewFeatureData
     | OffsetFaceFeatureData
     | HelixFeatureData
+    | ThreadFeatureData
     | TransformFeatureData;
 
 /**
@@ -956,6 +958,51 @@ export interface HelixFeatureData extends FeatureBase {
      * absent.
      */
     readonly axis?: XYZLike;
+}
+
+/**
+ * Thread (Fusion's Thread): a screw thread on a cylindrical face of the chain input — an external
+ * one on a shaft, an internal one in a bore, told apart by the face's own orientation at every
+ * rebuild (nothing stored decides it).
+ *
+ * MODELLED, the thread is real geometry: a helical groove of the form's profile (60° ISO/unified,
+ * 55° Whitworth/BSP) swept along a helix and CUT from the body — out of the shaft down to the
+ * minor diameter, or out of the bore's wall up to the major one. COSMETIC, the body is left as it
+ * is and the feature only records the thread (its row in the feature list says so, with the size).
+ *
+ * The geometry is anchored to the STANDARD's diameters, not to the face's: a rod modelled a little
+ * under size still gets the full-depth profile at the standard's minor diameter. The face only has
+ * to be near the size (`thread.ts` refuses a face the thread cannot sit on).
+ *
+ * The thread runs along the face from its start end (the end toward the cylinder axis' negative
+ * side, or the other one with `flip`), after `offset`, for `length` (absent: the rest of the face).
+ * The cut stays inside that span — the groove ends short of the span's ends by half a profile — so
+ * it never reaches a shoulder or a neighbouring face beyond the picked one.
+ */
+export interface ThreadFeatureData extends FeatureBase {
+    readonly type: "thread";
+    /** The cylindrical face, as a face fingerprint in the chain input's LOCAL space. */
+    readonly face: ProfileRef;
+    /** The preset's designation ("M8", "G1/4"); a label only — the numbers below build. */
+    readonly size: string;
+    /** The profile form: decides the flank angle and the thread depth (`threadStandards.ts`). */
+    readonly form: ThreadForm;
+    /** Nominal (major) diameter. */
+    readonly diameter: ParameterValue;
+    readonly pitch: ParameterValue;
+    /** Cut the thread into the body (true) or only record it (false, cosmetic). */
+    readonly modeled: boolean;
+    /** Thread length along the face; absent runs to the face's far end. */
+    readonly length?: ParameterValue;
+    /** Distance from the start end to where the thread begins; absent is 0. */
+    readonly offset?: ParameterValue;
+    /** Measure from the other end of the face. */
+    readonly flip?: boolean;
+    /**
+     * Radial clearance for a printed fit: an external thread is cut this much deeper, an internal
+     * one this much wider. Absent is 0 (the basic profile).
+     */
+    readonly clearance?: ParameterValue;
 }
 
 /**

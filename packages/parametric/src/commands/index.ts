@@ -25,4 +25,5 @@ import "./shellCommand";
 import "./splitCommand";
 import "./sweepCommand";
 import "./thickenCommand";
+import "./threadCommand";
 import "./variableCommand";
