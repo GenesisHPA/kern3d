@@ -9,15 +9,19 @@ type RibbonProfileExtra = RibbonTabProfile & { before?: RibbonTabKeys };
 /**
  * Ribbon contributions of the sketch module, applied by `AppBuilder.useParametric`.
  * Without it no sketch command is registered, so these stay out of the ribbon.
+ *
+ * The parametric tab gets the sketch entry commands at the head of its CREATE group; the
+ * contextual sketch tab, open while a sketch is edited, groups its tools the way a sketch is
+ * drawn — CREATE, MODIFY, CONSTRAINTS, INSPECT — and ends with the prominent finish button.
  */
 export const SketchRibbonProfiles: RibbonProfileExtra[] = [
     {
         tabName: "ribbon.tab.parametric",
-        before: "ribbon.tab.manager",
+        before: "ribbon.tab.basic",
         groups: [
             {
-                groupName: "ribbon.group.sketch",
-                items: ["sketch.create", "sketch.enter"],
+                groupName: "ribbon.group.create",
+                items: ["sketch.create", ["sketch.enter"]],
             },
         ],
     },
@@ -26,13 +30,13 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
         contextual: true,
         groups: [
             {
-                groupName: "ribbon.group.sketch",
-                items: ["sketch.exit"],
-            },
-            {
-                groupName: "ribbon.group.draw",
+                groupName: "ribbon.group.create",
                 items: [
                     "sketch.line",
+                    {
+                        type: "split",
+                        items: ["sketch.rectangle", "sketch.polygon"],
+                    },
                     {
                         type: "split",
                         items: ["sketch.circle", "sketch.ellipse"],
@@ -40,10 +44,6 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
                     {
                         type: "split",
                         items: ["sketch.arc", "sketch.ellipseArc"],
-                    },
-                    {
-                        type: "split",
-                        items: ["sketch.rectangle", "sketch.polygon"],
                     },
                     [
                         {
@@ -53,28 +53,7 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
                         "sketch.point",
                         "sketch.text",
                     ],
-                ],
-            },
-            {
-                groupName: "ribbon.group.constraint",
-                items: [
-                    "constraint.coincident",
-                    ["constraint.fix", "constraint.horizontal", "constraint.vertical"],
-                    ["constraint.parallel", "constraint.perpendicular", "constraint.equal"],
-                    ["constraint.tangent", "constraint.symmetric", "constraint.midpoint"],
-                    ["constraint.pointOn", "constraint.horizontalAlign", "constraint.verticalAlign"],
-                ],
-            },
-            {
-                groupName: "ribbon.group.dimension",
-                items: [
-                    "dimension",
-                    ["dimension.distance", "dimension.radius", "dimension.angle"],
-                    [
-                        "dimension.pointLineDistance",
-                        "dimension.horizontalDistance",
-                        "dimension.verticalDistance",
-                    ],
+                    ["sketch.projectEdges", "sketch.toggleExternal", "sketch.toggleConstruction"],
                 ],
             },
             {
@@ -84,18 +63,39 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
                         type: "split",
                         items: ["sketch.fillet", "sketch.chamfer"],
                     },
+                    "sketch.trim",
                     "sketch.offset",
-                    ["sketch.trim", "sketch.extend", "sketch.break"],
+                    ["sketch.extend", "sketch.break"],
                     ["sketch.mirror", "sketch.transform", "sketch.array"],
                 ],
             },
             {
-                groupName: "ribbon.group.other",
+                groupName: "ribbon.group.constraint",
                 items: [
-                    "sketch.constraints",
-                    "constraint.toggleDriven",
-                    ["sketch.projectEdges", "sketch.toggleExternal", "sketch.toggleConstruction"],
+                    "dimension",
+                    "constraint.coincident",
+                    "constraint.horizontal",
+                    "constraint.vertical",
+                    ["constraint.fix", "constraint.parallel", "constraint.perpendicular"],
+                    ["constraint.equal", "constraint.tangent", "constraint.symmetric"],
+                    ["constraint.midpoint", "constraint.pointOn"],
+                    ["constraint.horizontalAlign", "constraint.verticalAlign", "constraint.toggleDriven"],
+                    ["dimension.distance", "dimension.radius", "dimension.angle"],
+                    [
+                        "dimension.pointLineDistance",
+                        "dimension.horizontalDistance",
+                        "dimension.verticalDistance",
+                    ],
                 ],
+            },
+            {
+                groupName: "ribbon.group.inspect",
+                items: ["sketch.constraints"],
+            },
+            {
+                groupName: "ribbon.group.finishSketch",
+                prominent: true,
+                items: ["sketch.exit"],
             },
         ],
     },

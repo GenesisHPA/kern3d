@@ -5,6 +5,7 @@ import { ObservableCollection } from "@chili3d/core";
 import { SketchRibbonProfiles } from "@chili3d/parametric";
 import {
     DefaultRibbon,
+    DrawingRibbonProfiles,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
@@ -123,27 +124,32 @@ describe("DefaultRibbon", () => {
 });
 
 describe("SketchRibbonProfiles", () => {
-    test("parametric tab should hold the sketch entry commands", () => {
+    test("parametric tab should lead its create group with the sketch entry commands", () => {
         const tab = SketchRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
         expect(tab).toBeDefined();
         expect(tab!.contextual).toBeUndefined();
+        expect(tab!.groups.map((g) => g.groupName)).toEqual(["ribbon.group.create"]);
         const allItems = flattenItems(tab!.groups.flatMap((g) => g.items));
         expect(allItems).toEqual(["sketch.create", "sketch.enter"]);
     });
 
-    test("sketch tab should be contextual and contain sketch, draw, constraint, dimension groups", () => {
+    test("sketch tab should be contextual: create, modify, constraints, inspect, then finish", () => {
         const sketchTab = SketchRibbonProfiles.find((t) => t.tabName === "ribbon.tab.sketch");
         expect(sketchTab).toBeDefined();
         expect(sketchTab!.contextual).toBe(true);
-        const groupNames = sketchTab!.groups.map((g) => g.groupName);
-        expect(groupNames).toContain("ribbon.group.sketch");
-        expect(groupNames).toContain("ribbon.group.draw");
-        expect(groupNames).toContain("ribbon.group.constraint");
-        expect(groupNames).toContain("ribbon.group.dimension");
+        expect(sketchTab!.groups.map((g) => g.groupName)).toEqual([
+            "ribbon.group.create",
+            "ribbon.group.modify",
+            "ribbon.group.constraint",
+            "ribbon.group.inspect",
+            "ribbon.group.finishSketch",
+        ]);
+        const finish = sketchTab!.groups.at(-1)!;
+        expect(finish.prominent).toBe(true);
+        expect(finish.items).toEqual(["sketch.exit"]);
         const allItems = flattenItems(sketchTab!.groups.flatMap((g) => g.items));
         expect(allItems).toContain("sketch.array");
         expect(allItems).toContain("sketch.bezier");
-        expect(allItems).toContain("sketch.exit");
         expect(allItems).toContain("sketch.line");
         expect(allItems).toContain("sketch.nurbs");
         // the free curves' one tool until garlic's families were split into bezier and nurbs
@@ -155,155 +161,154 @@ describe("SketchRibbonProfiles", () => {
         expect(allItems).toContain("dimension.distance");
         expect(allItems).not.toContain("sketch.create");
     });
+
+    test("the sketch tab's single top-level commands are the most used tools", () => {
+        // The toolbar shows a group's top-level commands as its icons, the rest in its dropdown.
+        const sketchTab = SketchRibbonProfiles.find((t) => t.tabName === "ribbon.tab.sketch")!;
+        const create = sketchTab.groups.find((g) => g.groupName === "ribbon.group.create")!;
+        const topLevel = create.items.filter((item) => !Array.isArray(item));
+        expect(flattenItems(topLevel).filter((_, i, all) => all.indexOf(_) === i)).toEqual([
+            "sketch.line",
+            "sketch.rectangle",
+            "sketch.polygon",
+            "sketch.circle",
+            "sketch.ellipse",
+            "sketch.arc",
+            "sketch.ellipseArc",
+        ]);
+    });
 });
 
 describe("ParametricRibbonProfiles", () => {
-    test("should contribute the feature group to the parametric tab", () => {
+    test("should open the design workspace: the parametric tab goes before the direct-modeling tab", () => {
         const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
         expect(tab).toBeDefined();
-        expect(tab!.before).toBe("ribbon.tab.manager");
-        const createGroup = tab!.groups.find((g) => g.groupName === "ribbon.group.create");
-        expect(createGroup).toBeDefined();
-        expect(flattenItems(createGroup!.items)).toContain("feature.extrude");
+        expect(tab!.before).toBe("ribbon.tab.basic");
+        expect(tab!.workspace).toBeUndefined();
+    });
+
+    test("groups follow the order a part is built in", () => {
+        const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric")!;
+        expect(tab.groups.map((g) => g.groupName)).toEqual([
+            "ribbon.group.create",
+            "ribbon.group.modify",
+            "ribbon.group.assemble",
+            "ribbon.group.construct",
+            "ribbon.group.inspect",
+            "ribbon.group.insert",
+        ]);
     });
 
     test("should split building a shape from modifying one into two groups", () => {
         // What builds geometry out of a profile, then what rewrites geometry already there — the
-        // split every other CAD tool's toolbar makes, and the reason a draft (which rewrites the
-        // body it is applied to) does not sit next to an extrude.
+        // reason a draft (which rewrites the body it is applied to) does not sit next to an extrude.
         const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
         const itemsOf = (groupName: string) =>
             flattenItems(tab!.groups.find((g) => g.groupName === groupName)!.items);
 
-        // Thicken sits with the builders, not the modifiers — Fusion's CREATE panel holds it too.
         expect(itemsOf("ribbon.group.create")).toEqual([
-            "feature.plane",
-            "feature.primitiveBox",
-            "feature.primitiveCylinder",
-            "feature.primitiveSphere",
-            "feature.primitiveCone",
             "feature.extrude",
             "feature.revolve",
-            "feature.loft",
             "feature.sweep",
-            "feature.thicken",
+            "feature.loft",
             "feature.rib",
-            "feature.helix",
-        ]);
-        expect(itemsOf("ribbon.group.feature")).toEqual([
-            "feature.pressPull",
-            "feature.fillet",
-            "feature.chamfer",
-            "feature.modifyFillet",
-            "feature.modifyChamfer",
-            "feature.draft",
-            "feature.shell",
-            "feature.offsetFace",
-            "feature.split",
             "feature.hole",
             "feature.thread",
-            "feature.removeFeature",
+            "feature.helix",
             "feature.patternLinear",
             "feature.patternCircular",
             "feature.patternCurve",
             "feature.mirror",
+            "feature.thicken",
+            "feature.primitiveBox",
+            "feature.primitiveCylinder",
+            "feature.primitiveSphere",
+            "feature.primitiveCone",
+        ]);
+        expect(itemsOf("ribbon.group.modify")).toEqual([
+            "feature.pressPull",
+            "feature.fillet",
+            "feature.modifyFillet",
+            "feature.chamfer",
+            "feature.modifyChamfer",
+            "feature.shell",
+            "feature.draft",
+            "feature.offsetFace",
+            "feature.split",
+            "feature.removeFeature",
+            "feature.fuse",
+            "feature.cut",
+            "feature.common",
+            "modify.deleteNode",
+            "modify.paintBucket",
+            "feature.variable",
         ]);
     });
 
-    test("should keep the node operations in a group of their own", () => {
-        // These act on the document's nodes rather than on a body's geometry, so they carry their
-        // own label instead of borrowing the model tab's "modify".
+    test("should keep the node placement operations in the assemble group", () => {
         const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
-        const nodeGroup = tab!.groups.find((g) => g.groupName === "ribbon.group.node");
-        expect(nodeGroup).toBeDefined();
-        expect(flattenItems(nodeGroup!.items)).toEqual([
+        const group = tab!.groups.find((g) => g.groupName === "ribbon.group.assemble");
+        expect(group).toBeDefined();
+        expect(flattenItems(group!.items)).toEqual([
+            "modify.moveCopy",
+            "modify.align",
             "modify.move",
             "modify.rotate",
             "modify.mirror",
             "modify.detach",
-            "modify.moveCopy",
-            "modify.align",
-            "modify.deleteNode",
-            "modify.paintBucket",
             "modify.array",
         ]);
-        expect(tab!.groups.some((g) => g.groupName === "ribbon.group.modify")).toBe(false);
     });
 
     test("should merge into the sketch module's parametric tab without duplicating it", () => {
         const merged = mergeRibbonProfiles(DefaultRibbon, [
-            ...SketchRibbonProfiles,
             ...ParametricRibbonProfiles,
+            ...SketchRibbonProfiles,
         ]);
         const parametricTabs = merged.filter((t) => t.tabName === "ribbon.tab.parametric");
 
         expect(parametricTabs.length).toBe(1);
-        const allItems = flattenItems(parametricTabs[0].groups.flatMap((g) => g.items));
-        expect(allItems).toEqual([
+        const create = parametricTabs[0].groups.find((g) => g.groupName === "ribbon.group.create")!;
+        // the sketch module's contribution is prepended: a part starts with a sketch
+        expect(flattenItems(create.items).slice(0, 4)).toEqual([
             "sketch.create",
             "sketch.enter",
-            "feature.plane",
-            "feature.primitiveBox",
-            "feature.primitiveCylinder",
-            "feature.primitiveSphere",
-            "feature.primitiveCone",
             "feature.extrude",
             "feature.revolve",
-            "feature.loft",
-            "feature.sweep",
-            "feature.thicken",
-            "feature.rib",
-            "feature.helix",
-            "feature.pressPull",
-            "feature.fillet",
-            "feature.chamfer",
-            "feature.modifyFillet",
-            "feature.modifyChamfer",
-            "feature.draft",
-            "feature.shell",
-            "feature.offsetFace",
-            "feature.split",
-            "feature.hole",
-            "feature.thread",
-            "feature.removeFeature",
-            "feature.patternLinear",
-            "feature.patternCircular",
-            "feature.patternCurve",
-            "feature.mirror",
-            "feature.fuse",
-            "feature.cut",
-            "feature.common",
-            "modify.move",
-            "modify.rotate",
-            "modify.mirror",
-            "modify.detach",
-            "modify.moveCopy",
-            "modify.align",
-            "modify.deleteNode",
-            "modify.paintBucket",
-            "modify.array",
-            "annotate.dimension",
-            "annotate.radius",
-            "annotate.diameter",
-            "annotate.angle",
+        ]);
+        const allItems = flattenItems(parametricTabs[0].groups.flatMap((g) => g.items));
+        for (const key of [
+            "feature.plane",
+            "feature.variable",
+            "inspect.section",
+            "inspect.interference",
+            "inspect.massProperties",
             "annotate.text",
             "file.import",
             "file.export",
-            "feature.variable",
-            "wechat.group",
             "ai.toggleChat",
-        ]);
+        ]) {
+            expect(allItems).toContain(key);
+        }
+        expect(new Set(allItems).size).toBe(allItems.length);
+    });
+});
+
+describe("DrawingRibbonProfiles", () => {
+    test("the drawing tab lives in its own workspace", () => {
+        const tab = DrawingRibbonProfiles.find((t) => t.tabName === "ribbon.tab.drawing");
+        expect(tab?.workspace).toBe("ribbon.workspace.drawing");
     });
 });
 
 describe("mergeRibbonProfiles", () => {
-    test("should insert the parametric tab before the manager tab and append the sketch tab", () => {
+    test("should insert the parametric tab before the model tab and append the sketch tab", () => {
         const merged = mergeRibbonProfiles(DefaultRibbon, SketchRibbonProfiles);
         const tabNames = merged.map((t) => t.tabName);
 
         expect(tabNames).toEqual([
-            "ribbon.tab.basic",
             "ribbon.tab.parametric",
+            "ribbon.tab.basic",
             "ribbon.tab.manager",
             "ribbon.tab.sketch",
         ]);

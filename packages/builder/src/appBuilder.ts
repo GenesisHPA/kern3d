@@ -98,9 +98,11 @@ export class AppBuilder {
             const parametric = await import("@chili3d/parametric");
             await parametric.initGarlic();
             parametric.installAnnotationAssociations();
+            // Parametric first: the sketch module's CREATE items are prepended into the group
+            // it made, so "Create sketch" leads the group the way a part starts.
             this._ribbonExtras.push(
-                ...parametric.SketchRibbonProfiles,
                 ...ParametricRibbonProfiles,
+                ...parametric.SketchRibbonProfiles,
                 ...DrawingRibbonProfiles,
             );
         });

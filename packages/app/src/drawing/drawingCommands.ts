@@ -10,6 +10,7 @@ import {
     type IDocument,
     type INode,
     isReferenceGeometryNode,
+    NodeCategories,
     NodeUtils,
     PubSub,
     ShapeNode,
@@ -93,3 +94,6 @@ export class OpenDrawing implements ICommand {
 PubSub.default.sub("nodeDoubleClicked", (node) => {
     if (node instanceof DrawingNode) DrawingEditor.open(node);
 });
+
+// The browser lists drawings in a section of their own.
+NodeCategories.register((node) => (node instanceof DrawingNode ? "drawing" : undefined));

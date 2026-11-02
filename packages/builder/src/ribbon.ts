@@ -147,53 +147,26 @@ export type RibbonProfileExtra = RibbonTabProfile & { before?: RibbonTabKeys };
 
 /**
  * Ribbon contributions of the parametric module, applied by `AppBuilder.useParametric`.
- * Feature commands join the parametric tab next to the sketch group, split the way Fusion splits
- * its panels: what BUILDS geometry out of a profile, then what REWRITES geometry that is already
- * there.
+ * The parametric tab is the design workspace's first ("Solid") tab and its groups follow the
+ * order a part is built in: CREATE what builds geometry out of a profile (the sketch module
+ * prepends its sketch commands here), MODIFY what rewrites geometry that is already there,
+ * ASSEMBLE what places bodies, CONSTRUCT the reference geometry, INSPECT what measures and
+ * annotates, INSERT what brings data in or out. In every group the top-level single commands
+ * are the toolbar's icons; stacks and the rest are reached through the group's dropdown.
  */
 export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
     {
         tabName: "ribbon.tab.parametric",
-        before: "ribbon.tab.manager",
+        before: "ribbon.tab.basic",
         groups: [
             {
                 groupName: "ribbon.group.create",
                 items: [
-                    "feature.plane",
-                    {
-                        type: "split",
-                        items: [
-                            "feature.primitiveBox",
-                            "feature.primitiveCylinder",
-                            "feature.primitiveSphere",
-                            "feature.primitiveCone",
-                        ],
-                    },
                     "feature.extrude",
-                    ["feature.revolve", "feature.loft", "feature.sweep"],
-                    ["feature.thicken", "feature.rib", "feature.helix"],
-                ],
-            },
-            {
-                groupName: "ribbon.group.feature",
-                items: [
-                    "feature.pressPull",
+                    "feature.revolve",
+                    ["feature.sweep", "feature.loft", "feature.rib"],
+                    ["feature.hole", "feature.thread", "feature.helix"],
                     [
-                        {
-                            type: "split",
-                            items: [
-                                "feature.fillet",
-                                "feature.chamfer",
-                                "feature.modifyFillet",
-                                "feature.modifyChamfer",
-                            ],
-                        },
-                        "feature.draft",
-                        "feature.shell",
-                    ],
-                    ["feature.offsetFace", "feature.split", "feature.hole", "feature.thread"],
-                    [
-                        "feature.removeFeature",
                         {
                             type: "split",
                             items: [
@@ -203,51 +176,89 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                             ],
                         },
                         "feature.mirror",
+                        "feature.thicken",
+                    ],
+                    [
+                        {
+                            type: "split",
+                            items: [
+                                "feature.primitiveBox",
+                                "feature.primitiveCylinder",
+                                "feature.primitiveSphere",
+                                "feature.primitiveCone",
+                            ],
+                        },
                     ],
                 ],
             },
             {
-                groupName: "ribbon.group.boolean",
-                items: [["feature.fuse", "feature.cut", "feature.common"]],
-            },
-            {
-                groupName: "ribbon.group.node",
+                groupName: "ribbon.group.modify",
                 items: [
-                    "modify.move",
-                    ["modify.rotate", "modify.mirror", "modify.detach"],
-                    ["modify.moveCopy", "modify.align"],
-                    ["modify.deleteNode", "modify.paintBucket", "modify.array"],
+                    "feature.pressPull",
+                    {
+                        type: "split",
+                        items: ["feature.fillet", "feature.modifyFillet"],
+                    },
+                    {
+                        type: "split",
+                        items: ["feature.chamfer", "feature.modifyChamfer"],
+                    },
+                    ["feature.shell", "feature.draft", "feature.offsetFace"],
+                    ["feature.split", "feature.removeFeature"],
+                    ["feature.fuse", "feature.cut", "feature.common"],
+                    ["modify.deleteNode", "modify.paintBucket", "feature.variable"],
                 ],
             },
             {
-                groupName: "ribbon.group.annotation",
+                groupName: "ribbon.group.assemble",
                 items: [
-                    "annotate.dimension",
-                    ["annotate.radius", "annotate.diameter", "annotate.angle"],
-                    "annotate.text",
+                    "modify.moveCopy",
+                    "modify.align",
+                    ["modify.move", "modify.rotate", "modify.mirror"],
+                    ["modify.detach", "modify.array"],
                 ],
             },
             {
-                groupName: "ribbon.group.importExport",
-                items: ["file.import", "file.export"],
+                groupName: "ribbon.group.construct",
+                items: [
+                    "feature.plane",
+                    [
+                        "workingPlane.set",
+                        "workingPlane.alignToPlane",
+                        "workingPlane.fromSection",
+                        "workingPlane.toggleDynamic",
+                    ],
+                ],
             },
             {
-                groupName: "ribbon.group.other",
-                items: ["feature.variable", "wechat.group", "ai.toggleChat"],
+                groupName: "ribbon.group.inspect",
+                items: [
+                    "measure.length",
+                    "inspect.section",
+                    ["measure.angle", "measure.select"],
+                    ["inspect.interference", "inspect.massProperties"],
+                    ["annotate.dimension", "annotate.radius", "annotate.diameter"],
+                    ["annotate.angle", "annotate.text"],
+                ],
+            },
+            {
+                groupName: "ribbon.group.insert",
+                items: ["file.import", ["file.export", "ai.toggleChat", "wechat.group"]],
             },
         ],
     },
 ];
 
 /**
- * The drawing workspace (Fusion's "Drawing from design"): its own tab after the parametric
- * one. A drawing opens in a full-screen sheet editor, where views, dimensions and exports
- * live; the tab only starts one, or reopens the drawing selected in the tree.
+ * The drawing workspace: its own tab, in a workspace of its own so the toolbar's switcher
+ * shows it alone. A drawing opens in a full-screen sheet editor, where views, dimensions and
+ * exports live; the tab only starts one, or reopens the drawing selected in the tree.
  */
 export const DrawingRibbonProfiles: RibbonProfileExtra[] = [
     {
         tabName: "ribbon.tab.drawing",
         before: "ribbon.tab.manager",
+        workspace: "ribbon.workspace.drawing",
         groups: [
             {
                 groupName: "ribbon.group.drawing",

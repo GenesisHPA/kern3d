@@ -12,7 +12,7 @@ export * from "./sketchNode";
 export * from "./solver";
 import "./commands";
 
-import { PubSub } from "@chili3d/core";
+import { NodeCategories, PubSub } from "@chili3d/core";
 import { SketchEditor } from "./editor/sketchEditor";
 import { SketchNode } from "./sketchNode";
 
@@ -22,3 +22,6 @@ PubSub.default.sub("nodeDoubleClicked", (node) => {
         SketchEditor.enter(node);
     }
 });
+
+// The browser lists sketches in a section of their own.
+NodeCategories.register((node) => (node instanceof SketchNode ? "sketch" : undefined));
