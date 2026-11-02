@@ -19,6 +19,7 @@ import {
 import { DefaultDataExchange } from "./defaultDataExchange";
 import {
     DefaultRibbon,
+    DrawingRibbonProfiles,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
@@ -97,7 +98,11 @@ export class AppBuilder {
             const parametric = await import("@chili3d/parametric");
             await parametric.initGarlic();
             parametric.installAnnotationAssociations();
-            this._ribbonExtras.push(...parametric.SketchRibbonProfiles, ...ParametricRibbonProfiles);
+            this._ribbonExtras.push(
+                ...parametric.SketchRibbonProfiles,
+                ...ParametricRibbonProfiles,
+                ...DrawingRibbonProfiles,
+            );
         });
         return this;
     }

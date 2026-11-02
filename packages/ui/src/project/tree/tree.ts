@@ -2,7 +2,6 @@
 // See LICENSE file in the project root for full license information.
 
 import {
-    Annotation,
     FolderNode,
     type IDocument,
     type INode,
@@ -15,7 +14,6 @@ import {
     ShapeSelectionHandler,
     ShapeTypes,
     Transaction,
-    VisualNode,
 } from "@chili3d/core";
 import style from "./tree.module.css";
 import { TreeItem } from "./treeItem";
@@ -172,9 +170,8 @@ export class Tree extends HTMLElement {
     private createHTMLElement(document: IDocument, node: INode): TreeItem {
         let result: TreeItem;
         if (NodeUtils.isLinkedListNode(node)) result = new TreeGroup(document, node);
-        else if (node instanceof VisualNode || node instanceof Annotation)
-            result = new TreeModel(document, node);
-        else throw new Error("unknown node");
+        // Leaf nodes with nothing in the scene (a drawing sheet) show as plain rows too.
+        else result = new TreeModel(document, node);
         return result;
     }
 

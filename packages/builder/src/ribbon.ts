@@ -240,6 +240,24 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
 ];
 
 /**
+ * The drawing workspace (Fusion's "Drawing from design"): its own tab after the parametric
+ * one. A drawing opens in a full-screen sheet editor, where views, dimensions and exports
+ * live; the tab only starts one, or reopens the drawing selected in the tree.
+ */
+export const DrawingRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.drawing",
+        before: "ribbon.tab.manager",
+        groups: [
+            {
+                groupName: "ribbon.group.drawing",
+                items: ["drawing.create", "drawing.open"],
+            },
+        ],
+    },
+];
+
+/**
  * Returns a new profile list with `extras` merged into a copy of `base`: extra
  * items are prepended to the matching group (contributions land first), unknown
  * groups are appended, and new tabs are inserted before their `before` tab or
