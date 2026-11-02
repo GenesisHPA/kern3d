@@ -86,6 +86,12 @@ export interface IView extends IPropertyChanged, IDisposable {
      */
     readonly sectionPlane?: Plane;
     setSectionPlane?(plane: Plane | undefined): void;
+    /**
+     * Whether the view draws its ground grid on the XY plane — display state of this view
+     * only, never saved. Optional: a view without a grid leaves it out. Emits a property
+     * change, so a toggle button can bind to it.
+     */
+    showGrid?: boolean;
     direction(): XYZ;
     rayAt(mx: number, my: number): Ray;
     screenToWorld(mx: number, my: number): XYZ;

@@ -57,6 +57,11 @@ export interface PubSubEventMap {
     editMaterial: (document: IDocument, material: Material, callback: (material: Material) => void) => void;
     editVariables: (document: IDocument, onApplied: () => void) => void;
     executeCommand: (commandName: CommandKeys) => void;
+    /**
+     * Asks the feature list panel to open one feature of `node` (a feature-list body): the
+     * timeline's double-click, which selects the body and lands on the feature's parameters.
+     */
+    focusFeature: (node: INode, featureId: string) => void;
     loggerError: (message: unknown, optionalParams: unknown[]) => void;
     modelUpdate: (model: INode) => void;
     nodeDoubleClicked: (node: INode) => void;

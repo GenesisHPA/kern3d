@@ -61,7 +61,7 @@ export const Chili3dShortcuts: ShortcutMap = {
 
     // Primitives
     "create.box": "b",
-    "create.sphere": "s",
+    // "s" is not a command key: it opens the command toolbox (the ui's `CommandToolbox`).
     "create.cylinder": "y",
     "create.cone": "n",
     "create.pipe": "shift+p",

@@ -18,6 +18,7 @@ export * from "./instanceNodeContract";
 export * from "./meshInstanceNode";
 export * from "./meshNode";
 export * from "./node";
+export * from "./nodeCategory";
 export * from "./nodeIcon";
 export * from "./nodeWarning";
 export * from "./planarDimensionLayout";

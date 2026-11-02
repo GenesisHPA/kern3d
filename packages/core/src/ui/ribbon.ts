@@ -15,6 +15,17 @@ export type RibbonGroupKeys = {
     [P in I18nKeys]: P extends `ribbon.group.${infer _}` ? P : never;
 }[I18nKeys];
 
+/**
+ * A workspace is a set of tabs shown together (design, drawing): the toolbar's switcher
+ * lists the workspaces and shows only the tabs of the current one.
+ */
+export type RibbonWorkspaceKeys = {
+    [P in I18nKeys]: P extends `ribbon.workspace.${infer _}` ? P : never;
+}[I18nKeys];
+
+/** The workspace a tab joins when its profile names none. */
+export const DefaultRibbonWorkspace: RibbonWorkspaceKeys = "ribbon.workspace.design";
+
 /** A single ribbon button; a bare string names a registered command. */
 export type RibbonButton = CommandKeys | PushButton | PulldownButton | SplitButton;
 
@@ -25,11 +36,14 @@ export type RibbonGroupProfile = {
     /** An array stacks its buttons as a column of small ones. */
     items: (RibbonCommand | RibbonButton[])[];
     collapsedItems?: CommandKeys[];
+    /** Rendered as one emphasised button (e.g. "Finish sketch") rather than a command group. */
+    prominent?: boolean;
 };
 
 export class RibbonGroup extends Observable {
     readonly items: ObservableCollection<RibbonCommand>;
     readonly collapsedItems: ObservableCollection<CommandKeys>;
+    prominent = false;
 
     get groupName(): RibbonGroupKeys {
         return this.getPrivateValue("groupName");
@@ -49,7 +63,9 @@ export class RibbonGroup extends Observable {
         const mapItems = (items: (RibbonCommand | RibbonButton[])[]) =>
             items.map((item) => (Array.isArray(item) ? new ObservableCollection(...item) : item));
 
-        return new RibbonGroup(profile.groupName, mapItems(profile.items), profile.collapsedItems);
+        const group = new RibbonGroup(profile.groupName, mapItems(profile.items), profile.collapsedItems);
+        group.prominent = profile.prominent === true;
+        return group;
     }
 }
 
@@ -58,12 +74,15 @@ export type RibbonTabProfile = {
     groups: RibbonGroupProfile[];
     /** Contextual tabs are hidden until opened with `Ribbon.openTab` (e.g. sketch mode). */
     contextual?: boolean;
+    /** The workspace the tab belongs to; `DefaultRibbonWorkspace` when absent. */
+    workspace?: RibbonWorkspaceKeys;
 };
 
 export class RibbonTab extends Observable {
     readonly groups = new ObservableCollection<RibbonGroup>();
 
     contextual = false;
+    workspace: RibbonWorkspaceKeys = DefaultRibbonWorkspace;
 
     get tabName(): RibbonTabKeys {
         return this.getPrivateValue("tabName");
@@ -91,6 +110,7 @@ export class RibbonTab extends Observable {
             ...profile.groups.map((group) => RibbonGroup.fromProfile(group)),
         );
         tab.contextual = profile.contextual === true;
+        tab.workspace = profile.workspace ?? DefaultRibbonWorkspace;
         tab.setPrivateValue("visible", profile.contextual !== true);
         return tab;
     }
