@@ -13,6 +13,7 @@ import {
     ShapeNode,
     type VisualNode,
 } from "@chili3d/core";
+import { buildThreeMf, type ThreeMfObject } from "./threeMf";
 
 export class DefaultDataExchange implements IDataExchange {
     importFormats(): string[] {
@@ -20,7 +21,7 @@ export class DefaultDataExchange implements IDataExchange {
     }
 
     exportFormats(): string[] {
-        return [".step", ".iges", ".brep", ".stl", ".stl binary", ".ply", ".ply binary", ".obj"];
+        return [".step", ".iges", ".brep", ".stl", ".stl binary", ".ply", ".ply binary", ".obj", ".3mf"];
     }
 
     async import(document: IDocument, files: FileList | File[]): Promise<void> {
@@ -88,6 +89,8 @@ export class DefaultDataExchange implements IDataExchange {
     async export(type: string, nodes: VisualNode[]): Promise<BlobPart[] | undefined> {
         if (nodes.length === 0) return undefined;
 
+        if (type === ".3mf") return this.export3mf(nodes);
+
         const document = nodes[0].document;
         let shapeResult: Result<BlobPart> | undefined;
         if (type === ".ply") {
@@ -121,6 +124,25 @@ export class DefaultDataExchange implements IDataExchange {
 
         !shapes.length && PubSub.default.pub("showToast", "error.export.noNodeCanBeExported");
         return shapes;
+    }
+
+    /** One 3MF object per body, each meshed by the kernel in world space (millimetres). */
+    private async export3mf(nodes: VisualNode[]): Promise<BlobPart[] | undefined> {
+        const objects: ThreeMfObject[] = [];
+        for (const node of nodes) {
+            if (!(node instanceof ShapeNode) || node.isReferenceGeometry || !node.shape.isOk) continue;
+            const shape = node.shape.value.transformedMul(node.worldTransform());
+            const faces = shape.mesh.faces;
+            if (faces?.index.length) {
+                objects.push({ name: node.name, position: faces.position, index: faces.index });
+            }
+            shape.dispose();
+        }
+        if (objects.length === 0) {
+            PubSub.default.pub("showToast", "error.export.noNodeCanBeExported");
+            return undefined;
+        }
+        return [(await buildThreeMf(objects)) as BlobPart];
     }
 
     private exportStl(doc: IDocument, shapes: IShape[], binary: boolean): Result<BlobPart> {

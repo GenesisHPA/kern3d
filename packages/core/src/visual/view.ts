@@ -79,6 +79,13 @@ export interface IView extends IPropertyChanged, IDisposable {
      * that cannot resize keeps the per-call `toImage({ width, height })` path.
      */
     beginImageCapture?(width: number, height: number): () => void;
+    /**
+     * The view-only section of Section Analysis: everything on the side `plane.normal` points
+     * to is clipped away, in this view only. It is display state — no model geometry, nothing
+     * saved. Optional: a view that cannot clip leaves both out.
+     */
+    readonly sectionPlane?: Plane;
+    setSectionPlane?(plane: Plane | undefined): void;
     direction(): XYZ;
     rayAt(mx: number, my: number): Ray;
     screenToWorld(mx: number, my: number): XYZ;

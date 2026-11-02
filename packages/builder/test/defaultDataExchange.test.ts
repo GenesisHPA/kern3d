@@ -408,6 +408,33 @@ describe("DefaultDataExchange", () => {
             expect(disposeSpy).toHaveBeenCalledTimes(1);
         });
 
+        test("should export .3mf as one object per node, meshed from the transformed shape", async () => {
+            const doc = createMockDocument();
+            const tetra = {
+                position: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
+                index: new Uint32Array([0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3]),
+            };
+            const nodes = ["a", "b"].map((name) => {
+                const { node, transformed, transformedMul } = createShapeNode(doc, name);
+                Object.defineProperty(transformed, "mesh", { value: { faces: tetra } });
+                return { node, transformedMul };
+            });
+
+            const result = await exchange.export(
+                ".3mf",
+                nodes.map((x) => x.node),
+            );
+
+            expect(result?.length).toBe(1);
+            const { default: JSZip } = await import("jszip");
+            const zip = await JSZip.loadAsync(result![0] as Uint8Array);
+            const model = await zip.file("3D/3dmodel.model")!.async("string");
+            expect(model.match(/<object /g)?.length).toBe(2);
+            expect(model.match(/<triangle /g)?.length).toBe(8);
+            expect(model).toContain('name="a"');
+            for (const x of nodes) expect(x.transformedMul).toHaveBeenCalledTimes(1);
+        });
+
         test("should return undefined and not call any exporter for an unknown type", async () => {
             const converter = stubShapeConverter();
             const doc = createMockDocument();

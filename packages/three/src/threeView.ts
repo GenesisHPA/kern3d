@@ -53,6 +53,7 @@ import {
     PerspectiveCamera,
     Raycaster,
     type Scene,
+    Plane as ThreePlane,
     Vector2,
     Vector3,
     WebGLRenderer,
@@ -199,6 +200,18 @@ function orthographicRectFrustum(
     planes[5].setFromCoplanarPoints(farDownRight, farTopRight, farTopLeft);
     planes[5].normal.multiplyScalar(-1);
     return frustum;
+}
+
+/** How far (mm) the section clip sits past the cut, so caps drawn on the cut are not clipped. */
+export const SECTION_CAP_SLACK = 0.01;
+
+/**
+ * The three.js clip plane that removes the side `plane.normal` points to: it keeps the points
+ * with `-n·p + (n·o + slack) >= 0`, i.e. `n·p <= n·o + slack`.
+ */
+export function threeClipPlane(plane: Plane): ThreePlane {
+    const n = plane.normal;
+    return new ThreePlane(new Vector3(-n.x, -n.y, -n.z), n.dot(plane.origin) + SECTION_CAP_SLACK);
 }
 
 export class ThreeView extends Observable implements IView {
@@ -473,6 +486,22 @@ export class ThreeView extends Observable implements IView {
 
     set workplane(value: Plane) {
         this.setProperty("workplane", value);
+    }
+
+    private _sectionPlane?: Plane;
+    get sectionPlane(): Plane | undefined {
+        return this._sectionPlane;
+    }
+
+    /**
+     * Global renderer clipping: three.js keeps the fragments a plane's signed distance is
+     * non-negative for, so the plane is handed over facing away from the removed side. It is
+     * pushed `SECTION_CAP_SLACK` past the cut so the cap faces drawn exactly on it survive.
+     */
+    setSectionPlane(plane: Plane | undefined) {
+        this._sectionPlane = plane;
+        this._renderer.clippingPlanes = plane ? [threeClipPlane(plane)] : [];
+        this.update();
     }
 
     update() {

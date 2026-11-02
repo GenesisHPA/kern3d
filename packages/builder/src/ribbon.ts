@@ -106,6 +106,10 @@ export const DefaultRibbon: RibbonTabProfile[] = [
                 items: [["measure.length", "measure.angle", "measure.select"]],
             },
             {
+                groupName: "ribbon.group.inspect",
+                items: ["inspect.section", ["inspect.interference", "inspect.massProperties"]],
+            },
+            {
                 groupName: "ribbon.group.annotation",
                 items: [
                     "annotate.dimension",
