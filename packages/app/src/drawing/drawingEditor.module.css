@@ -1,0 +1,137 @@
+.dialog {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    font-size: 13px;
+}
+
+.root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    outline: none;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--panel-background-color);
+}
+
+.separator {
+    width: 1px;
+    align-self: stretch;
+    margin: 0 4px;
+    background-color: var(--border-color);
+}
+
+.toolbar button,
+.panel button {
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--panel-background-color);
+    color: var(--foreground-color);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.toolbar button:hover,
+.panel button:hover {
+    background-color: var(--hover-background-color);
+}
+
+.active {
+    background-color: var(--primary-color) !important;
+    color: var(--title-checked, #fff) !important;
+}
+
+.toolbar select {
+    padding: 3px;
+    background-color: var(--panel-background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.canvas {
+    flex: 1 1 auto;
+    min-width: 0;
+    background-color: #8a8f98;
+    cursor: default;
+    touch-action: none;
+    user-select: none;
+}
+
+.panel {
+    width: 300px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 8px 10px;
+    border-left: 1px solid var(--border-color);
+    background-color: var(--panel-background-color);
+}
+
+.panel h3 {
+    margin: 10px 0 6px;
+    font-size: 13px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+}
+
+.row > span {
+    width: 110px;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.row input[type="text"],
+.row input[type="number"],
+.row select,
+.row textarea {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 3px 4px;
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-family: inherit;
+}
+
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 6px 0;
+}
+
+.status {
+    padding: 4px 10px;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--panel-background-color);
+    opacity: 0.85;
+    min-height: 18px;
+}
