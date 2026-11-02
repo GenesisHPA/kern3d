@@ -23,7 +23,7 @@
 //      npm run test:scenarios [name ...]        (all of them when no name is given)
 //
 // Env: CHILI3D_URL (default http://localhost:8080), CHROME (browser binary),
-//      SCENARIO_OUT (default <repo>/test/scenarios)
+//      SCENARIO_OUT (default <repo>/test/scenarios), SCENARIO_WINDOW (e.g. 1600,900)
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -377,8 +377,10 @@ async function runScenario(browser, name) {
             }
             // Every step ends the same way: the app settles, then a frame draws it. A
             // scenario therefore says nothing about timing except where timing is the
-            // thing under test.
-            await page.settled();
+            // thing under test. `"settle": false` opts a step out — the way to look at a
+            // tool that is up (a command waiting for a pick never settles while it waits).
+            if (step.settle === false) await new Promise((resolve) => setTimeout(resolve, step.ms ?? 400));
+            else await page.settled();
         }
     } finally {
         await page.close();
@@ -443,6 +445,8 @@ async function withChrome(callback) {
             "--enable-unsafe-swiftshader",
             "--no-first-run",
             "--no-default-browser-check",
+            // SCENARIO_WINDOW=1600,900 for screenshots of a desktop-sized window.
+            ...(process.env.SCENARIO_WINDOW ? [`--window-size=${process.env.SCENARIO_WINDOW}`] : []),
             `--user-data-dir=${profile}`,
             "about:blank",
         ],
