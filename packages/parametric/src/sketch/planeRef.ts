@@ -31,6 +31,42 @@ export interface PlaneFaceRef {
     normal: XYZLike;
     offset: number;
     faceId?: string;
+    /**
+     * Where the sketch frame sits inside the face's default frame (`sketchPlaneOfFace`): set
+     * when the sketch was placed at a picked point and/or turned to a face edge. Absent means
+     * the default frame, so refs written before this field existed resolve exactly as before.
+     */
+    local?: PlaneLocalFrame;
+}
+
+/**
+ * A sketch frame expressed in a face's default sketch frame: the origin at (`u`, `v`) along
+ * that frame's x/y axes, the x axis turned by `angle` radians about the normal. Stored
+ * relative rather than in world coordinates so the frame rides along when the face moves
+ * along its normal (an extrude length edit).
+ */
+export interface PlaneLocalFrame {
+    u: number;
+    v: number;
+    angle: number;
+}
+
+/** `base` with `local` applied; `base` itself when there is no local frame. */
+export function applyLocalFrame(base: Plane, local: PlaneLocalFrame | undefined): Plane {
+    if (local === undefined) return base;
+    const origin = base.origin.add(base.xvec.multiply(local.u)).add(base.yvec.multiply(local.v));
+    const xvec = base.xvec.multiply(Math.cos(local.angle)).add(base.yvec.multiply(Math.sin(local.angle)));
+    return new Plane({ origin, normal: base.normal, xvec });
+}
+
+/** The inverse of `applyLocalFrame`: where `plane` (coplanar with `base`) sits in `base`. */
+export function localFrameOf(base: Plane, plane: Plane): PlaneLocalFrame {
+    const delta = plane.origin.sub(base.origin);
+    return {
+        u: delta.dot(base.xvec),
+        v: delta.dot(base.yvec),
+        angle: Math.atan2(plane.xvec.dot(base.yvec), plane.xvec.dot(base.xvec)),
+    };
 }
 
 /**
@@ -143,7 +179,7 @@ export function resolveFacePlane(
     const face = matchFace(faces, source.transform, ref, source.indexById, source.indexesOfId);
     if (face === undefined) return undefined;
     const worldFace = face.transformedMul(source.transform) as IFace;
-    const plane = sketchPlaneOfFace(worldFace);
+    const plane = applyLocalFrame(sketchPlaneOfFace(worldFace), ref.local);
     worldFace.dispose();
     return plane;
 }

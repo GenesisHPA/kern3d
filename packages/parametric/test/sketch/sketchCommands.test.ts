@@ -358,6 +358,8 @@ describe("CreateSketch", () => {
         // a face ref but no external refs, leaving refPositions as the only data
         const worldFace = {
             normal: () => [XYZ.zero, XYZ.unitZ],
+            // the sketch frame snaps to and aligns with the face's own edges and vertices
+            findSubShapes: () => [],
             dispose: rs.fn(),
         } as unknown as IFace;
         const pickedFace = {

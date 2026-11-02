@@ -510,6 +510,8 @@ export default {
         "option.command.normalOffset": "法向间距",
         "option.command.planeOffset": "平面偏移",
         "option.command.specifyPlaneOffset": "指定平面偏移",
+        "option.command.sketchOriginAtPick": "原点位于拾取点",
+        "option.command.sketchAxesAlongEdge": "坐标轴沿最近边",
         "option.command.operation": "操作",
         "option.command.operation.cut": "移除",
         "option.command.operation.intersect": "相交",

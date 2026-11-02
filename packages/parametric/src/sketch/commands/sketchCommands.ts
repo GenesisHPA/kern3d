@@ -32,6 +32,7 @@ import {
     captureFaceRef,
     type DatumPlaneName,
     datumDisplayPlane,
+    localFrameOf,
     type PlaneFaceRef,
     sketchPlaneOfFace,
 } from "../planeRef";
@@ -42,6 +43,7 @@ import {
     type SketchData,
 } from "../sketchModel";
 import { SketchNode } from "../sketchNode";
+import { type FaceFrameOptions, faceSketchFrame } from "./faceFrame";
 import { PlanePickHandler, type PlanePickResult } from "./planePickHandler";
 import {
     type OffsetDragData,
@@ -129,7 +131,11 @@ export function captureBoundaryExternalRefs(
     return refs.length === 0 ? undefined : refs;
 }
 
-function resolvePlane(document: IDocument, result: PlanePickResult | undefined): PickedPlane | undefined {
+function resolvePlane(
+    document: IDocument,
+    result: PlanePickResult | undefined,
+    frameOptions: FaceFrameOptions,
+): PickedPlane | undefined {
     if (result === undefined) return undefined;
     if (result.kind === "datum") {
         return { plane: result.plane, datumPlane: result.name, pickPoint: result.point };
@@ -139,9 +145,13 @@ function resolvePlane(document: IDocument, result: PlanePickResult | undefined):
     }
 
     const face = result.data.shape.transformedMul(result.data.transform) as IFace;
-    const plane = sketchPlaneOfFace(face);
+    const base = sketchPlaneOfFace(face);
+    const plane = faceSketchFrame(face, base, result.point, document.application.activeView, frameOptions);
     const owner = document.visual.context.getNode(result.data.owner);
     const picked = owner === undefined ? undefined : capturePlaneOwner(owner, result, face, plane);
+    // The ref re-derives the default frame on every rebuild; the offset from it is what
+    // keeps the picked origin and edge-aligned axes.
+    if (picked?.planeRef !== undefined && plane !== base) picked.planeRef.local = localFrameOf(base, plane);
     face.dispose();
     return { plane, pickPoint: result.point, ...picked };
 }
@@ -179,14 +189,18 @@ function capturePlaneOwner(
     };
 }
 
-async function pickPlane(document: IDocument, controller: AsyncController): Promise<PickedPlane | undefined> {
+async function pickPlane(
+    document: IDocument,
+    controller: AsyncController,
+    frameOptions: FaceFrameOptions,
+): Promise<PickedPlane | undefined> {
     document.selection.clearSelection();
     const handler = new PlanePickHandler(document, controller);
     await document.picker.pickAsync(handler, "prompt.select.plane", controller, "none", "select.default");
     controller.dispose();
     handler.dispose();
     document.selection.clearSelection();
-    return resolvePlane(document, handler.result);
+    return resolvePlane(document, handler.result, frameOptions);
 }
 
 function sketchDataFromPick(picked: PickedPlane): SketchData | undefined {
@@ -215,10 +229,14 @@ function sketchDataFromPick(picked: PickedPlane): SketchData | undefined {
  * from, so the command keeps it rather than the step carrying it forward.
  */
 class PickSketchPlaneStep implements IStep {
-    constructor(private readonly onPicked: (picked: PickedPlane) => void) {}
+    constructor(
+        private readonly onPicked: (picked: PickedPlane) => void,
+        private readonly frameOptions: () => FaceFrameOptions,
+    ) {}
 
     async execute(document: IDocument, controller: AsyncController): Promise<SnapResult | undefined> {
-        const picked = await pickPlane(document, controller);
+        // Read when the click lands, so ticking an option during the pick still counts.
+        const picked = await pickPlane(document, controller, this.frameOptions());
         if (picked === undefined) return undefined;
         this.onPicked(picked);
         return { view: document.application.activeView!, shapes: [], type: "input", plane: picked.plane };
@@ -236,6 +254,28 @@ export class CreateSketch extends MultistepCommand {
      * value resolved to — does not land back on the property and replace it.
      */
     private _pushingToOffset = false;
+
+    /**
+     * Fusion-style placement on a face: the sketch origin goes where the face was clicked,
+     * snapped onto a vertex, edge midpoint or arc centre within a few pixels. Off gives the
+     * default — the world origin projected onto the face.
+     */
+    @property("option.command.sketchOriginAtPick")
+    get originAtPick(): boolean {
+        return this.getPrivateValue("originAtPick", true);
+    }
+    set originAtPick(value: boolean) {
+        this.setProperty("originAtPick", value);
+    }
+
+    /** The sketch axes follow the straight edge of the face nearest the click. */
+    @property("option.command.sketchAxesAlongEdge")
+    get axesAlongEdge(): boolean {
+        return this.getPrivateValue("axesAlongEdge", true);
+    }
+    set axesAlongEdge(value: boolean) {
+        this.setProperty("axesAlongEdge", value);
+    }
 
     /**
      * Whether an offset is specified at all. Off by default: a sketch almost always sits on
@@ -319,7 +359,10 @@ export class CreateSketch extends MultistepCommand {
 
     protected override getSteps(): IStep[] {
         return [
-            new PickSketchPlaneStep((picked) => (this._picked = picked)),
+            new PickSketchPlaneStep(
+                (picked) => (this._picked = picked),
+                () => ({ originAtPick: this.originAtPick, axesAlongEdge: this.axesAlongEdge }),
+            ),
             // Always present, but it only opens a drag when the option asks for one — the
             // answer is read as the step runs, so the box can be ticked during the pick.
             new SketchPlaneOffsetStep(

@@ -504,6 +504,8 @@ export const I18N_KEYS = [
     "option.command.normalOffset",
     "option.command.planeOffset",
     "option.command.specifyPlaneOffset",
+    "option.command.sketchOriginAtPick",
+    "option.command.sketchAxesAlongEdge",
     "option.command.operation",
     "option.command.operation.cut",
     "option.command.operation.intersect",
