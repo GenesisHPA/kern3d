@@ -528,6 +528,7 @@ export default {
         "option.command.circularPattern": "Шаблон по кругу",
         "option.command.construction": "Построение",
         "option.command.distance": "Расстояние",
+        "document.untitled{0}": "Документ {0}",
         "option.command.sketchOriginAtPick": "Начало в точке клика",
         "option.command.sketchAxesAlongEdge": "Оси по ближайшему ребру",
         "option.command.driven": "Измерительный",

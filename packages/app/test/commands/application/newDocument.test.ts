@@ -28,7 +28,12 @@ describe("NewDocument", () => {
 
         const cmd = new NewDocument();
         await cmd.execute(app);
+        const first = newDocName;
+        await cmd.execute(app);
 
-        expect(newDocName).toContain("undefined");
+        // a localized "Document N", numbered up from one run to the next
+        const number = (name: string) => Number(name.match(/(\d+)\s*$/)?.[1]);
+        expect(first).not.toContain("undefined");
+        expect(number(newDocName)).toBe(number(first) + 1);
     });
 });

@@ -656,6 +656,7 @@ export default {
         "option.command.normalOffset": "Normal Offset",
         "option.command.planeOffset": "Plane Offset",
         "option.command.specifyPlaneOffset": "Specify Plane Offset",
+        "document.untitled{0}": "Document {0}",
         "option.command.sketchOriginAtPick": "Origin at Picked Point",
         "option.command.sketchAxesAlongEdge": "Axes Along Nearest Edge",
         "option.command.operation": "Operation",
