@@ -2,9 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    ANGLE_UNITS,
     BoundingBox,
+    Combobox,
     CurveUtils,
     command,
+    type I18nKeys,
     Id,
     type IEdge,
     type INode,
@@ -12,10 +15,12 @@ import {
     type IShape,
     type IStep,
     LENGTH_UNITS,
+    MathUtils,
     MultistepCommand,
     type ParameterValue,
     PubSub,
     property,
+    Result,
     type ShapeMeshData,
     ShapeTypes,
     Transaction,
@@ -26,9 +31,10 @@ import {
     VisualStates,
     XYZ,
 } from "@chili3d/core";
+import { referenceFaces } from "../features/edgeCorner";
 import { matchEdgeIndexes } from "../features/edgeMatcher";
 import { captureEdgeRef, type EdgeRef } from "../features/edgeRef";
-import type { ChamferFeatureData, FilletFeatureData } from "../features/feature";
+import type { ChamferFeatureData, ChamferMode, FilletFeatureData } from "../features/feature";
 import { reportSilentIdLoss } from "../features/idDiagnostics";
 import { ParametricBodyNode } from "../parametricBodyNode";
 
@@ -47,6 +53,19 @@ abstract class EdgeCornerFeatureCommand extends MultistepCommand {
     protected get valueNumber(): number | undefined {
         const resolved = this.resolveParameter(this.value, LENGTH_UNITS);
         return resolved.isOk ? resolved.value : undefined;
+    }
+
+    /**
+     * The asymmetric chamfer's second offset and reference side, for the preview. Undefined is a
+     * plain (equal) corner; null is an asymmetric one whose second value does not resolve yet.
+     */
+    protected chamferSides(): ChamferSides | undefined | null {
+        return undefined;
+    }
+
+    /** Checks the command's other rows before commit; an error refuses the commit. */
+    protected validateExtraParameters(): Result<void> {
+        return Result.ok(undefined);
     }
 
     private get body(): ParametricBodyNode {
@@ -116,7 +135,9 @@ abstract class EdgeCornerFeatureCommand extends MultistepCommand {
     ): ShapeMeshData[] | undefined {
         const value = this.valueNumber;
         if (value === undefined) return undefined;
-        const world = cornerPreview(node, edges, value, this.featureType);
+        const sides = this.chamferSides();
+        if (sides === null) return undefined;
+        const world = cornerPreview(node, edges, value, this.featureType, sides);
         if (world === undefined) return undefined;
         const { faces, edges: outlines } = world.mesh;
         world.dispose();
@@ -218,6 +239,11 @@ abstract class EdgeCornerFeatureCommand extends MultistepCommand {
             PubSub.default.pub("showToast", "error.default:{0}", resolved.error);
             return;
         }
+        const extra = this.validateExtraParameters();
+        if (!extra.isOk) {
+            PubSub.default.pub("showToast", "error.default:{0}", extra.error);
+            return;
+        }
         const edges = this.stepDatas[0].shapes.map((data) => {
             const edgeId = this.body.edgeIdAt(data.indexes[0]);
             if (edgeId === undefined) {
@@ -231,7 +257,7 @@ abstract class EdgeCornerFeatureCommand extends MultistepCommand {
         });
     }
 
-    private feature(value: ParameterValue, edges: EdgeRef[]): FilletFeatureData | ChamferFeatureData {
+    protected feature(value: ParameterValue, edges: EdgeRef[]): FilletFeatureData | ChamferFeatureData {
         if (this.featureType === "fillet") {
             return { id: Id.generate(), type: "fillet", radius: value, edges };
         }
@@ -252,6 +278,18 @@ export class FilletFeatureCommand extends EdgeCornerFeatureCommand {
     }
 }
 
+/** The chamfer modes as the command's dropdown shows them, keyed by the feature's own names. */
+const CHAMFER_MODE_KEYS: Record<ChamferMode, I18nKeys> = {
+    equal: "feature.chamfer.mode.equal",
+    twoDistance: "feature.chamfer.mode.twoDistance",
+    distanceAngle: "feature.chamfer.mode.distanceAngle",
+};
+
+function chamferModeOf(key: I18nKeys): ChamferMode {
+    const entry = Object.entries(CHAMFER_MODE_KEYS).find(([, display]) => display === key);
+    return (entry?.[0] as ChamferMode | undefined) ?? "equal";
+}
+
 @command({ key: "feature.chamfer", icon: "icon-chamfer" })
 export class ChamferFeatureCommand extends EdgeCornerFeatureCommand {
     protected readonly featureType = "chamfer" as const;
@@ -263,6 +301,111 @@ export class ChamferFeatureCommand extends EdgeCornerFeatureCommand {
     set value(value: ParameterValue) {
         this.setProperty("value", value, () => this.updatePreview());
     }
+
+    /**
+     * Fusion-style chamfer type: one distance on both faces, a separate distance per face, or a
+     * distance and an angle. The asymmetric two measure `value` on the reference face.
+     */
+    @property("feature.chamfer.mode", { combobox: Combobox.from(Object.values(CHAMFER_MODE_KEYS)) })
+    get mode(): I18nKeys {
+        return this.getPrivateValue("mode", CHAMFER_MODE_KEYS.equal);
+    }
+    set mode(value: I18nKeys) {
+        const wasAsymmetric = this.asymmetric;
+        this.setProperty("mode", value, () => {
+            // the flip row hangs on `asymmetric`, so it has to hear the change too
+            if (this.asymmetric !== wasAsymmetric) this.emitPropertyChanged("asymmetric", wasAsymmetric);
+            this.updatePreview();
+        });
+    }
+
+    /**
+     * `mode !== equal`, exposed on its own because a row's visibility dependency compares
+     * against one value: the flip row shows for both asymmetric modes. Derived, so a mode
+     * restored from the option cache (which bypasses the setter) still reads right.
+     */
+    get asymmetric(): boolean {
+        return this.mode !== CHAMFER_MODE_KEYS.equal;
+    }
+
+    @property("feature.chamfer.distance2", {
+        unit: LENGTH_UNITS,
+        dependencies: [{ property: "mode", value: CHAMFER_MODE_KEYS.twoDistance }],
+    })
+    get distance2(): ParameterValue {
+        return this.getPrivateValue("distance2", 2);
+    }
+    set distance2(value: ParameterValue) {
+        this.setProperty("distance2", value, () => this.updatePreview());
+    }
+
+    @property("feature.chamfer.angle", {
+        unit: ANGLE_UNITS,
+        dependencies: [{ property: "mode", value: CHAMFER_MODE_KEYS.distanceAngle }],
+    })
+    get angle(): ParameterValue {
+        return this.getPrivateValue("angle", 45);
+    }
+    set angle(value: ParameterValue) {
+        this.setProperty("angle", value, () => this.updatePreview());
+    }
+
+    /** Swaps which face of each edge `value` is measured on. */
+    @property("feature.chamfer.flip", { dependencies: [{ property: "asymmetric", value: true }] })
+    get flip(): boolean {
+        return this.getPrivateValue("flip", false);
+    }
+    set flip(value: boolean) {
+        this.setProperty("flip", value, () => this.updatePreview());
+    }
+
+    private get chamferMode(): ChamferMode {
+        return chamferModeOf(this.mode);
+    }
+
+    /** The second offset in millimetres, as the feature will derive it. */
+    private secondDistance(): Result<number> {
+        if (this.chamferMode === "twoDistance") return this.resolveParameter(this.distance2, LENGTH_UNITS);
+        const angle = this.resolveParameter(this.angle, ANGLE_UNITS);
+        if (!angle.isOk) return angle;
+        if (angle.value <= 0 || angle.value >= 90)
+            return Result.err("The angle must lie between 0 and 90 degrees");
+        const d1 = this.valueNumber;
+        if (d1 === undefined) return Result.err("The length does not resolve");
+        return Result.ok(d1 * Math.tan(MathUtils.degToRad(angle.value)));
+    }
+
+    protected override chamferSides(): ChamferSides | undefined | null {
+        if (this.chamferMode === "equal") return undefined;
+        const d2 = this.secondDistance();
+        return d2.isOk && d2.value > 0 ? { distance2: d2.value, flip: this.flip } : null;
+    }
+
+    protected override validateExtraParameters(): Result<void> {
+        if (this.chamferMode === "equal") return Result.ok(undefined);
+        const d2 = this.secondDistance();
+        if (!d2.isOk) return Result.err(d2.error);
+        return d2.value > 0 ? Result.ok(undefined) : Result.err("The second distance must be positive");
+    }
+
+    protected override feature(value: ParameterValue, edges: EdgeRef[]): ChamferFeatureData {
+        const base = super.feature(value, edges) as ChamferFeatureData;
+        const mode = this.chamferMode;
+        if (mode === "equal") return base;
+        return {
+            ...base,
+            mode,
+            distance2: mode === "twoDistance" ? this.distance2 : undefined,
+            angle: mode === "distanceAngle" ? this.angle : undefined,
+            flip: this.flip || undefined,
+        };
+    }
+}
+
+/** An asymmetric chamfer's second offset (mm) and whether the reference face is flipped. */
+export interface ChamferSides {
+    readonly distance2: number;
+    readonly flip: boolean;
 }
 
 /**
@@ -278,6 +421,7 @@ export function cornerPreview(
     picked: readonly VisualShapeData[],
     value: number,
     method: "fillet" | "chamfer",
+    sides?: ChamferSides,
 ): IShape | undefined {
     if (picked.length === 0 || !(node instanceof ParametricBodyNode) || !node.shape.isOk) return undefined;
     const shape = node.shape.value;
@@ -287,9 +431,25 @@ export function cornerPreview(
     );
     if (!indexes.isOk) return undefined;
 
-    const result = shapeFactory[method](shape, indexes.value, value);
+    const result = cornerResult(shape, indexes.value, value, method, sides);
     if (!result.isOk) return undefined;
     const world = result.value.transformedMul(picked[0].transform);
     result.value.dispose();
     return world;
+}
+
+/** The kernel call the feature makes for these settings: two-distance when `sides` is given. */
+function cornerResult(
+    shape: IShape,
+    indexes: number[],
+    value: number,
+    method: "fillet" | "chamfer",
+    sides: ChamferSides | undefined,
+): Result<IShape> {
+    if (method === "fillet" || sides === undefined) return shapeFactory[method](shape, indexes, value);
+    const twoDist = shapeFactory.chamferTwoDist;
+    if (twoDist === undefined) return Result.err("The kernel does not support two-distance chamfers");
+    const faces = referenceFaces(shape, indexes, sides.flip);
+    if (!faces.isOk) return Result.err(faces.error);
+    return twoDist.call(shapeFactory, shape, indexes, value, sides.distance2, faces.value);
 }

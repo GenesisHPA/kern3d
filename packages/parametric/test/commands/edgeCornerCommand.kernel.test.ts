@@ -8,7 +8,7 @@ import { type IEdge, type IFace, Matrix4, Plane, ShapeTypes } from "@chili3d/cor
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { ChamferFeatureCommand, FilletFeatureCommand } from "../../src/commands/edgeCornerCommand";
-import type { FilletFeatureData } from "../../src/features/feature";
+import type { ChamferFeatureData, FilletFeatureData } from "../../src/features/feature";
 import { captureProfileRef } from "../../src/features/profileRef";
 import { ParametricBodyNode } from "../../src/parametricBodyNode";
 import type { SketchData } from "../../src/sketch/sketchModel";
@@ -143,5 +143,69 @@ describe("EdgeCornerFeatureCommand id capture", () => {
 
         expect(body.featureItems()[1].error).toBeUndefined();
         expect((body.features[1] as FilletFeatureData).edges[0].edgeId).toBe(captured);
+    });
+});
+
+describe("ChamferFeatureCommand modes", () => {
+    // A 40 × 20 × 10 box; a chamfer of legs a, b on a 10 mm vertical edge removes a·b/2 · 10.
+    const BOX_VOLUME = 40 * 20 * 10;
+
+    test("an equal chamfer stores no mode", () => {
+        const { app, body } = scenario();
+        const feature = pickAndCommit(new ChamferFeatureCommand(), app, body, verticalEdgeIndex(body), 2);
+        expect((feature as ChamferFeatureData).mode).toBeUndefined();
+        expect(body.shape.unchecked()!.volume()).toBeCloseTo(BOX_VOLUME - 2 * 2 * 5, 3);
+    });
+
+    test("two distances land on the feature and cut a separate leg per face", () => {
+        const { app, body } = scenario();
+        const command = new ChamferFeatureCommand();
+        (command as any)._application = app;
+        command.mode = "feature.chamfer.mode.twoDistance";
+        command.distance2 = 4;
+        const feature = pickAndCommit(command, app, body, verticalEdgeIndex(body), 2) as ChamferFeatureData;
+
+        expect(feature.mode).toBe("twoDistance");
+        expect(feature.distance2).toBe(4);
+        expect(feature.angle).toBeUndefined();
+        expect(body.featureItems()[1].error).toBeUndefined();
+        expect(body.shape.unchecked()!.volume()).toBeCloseTo(BOX_VOLUME - 2 * 4 * 5, 3);
+    });
+
+    test("distance and angle derive the second leg as d·tan(angle)", () => {
+        const { app, body } = scenario();
+        const command = new ChamferFeatureCommand();
+        (command as any)._application = app;
+        command.mode = "feature.chamfer.mode.distanceAngle";
+        command.angle = 60;
+        command.flip = true;
+        const feature = pickAndCommit(command, app, body, verticalEdgeIndex(body), 2) as ChamferFeatureData;
+
+        expect(feature.mode).toBe("distanceAngle");
+        expect(feature.angle).toBe(60);
+        expect(feature.flip).toBe(true);
+        expect(body.featureItems()[1].error).toBeUndefined();
+        const d2 = 2 * Math.tan(Math.PI / 3);
+        expect(body.shape.unchecked()!.volume()).toBeCloseTo(BOX_VOLUME - 2 * d2 * 5, 3);
+    });
+
+    test("the flip row shows for both asymmetric modes only", () => {
+        const { app } = scenario();
+        const command = new ChamferFeatureCommand();
+        (command as any)._application = app;
+        const seen: unknown[] = [];
+        command.onPropertyChanged((property: string) => seen.push(property));
+
+        command.mode = "feature.chamfer.mode.twoDistance";
+        expect(command.asymmetric).toBe(true);
+        expect(seen).toContain("asymmetric");
+
+        seen.length = 0;
+        command.mode = "feature.chamfer.mode.distanceAngle";
+        expect(seen).not.toContain("asymmetric");
+
+        command.mode = "feature.chamfer.mode.equal";
+        expect(command.asymmetric).toBe(false);
+        expect(seen).toContain("asymmetric");
     });
 });

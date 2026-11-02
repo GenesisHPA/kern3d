@@ -593,7 +593,7 @@ function resolveSecondDistance(
  * measures d1 ON that face). Adjacent faces are deduplicated — a seam edge (one face on
  * both sides) is refused by the factory itself.
  */
-function referenceFaces(input: IShape, indexes: readonly number[], flip: boolean): Result<number[]> {
+export function referenceFaces(input: IShape, indexes: readonly number[], flip: boolean): Result<number[]> {
     const edges = input.findSubShapes(ShapeTypes.edge) as IEdge[];
     const faces = input.findSubShapes(ShapeTypes.face) as IFace[];
     const result: number[] = [];
