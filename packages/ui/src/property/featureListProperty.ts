@@ -64,6 +64,13 @@ function unitSpecLabelKey(unit: UnitSpec | undefined): I18nKeys | undefined {
  * editable. Edits go through the node's methods inside a transaction, so every
  * change is one undo step.
  */
+/**
+ * A feature some caller asked to open (`focusFeature`) before its body's panel existed — the
+ * timeline selects the body right after asking, and the panel that selection builds opens it.
+ */
+const pendingFocus = new WeakMap<INode, string>();
+PubSub.default.sub("focusFeature", (node, featureId) => pendingFocus.set(node, featureId));
+
 export class FeatureListProperty extends HTMLElement {
     private readonly expanded = new Set<string>();
     /** Live row elements by feature id, rebuilt by every `renderItems` — the dependency jump target. */
@@ -79,17 +86,30 @@ export class FeatureListProperty extends HTMLElement {
         readonly node: INode & IFeatureListNode,
     ) {
         super();
+        const pending = pendingFocus.get(node);
+        if (pending !== undefined) {
+            pendingFocus.delete(node);
+            this.expanded.add(pending);
+        }
         this.renderItems();
     }
 
     connectedCallback(): void {
         this.node.onPropertyChanged(this.handleNodeChanged);
+        PubSub.default.sub("focusFeature", this.handleFocusFeature);
     }
 
     disconnectedCallback(): void {
         this.node.removePropertyChanged(this.handleNodeChanged);
+        PubSub.default.remove("focusFeature", this.handleFocusFeature);
         this.closeMenu();
     }
+
+    private readonly handleFocusFeature = (node: INode, featureId: string) => {
+        if (node !== this.node) return;
+        pendingFocus.delete(node);
+        this.jumpToFeature(featureId);
+    };
 
     private readonly handleNodeChanged = (property: string) => {
         if (property === "featuresJson" || property === "rollbackBarIndex") this.renderItems();

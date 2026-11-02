@@ -11,15 +11,18 @@ import {
     type Ribbon,
 } from "@chili3d/core";
 import { div } from "@chili3d/element";
+import { CommandToolbox } from "./commandAccess/commandToolbox";
+import { MarkingMenu } from "./commandAccess/markingMenu";
 import style from "./editor.module.css";
 import { FloatPanel } from "./floatPanel";
 import { ProjectView } from "./project";
 import { PropertyView } from "./property";
 import { MaterialDataContent, MaterialEditor } from "./property/material";
 import { showVariablesPanel } from "./property/variables";
-import { RibbonUI } from "./ribbon";
 import { CommandContext } from "./ribbon/commandContext";
 import { Statusbar } from "./statusbar";
+import { Timeline } from "./timeline/timeline";
+import { MainToolbar } from "./toolbar/toolbar";
 import { LayoutViewport } from "./viewport";
 
 export class Editor extends HTMLElement {
@@ -30,13 +33,15 @@ export class Editor extends HTMLElement {
     private chatDock?: HTMLElement;
     private chatPanel?: ChatPanel;
     private floatingChat?: FloatPanel;
-    private _sidebarWidth: number = 360;
+    private _sidebarWidth: number = 290;
     private _chatWidth: number = 320;
     private _isResizingSidebar: boolean = false;
     private _sidebarEl: HTMLDivElement | null = null;
     private _projectView?: ProjectView;
     private _propertyView?: PropertyView;
     private _sidebarSplit: number = 0.5;
+    private markingMenu?: MarkingMenu;
+    private toolbox?: CommandToolbox;
 
     constructor(
         readonly app: IApplication,
@@ -74,8 +79,9 @@ export class Editor extends HTMLElement {
         this.append(
             div(
                 { className: style.root },
-                new RibbonUI(this.app, this.ribbonContent),
+                new MainToolbar(this.app, this.ribbonContent),
                 this._contentEl,
+                new Timeline(this.app),
                 new Statusbar(style.statusbar),
             ),
         );
@@ -264,6 +270,12 @@ export class Editor extends HTMLElement {
         PubSub.default.sub("openCommandContext", this.openContext);
         PubSub.default.sub("closeCommandContext", this.closeContext);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
+        this.markingMenu ??= new MarkingMenu(
+            this.app,
+            this._viewportContainer,
+            () => this.ribbonContent.activeTab?.tabName === "ribbon.tab.sketch",
+        );
+        this.toolbox ??= new CommandToolbox();
     }
 
     disconnectedCallback(): void {
@@ -272,6 +284,10 @@ export class Editor extends HTMLElement {
         PubSub.default.remove("openCommandContext", this.openContext);
         PubSub.default.remove("closeCommandContext", this.closeContext);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
+        this.markingMenu?.dispose();
+        this.markingMenu = undefined;
+        this.toolbox?.dispose();
+        this.toolbox = undefined;
         this.chatDock?.remove();
         this.chatDock = undefined;
         this.closeFloatingChat();
@@ -281,7 +297,7 @@ export class Editor extends HTMLElement {
         if (this.commandContext) {
             this.closeContext();
         }
-        this.commandContext = new CommandContext(command);
+        this.commandContext = new CommandContext(command, { docked: true });
         this._commandContextContainer.append(this.commandContext);
         this._viewportContainer.append(this._commandContextContainer);
     };

@@ -5,43 +5,15 @@ import {
     type Act,
     Binding,
     CAMERA_FLY_DURATION,
-    type CameraType,
-    I18n,
-    type IConverter,
     type IEventHandler,
     type IView,
     Localize,
     PubSub,
-    Result,
-    type ViewMode,
-    ViewModeI18nKeys,
-    ViewModes,
 } from "@chili3d/core";
 import { collection, div, input, label, span, svg } from "@chili3d/element";
 import { Flyout } from "./flyout";
+import { NavigationBar } from "./navigationBar";
 import style from "./viewport.module.css";
-
-class CameraConverter implements IConverter<CameraType> {
-    constructor(readonly type: CameraType) {}
-
-    convert(value: CameraType): Result<string, string> {
-        if (value === this.type) {
-            return Result.ok(style.actived);
-        }
-        return Result.ok("");
-    }
-}
-
-class ViewModeConverter implements IConverter<ViewMode> {
-    constructor(readonly mode: ViewMode) {}
-
-    convert(value: ViewMode): Result<string, string> {
-        if (value === this.mode) {
-            return Result.ok(style.actived);
-        }
-        return Result.ok("");
-    }
-}
 
 export class Viewport extends HTMLElement {
     private readonly _flyout: Flyout;
@@ -69,60 +41,7 @@ export class Viewport extends HTMLElement {
     };
 
     private render() {
-        this.append(
-            this._acts,
-            this.showViewControls
-                ? div(
-                      {
-                          className: style.viewControls,
-                          onpointerdown: (ev) => ev.stopPropagation(),
-                          onclick: (e) => e.stopPropagation(),
-                      },
-                      this.createCameraControls(),
-                      this.createActionControls(),
-                  )
-                : "",
-            this.createViewModeControl(),
-        );
-    }
-
-    private createCameraControls() {
-        return div(
-            { className: style.border },
-            this.createCameraControl("orthographic", "icon-orthographic"),
-            this.createCameraControl("perspective", "icon-perspective"),
-        );
-    }
-
-    private createActionControls() {
-        return div(
-            { className: style.border },
-            svg({
-                icon: "icon-fitcontent",
-                title: new Localize("viewport.fitContent"),
-                onclick: async (e) => {
-                    e.stopPropagation();
-                    this.view.cameraController.fitContent({ duration: CAMERA_FLY_DURATION });
-                    this.view.update();
-                },
-            }),
-            svg({
-                icon: "icon-zoomin",
-                title: new Localize("viewport.zoomIn"),
-                onclick: () => {
-                    this.view.cameraController.zoom(this.view.width / 2, this.view.height / 2, -5);
-                    this.view.update();
-                },
-            }),
-            svg({
-                icon: "icon-zoomout",
-                title: new Localize("viewport.zoomOut"),
-                onclick: () => {
-                    this.view.cameraController.zoom(this.view.width / 2, this.view.height / 2, 5);
-                    this.view.update();
-                },
-            }),
-        );
+        this.append(this._acts, this.showViewControls ? new NavigationBar(this.view) : "");
     }
 
     private createActs() {
@@ -196,75 +115,6 @@ export class Viewport extends HTMLElement {
             },
         );
     };
-
-    private createCameraControl(cameraType: CameraType, icon: string) {
-        return div(
-            {
-                className: new Binding(
-                    this.view.cameraController,
-                    "cameraType",
-                    new CameraConverter(cameraType),
-                ),
-            },
-            svg({
-                icon: icon,
-                title: new Localize(`viewport.${cameraType}`),
-                onclick: (e) => {
-                    e.stopPropagation();
-                    this.view.cameraController.cameraType = cameraType;
-                    this.view.update();
-                },
-            }),
-        );
-    }
-
-    private createViewModeControl() {
-        const label = span({
-            textContent: new Localize(ViewModeI18nKeys[this.view.mode]),
-        });
-        return div(
-            {
-                className: style.viewModeControl,
-            },
-            div(
-                {
-                    className: style.viewModeDisplay,
-                    onclick: (e) => {
-                        e.stopPropagation();
-                        const target = e.currentTarget as HTMLElement;
-                        if (target.nextElementSibling instanceof HTMLElement) {
-                            target.nextElementSibling.classList.toggle(style.visible);
-                        }
-                    },
-                },
-                "[ ",
-                label,
-                " ]",
-            ),
-            div(
-                {
-                    className: style.viewModeMenu,
-                },
-                ...ViewModes.map((m) =>
-                    div({
-                        className: new Binding(this.view, "mode", new ViewModeConverter(m)),
-                        textContent: new Localize(ViewModeI18nKeys[m]),
-                        onclick: (e) => {
-                            e.stopPropagation();
-                            I18n.set(label, "textContent", ViewModeI18nKeys[m]);
-                            this.view.mode = m;
-                            this.view.update();
-
-                            const target = e.currentTarget as HTMLElement;
-                            if (target.parentElement instanceof HTMLElement) {
-                                target.parentElement.classList.remove(style.visible);
-                            }
-                        },
-                    }),
-                ),
-            ),
-        );
-    }
 
     connectedCallback() {
         this.initEvent();

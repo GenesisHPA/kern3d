@@ -38,6 +38,8 @@ div {
 }
 
 chili3d-main-window {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 12px;
     position: absolute;
     top: 0;
     left: 0;
@@ -77,8 +79,8 @@ chili3d-main-window {
     --foreground-muted-color: #999;
     --border-color: #dddddd;
     --border-hover-color: #bbbbbb;
-    --background-color: #eeeeee;
-    --panel-background-color: #ffffff;
+    --background-color: #e7e9ec;
+    --panel-background-color: #fbfbfc;
     --panel-hover-background-color: #f5f5f5;
     --hover-background-color: rgba(25, 25, 25, 0.15);
     --active-background-color: rgba(25, 25, 25, 0.25);
@@ -91,7 +93,7 @@ chili3d-main-window {
     --bridge-connected-color: #187a2e;
     --bridge-retrying-color: #8a5700;
     --bridge-muted-color: #59636e;
-    --viewport-background-color: #888;
+    --viewport-background-color: #d5d9de;
     --input-background-color: #ffffff;
     --input-border-color: #dddddd;
     --input-text-color: #333;
@@ -104,8 +106,16 @@ chili3d-main-window {
     --panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     --resizer-gradient: linear-gradient(to right, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.12));
     --resizer-gradient-hover: linear-gradient(to right, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.18));
-    --error-color: #ff0000;
-    --warning-color: #ffc107;
+    --error-color: #d92d20;
+    --warning-color: #c98a00;
+    /* chrome of the toolbar, browser, timeline and canvas overlays */
+    --appbar-background-color: #dcdfe3;
+    --toolbar-background-color: #f4f5f7;
+    --chrome-border-color: #c9cdd3;
+    --accent-color: #0b6bd6;
+    --accent-soft-color: rgba(11, 107, 214, 0.14);
+    --contextual-color: #c26a00;
+    --prominent-color: #178a52;
 }
 
 :root[theme="dark"] {
@@ -113,13 +123,13 @@ chili3d-main-window {
     --control-background-color: #2a2a2a;
     --primary-color: #4a9eff;
     --secondary-color: #6a9ee6;
-    --foreground-color: #ffffff;
-    --foreground-secondary-color: #b0b0b0;
+    --foreground-color: #e8e9eb;
+    --foreground-secondary-color: #aeb1b6;
     --foreground-muted-color: #808080;
-    --border-color: #4e4e4e;
-    --border-hover-color: #505050;
-    --background-color: #181818;
-    --panel-background-color: #1f1f1f;
+    --border-color: #4a4d52;
+    --border-hover-color: #5a5d62;
+    --background-color: #1f2023;
+    --panel-background-color: #26282c;
     --panel-hover-background-color: #323232;
     --hover-background-color: rgba(255, 255, 255, 0.2);
     --active-background-color: rgba(255, 255, 255, 0.15);
@@ -132,7 +142,7 @@ chili3d-main-window {
     --bridge-connected-color: #3fb950;
     --bridge-retrying-color: #d29922;
     --bridge-muted-color: #8b949e;
-    --viewport-background-color: #242424;
+    --viewport-background-color: #3b3e44;
     --input-background-color: #1e1e1e;
     --input-border-color: #404040;
     --input-text-color: #ffffff;
@@ -147,4 +157,11 @@ chili3d-main-window {
     --resizer-gradient-hover: linear-gradient(to right, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.18));
     --error-color: #ff6b6b;
     --warning-color: #ffd93d;
+    --appbar-background-color: #1b1c1f;
+    --toolbar-background-color: #2c2e33;
+    --chrome-border-color: #3d4046;
+    --accent-color: #4c9bff;
+    --accent-soft-color: rgba(76, 155, 255, 0.2);
+    --contextual-color: #f0a640;
+    --prominent-color: #3cc47c;
 }

@@ -94,6 +94,21 @@ rs.mock("../src/project/tree/index", () => {
     return { Tree, TreeItem, TreeModel };
 });
 
+// The by-kind browser view has its own tests; here it only has to be created and removed.
+rs.mock("../src/project/browser/browserView", () => ({
+    BrowserView: class {
+        removed = false;
+        disposed = false;
+        constructor(readonly doc: unknown) {}
+        remove() {
+            this.removed = true;
+        }
+        dispose() {
+            this.disposed = true;
+        }
+    },
+}));
+
 // treeItemGroup is imported by toolBar.ts — define inline
 rs.mock("../src/project/tree/treeItemGroup", () => ({
     TreeGroup: class {

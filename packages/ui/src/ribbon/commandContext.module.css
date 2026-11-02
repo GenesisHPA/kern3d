@@ -313,3 +313,133 @@
         height: 20px;
     }
 }
+
+/* --- docked: a column at the canvas' right edge, under the view cube --- */
+
+.panel.docked {
+    top: 176px;
+    right: 10px;
+    left: auto;
+    margin: 0;
+    width: 300px;
+    max-width: calc(100% - 20px);
+    border-radius: 8px;
+    padding: 0;
+    opacity: 1;
+    text-wrap: wrap;
+    border: 1px solid var(--chrome-border-color);
+    border-top: 3px solid var(--accent-color);
+}
+
+.panel.docked::before {
+    display: none;
+}
+
+.docked .container {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    gap: 0;
+    max-height: calc(100vh - 370px);
+    overflow-y: auto;
+
+    & > * {
+        display: flex;
+    }
+}
+
+.docked .command {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--chrome-border-color);
+    background-color: color-mix(in srgb, var(--foreground-color) 4%, transparent);
+
+    .icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .title {
+        margin: 0;
+        font-size: 12.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+}
+
+.docked .groups {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    padding: 8px 10px;
+    gap: 8px;
+}
+
+.docked .group {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: 4px;
+
+    & > * {
+        background-color: transparent;
+        padding: 2px 0;
+    }
+
+    & > div:has(> label) > label {
+        flex: 0 0 42%;
+        white-space: normal;
+        color: var(--foreground-secondary-color);
+    }
+}
+
+.docked .selectionControl,
+.docked .cancelButton {
+    justify-content: flex-end;
+    margin: 0;
+    padding: 8px 10px;
+    border-left: none;
+    border-top: 1px solid var(--chrome-border-color);
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.docked .selectionInfo {
+    flex-direction: row;
+    gap: 4px;
+    margin-right: auto;
+}
+
+.docked .selectionButton {
+    gap: 6px;
+    min-width: 64px;
+    padding: 4px 12px;
+    border: 1px solid var(--chrome-border-color);
+    background-color: var(--control-background-color);
+
+    svg {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+.docked .confirmButton {
+    border-color: var(--accent-color);
+    background-color: var(--accent-color);
+    color: #fff;
+
+    & span {
+        color: #fff;
+    }
+
+    &:hover {
+        background-color: var(--button-primary-hover);
+    }
+}
+
+.buttonText {
+    font-size: 12px;
+    font-weight: 600;
+}

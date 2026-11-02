@@ -2,13 +2,17 @@
     display: flex;
     flex-direction: row;
     flex: 0;
+    margin-left: 4px;
+    padding-left: 4px;
+    border-left: 1px solid var(--chrome-border-color);
 }
 
 .svg {
-    width: 16px;
-    height: 16px;
-    margin-left: 12px;
-    padding: 6px;
+    width: 14px;
+    height: 14px;
+    padding: 4px;
+    border-radius: 4px;
+    color: var(--foreground-secondary-color);
 }
 
 .svg:hover {

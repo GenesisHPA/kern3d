@@ -59,10 +59,16 @@ rs.mock("../src/statusbar/index", () => {
     return { Statusbar: StatusbarMock };
 });
 
-rs.mock("../src/ribbon/index", () => {
-    class RibbonUIMock extends HTMLElement {}
-    defineMock("test-ribbon-ui", RibbonUIMock);
-    return { RibbonUI: RibbonUIMock };
+rs.mock("../src/toolbar/toolbar", () => {
+    class MainToolbarMock extends HTMLElement {}
+    defineMock("test-main-toolbar", MainToolbarMock);
+    return { MainToolbar: MainToolbarMock };
+});
+
+rs.mock("../src/timeline/timeline", () => {
+    class TimelineMock extends HTMLElement {}
+    defineMock("test-timeline", TimelineMock);
+    return { Timeline: TimelineMock };
 });
 
 rs.mock("../src/ribbon/commandContext", () => {

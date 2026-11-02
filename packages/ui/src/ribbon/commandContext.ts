@@ -45,6 +45,15 @@ import {
 } from "@chili3d/element";
 import style from "./commandContext.module.css";
 
+/** How the panel is laid out: a strip across the top of the canvas, or docked at its right. */
+export interface CommandContextOptions {
+    /**
+     * Docked: a narrow column at the canvas' right edge — the command's title, its fields one
+     * per row, and OK / Cancel at the bottom. The strip's column balancing does not apply.
+     */
+    docked?: boolean;
+}
+
 export class CommandContext extends HTMLElement implements IDisposable {
     private readonly propMap: Map<string | number | symbol, [Property, HTMLElement][]> = new Map();
     /**
@@ -67,11 +76,22 @@ export class CommandContext extends HTMLElement implements IDisposable {
     private resizeObserver?: ResizeObserver;
     private fitPending = false;
 
-    constructor(readonly command: ICommand) {
+    readonly docked: boolean;
+
+    constructor(
+        readonly command: ICommand,
+        options: CommandContextOptions = {},
+    ) {
         super();
-        this.className = style.panel;
+        this.docked = options.docked === true;
+        this.className = this.docked ? `${style.panel} ${style.docked}` : style.panel;
         this.append(this.container);
         this.render();
+    }
+
+    /** A docked panel's buttons carry their word; the strip's stay icons. */
+    private buttonLabel(key: I18nKeys) {
+        return this.docked ? [span({ className: style.buttonText, textContent: new Localize(key) })] : [];
     }
 
     private render() {
@@ -96,6 +116,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
                         onclick: () => (this.command as CancelableCommand).cancel(),
                     },
                     svg({ icon: "icon-cancel" }),
+                    ...this.buttonLabel("commandPanel.cancel"),
                 ),
             );
             this.container.append(this.closeIcon);
@@ -123,12 +144,17 @@ export class CommandContext extends HTMLElement implements IDisposable {
             { className: style.selectionControl },
             ...(showCount ? [this.selectionInfoDom()] : []),
             div(
-                { className: style.selectionButton, onclick: () => controller.success() },
+                {
+                    className: `${style.selectionButton} ${style.confirmButton}`,
+                    onclick: () => controller.success(),
+                },
                 svg({ icon: "icon-confirm" }),
+                ...this.buttonLabel("commandPanel.ok"),
             ),
             div(
                 { className: style.selectionButton, onclick: () => controller.cancel() },
                 svg({ icon: "icon-cancel" }),
+                ...this.buttonLabel("commandPanel.cancel"),
             ),
         );
         this.container.append(this.selectionControlContainer);
@@ -233,6 +259,13 @@ export class CommandContext extends HTMLElement implements IDisposable {
      */
     private fitWidth() {
         if (!this.isConnected || !this.parentElement) return;
+        if (this.docked) {
+            // one field per row: the column is as wide as the dock, not as the fields
+            for (const child of this.groupsContainer.children) {
+                (child as HTMLElement).style.setProperty("--columns", "1");
+            }
+            return;
+        }
         this.style.width = "";
         this.measureColumnWidth();
         // The grid's natural width depends on the column count it was last given, so the
