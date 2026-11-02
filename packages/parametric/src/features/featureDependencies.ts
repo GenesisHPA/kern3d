@@ -193,6 +193,8 @@ export function referencedSubshapeIds(feature: FeatureData, hostId: string): Fea
             return { faces: profileRefIds(feature.faces), edges: [] };
         case "offsetFace":
             return { faces: profileRefIds(feature.faces), edges: [] };
+        case "thread":
+            return { faces: profileRefIds([feature.face]), edges: [] };
         case "removeFeature":
             return { faces: profileRefIds(feature.faces), edges: [] };
         case "split":

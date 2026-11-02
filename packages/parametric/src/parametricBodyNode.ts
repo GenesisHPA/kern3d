@@ -952,6 +952,16 @@ export class ParametricBodyNode
                 refFrame: "local",
             };
         }
+        // A thread's one cylindrical face, under the same rule; a re-pick of several takes the first.
+        if (feature.type === "thread") {
+            return {
+                refs: [feature.face],
+                withRefs: (f, refs) =>
+                    f.type === "thread" && refs[0] !== undefined ? { ...f, face: refs[0] } : f,
+                captureNormal: false,
+                refFrame: "local",
+            };
+        }
 
         const source = "source" in feature ? feature.source : undefined;
         if (source === undefined) return undefined;

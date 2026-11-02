@@ -187,7 +187,7 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                         "feature.draft",
                         "feature.shell",
                     ],
-                    ["feature.offsetFace", "feature.split", "feature.hole"],
+                    ["feature.offsetFace", "feature.split", "feature.hole", "feature.thread"],
                     [
                         "feature.removeFeature",
                         {
