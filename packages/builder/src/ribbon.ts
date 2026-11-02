@@ -59,6 +59,7 @@ export const DefaultRibbon: RibbonTabProfile[] = [
                 items: [
                     "modify.move",
                     ["modify.rotate", "modify.mirror", "modify.array"],
+                    ["modify.moveCopy", "modify.align"],
                     ["modify.trim", "modify.extend", "modify.shell"],
                     ["modify.split", "modify.sew", "modify.simplifyShape"],
                     ["modify.fillet", "modify.chamfer", "modify.explode"],
@@ -210,6 +211,7 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                 items: [
                     "modify.move",
                     ["modify.rotate", "modify.mirror", "modify.detach"],
+                    ["modify.moveCopy", "modify.align"],
                     ["modify.deleteNode", "modify.paintBucket", "modify.array"],
                 ],
             },
