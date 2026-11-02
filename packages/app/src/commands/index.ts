@@ -12,6 +12,7 @@ export * from "./createCommand";
 export * from "./delete";
 export * from "./folder";
 export * from "./importExport";
+export * from "./inspect";
 export * from "./measure";
 export * from "./modify";
 export * from "./redo";
