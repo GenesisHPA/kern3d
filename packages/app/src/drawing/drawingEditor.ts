@@ -673,6 +673,7 @@ export class DrawingEditor {
         const typing =
             target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
         if (typing) return;
+        if (typeof e.key !== "string") return; // autofill keydowns carry no key
         const key = e.key.toLowerCase();
         if ((e.ctrlKey || e.metaKey) && key === "z") {
             e.preventDefault();

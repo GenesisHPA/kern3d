@@ -303,6 +303,16 @@ describe("HotkeyService", () => {
             expect(publishedCommands[0]).toBe("doc.new");
         });
 
+        test("ignores a keydown with no key (browser autofill sends those)", () => {
+            service.addMap({ n: "doc.new" as CommandKeys });
+            const event = new KeyboardEvent("keydown");
+            Object.defineProperty(event, "key", { value: undefined });
+            Object.defineProperty(event, "target", { value: document.body });
+            const handler = (service as unknown as { commandKeyDown: (e: KeyboardEvent) => void })
+                .commandKeyDown;
+            expect(() => handler(event)).not.toThrow();
+        });
+
         test("should not publish when target is INPUT", () => {
             service.addMap({ a: "create.arc" as CommandKeys });
 

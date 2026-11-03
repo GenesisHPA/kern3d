@@ -131,6 +131,9 @@ export class HotkeyService implements IService {
     };
 
     private readonly commandKeyDown = (e: KeyboardEvent) => {
+        // Browser autofill (a password manager filling the AI key, say) sends keydown events
+        // with no key at all; there is nothing to match them against.
+        if (typeof e.key !== "string") return;
         // A focused text box keeps every shortcut a text box can use (Ctrl+Z and friends),
         // but saving has no meaning there: Ctrl+S must save wherever the caret is.
         if (!this.canHandleKey(e) && !this.isAlwaysAvailableChord(e)) return;

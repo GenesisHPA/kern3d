@@ -116,7 +116,8 @@ export class CommandToolbox {
 
     /** S with no modifier, outside a text box, opens it; the key never reaches the shortcuts. */
     private readonly onWindowKey = (e: KeyboardEvent) => {
-        if (this.isOpen || e.ctrlKey || e.altKey || e.metaKey || e.key.toLowerCase() !== "s") return;
+        // `e.key` is absent on the keydown events browser autofill sends.
+        if (this.isOpen || e.ctrlKey || e.altKey || e.metaKey || e.key?.toLowerCase() !== "s") return;
         const target = e.target as HTMLElement | null;
         if (
             target &&
