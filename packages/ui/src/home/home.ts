@@ -15,7 +15,6 @@ import {
 import { button, collection, div, img, span, svg } from "@chili3d/element";
 import style from "./home.module.css";
 import { LanguageSelector } from "./languageSelector";
-import { OrbitModeSelector } from "./orbitModeSelector";
 import { ThemeSelector } from "./themeSelector";
 
 interface ApplicationCommand {
@@ -137,14 +136,6 @@ export class Home extends HTMLElement {
                     textContent: new Localize("common.theme"),
                 }),
                 div({ className: style.settingControl }, ThemeSelector({})),
-            ),
-            div(
-                { className: style.settingItem },
-                span({
-                    className: style.settingLabel,
-                    textContent: new Localize("common.orbitMode"),
-                }),
-                div({ className: `${style.settingControl} ${style.wideControl}` }, OrbitModeSelector({})),
             ),
         );
     }

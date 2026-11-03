@@ -33,6 +33,16 @@
     }
 }
 
+.arrow {
+    width: 14px;
+    margin-left: -1px;
+}
+
+.arrowGlyph {
+    width: 10px;
+    height: 10px;
+}
+
 .active {
     color: var(--accent-color);
     background-color: var(--accent-soft-color);

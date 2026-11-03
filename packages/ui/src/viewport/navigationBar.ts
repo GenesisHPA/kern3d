@@ -3,9 +3,12 @@
 
 import {
     CAMERA_FLY_DURATION,
+    Config,
     I18n,
     type I18nKeys,
     type IView,
+    type OrbitMode,
+    OrbitModes,
     PubSub,
     type ViewMode,
     ViewModeI18nKeys,
@@ -20,8 +23,14 @@ export type NavigationMode = "orbit" | "pan" | "zoom";
 
 const ROTATE_SCALE = 4;
 
+const OrbitModeLabels: Record<OrbitMode, I18nKeys> = {
+    turntable: "common.orbitMode.turntable",
+    trackball: "common.orbitMode.trackball",
+};
+
 /**
- * The bar at the bottom centre of the canvas: orbit / pan / zoom drag modes, fit, the display
+ * The bar at the bottom centre of the canvas: orbit / pan / zoom drag modes (the orbit's arrow
+ * picks turntable or free orbit), fit, the display
  * mode, perspective or orthographic, the ground grid, and section analysis. A drag mode stays on
  * until its button is pressed again or Esc; it takes the left button over the canvas before the
  * view's own handlers see it, so selection and commands are untouched while it is off.
@@ -33,6 +42,7 @@ export class NavigationBar extends HTMLElement {
     private readonly sectionButton: HTMLElement;
     private readonly cameraButton: HTMLElement;
     private readonly displayMenu = div({ className: style.popup });
+    private readonly orbitMenu = div({ className: style.popup });
     private last?: { x: number; y: number };
 
     constructor(readonly view: IView) {
@@ -45,10 +55,23 @@ export class NavigationBar extends HTMLElement {
             "navbar.camera",
             () => this.toggleCamera(),
         );
-        const display = this.button("display", "navbar.displayMode", () => this.toggleDisplayMenu());
+        const display = this.button("display", "navbar.displayMode", () =>
+            this.toggleMenu(this.displayMenu, () => ViewModes.map((mode) => this.displayRow(mode))),
+        );
         display.append(this.displayMenu);
+        const orbitArrow = div(
+            {
+                className: `${style.button} ${style.arrow}`,
+                title: I18n.translate("common.orbitMode"),
+                onclick: () => this.toggleMenu(this.orbitMenu, () => this.orbitRows()),
+            },
+            glyph("chevronDown", style.arrowGlyph),
+        );
+        orbitArrow.dataset["nav"] = "orbitMode";
+        orbitArrow.append(this.orbitMenu);
         this.append(
             this.modeButton("orbit"),
+            orbitArrow,
             this.modeButton("pan"),
             this.modeButton("zoom"),
             this.button("fit", "navbar.fit", () => this.fit()),
@@ -72,7 +95,7 @@ export class NavigationBar extends HTMLElement {
     disconnectedCallback() {
         this.view.removePropertyChanged(this.onViewChanged);
         this.view.cameraController.removePropertyChanged?.(this.onCameraChanged);
-        this.closeDisplayMenu();
+        this.closeMenus();
         this.setMode(undefined);
     }
 
@@ -205,24 +228,44 @@ export class NavigationBar extends HTMLElement {
         this.refresh();
     }
 
-    private toggleDisplayMenu() {
-        if (this.displayMenu.classList.contains(style.open)) {
-            this.closeDisplayMenu();
-            return;
-        }
-        this.displayMenu.replaceChildren(...ViewModes.map((mode) => this.displayRow(mode)));
-        this.displayMenu.classList.add(style.open);
+    /** Opens `menu` with freshly built rows (closing any other), or closes it when open. */
+    private toggleMenu(menu: HTMLElement, rows: () => HTMLElement[]) {
+        const wasOpen = menu.classList.contains(style.open);
+        this.closeMenus();
+        if (wasOpen) return;
+        menu.replaceChildren(...rows());
+        menu.classList.add(style.open);
         document.addEventListener("pointerdown", this.onOutsideMenu, true);
     }
 
-    private closeDisplayMenu() {
+    private closeMenus() {
         this.displayMenu.classList.remove(style.open);
+        this.orbitMenu.classList.remove(style.open);
         document.removeEventListener("pointerdown", this.onOutsideMenu, true);
     }
 
     private readonly onOutsideMenu = (e: PointerEvent) => {
-        if (!this.contains(e.target as Node)) this.closeDisplayMenu();
+        if (!this.contains(e.target as Node)) this.closeMenus();
     };
+
+    private orbitRows() {
+        return OrbitModes.map((mode) => {
+            const active = mode === Config.instance.orbitMode;
+            const row = div(
+                {
+                    className: active ? `${style.popupRow} ${style.active}` : style.popupRow,
+                    onclick: (e) => {
+                        e.stopPropagation();
+                        Config.instance.orbitMode = mode;
+                        this.closeMenus();
+                    },
+                },
+                span({ textContent: I18n.translate(OrbitModeLabels[mode]) }),
+            );
+            row.dataset["orbitMode"] = mode;
+            return row;
+        });
+    }
 
     private displayRow(mode: ViewMode) {
         const row = div(
@@ -232,7 +275,7 @@ export class NavigationBar extends HTMLElement {
                     e.stopPropagation();
                     this.view.mode = mode;
                     this.view.update();
-                    this.closeDisplayMenu();
+                    this.closeMenus();
                 },
             },
             span({ textContent: I18n.translate(ViewModeI18nKeys[mode]) }),

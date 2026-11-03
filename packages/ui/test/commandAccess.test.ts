@@ -5,6 +5,7 @@ import {
     type CommandData,
     type CommandKeys,
     CommandStore,
+    Config,
     type IApplication,
     type IView,
     PubSub,
@@ -246,6 +247,21 @@ describe("NavigationBar", () => {
         host.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 10, clientY: 10 }));
         window.dispatchEvent(new PointerEvent("pointermove", { clientX: 20, clientY: 20 }));
         expect(camera.rotate).not.toHaveBeenCalled();
+    });
+
+    test("the orbit arrow picks turntable or free orbit", () => {
+        const previous = Config.instance.orbitMode;
+        try {
+            const { bar } = makeBar();
+            Config.instance.orbitMode = "turntable";
+            (bar.querySelector('[data-nav="orbitMode"]') as HTMLElement).click();
+            const rows = Array.from(bar.querySelectorAll<HTMLElement>("[data-orbit-mode]"));
+            expect(rows.map((row) => row.dataset["orbitMode"])).toEqual(["turntable", "trackball"]);
+            rows[1].click();
+            expect(Config.instance.orbitMode).toBe("trackball");
+        } finally {
+            Config.instance.orbitMode = previous;
+        }
     });
 
     test("the grid button toggles the view's grid", () => {
