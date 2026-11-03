@@ -3,6 +3,7 @@
 
 import OpenAI from "openai";
 import type { LLMConfig } from "../settings";
+import { fetchWithoutSdkHeaders } from "./browserFetch";
 import {
     type ChatMessage,
     flattenSystem,
@@ -27,6 +28,7 @@ export class CompletionsProvider implements LLMProvider {
             apiKey: config.apiKey,
             baseURL: (config.baseURL ?? "https://api.openai.com/v1").replace(/\/+$/, ""),
             dangerouslyAllowBrowser: true,
+            fetch: fetchWithoutSdkHeaders,
         });
     }
 
