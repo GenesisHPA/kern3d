@@ -23,7 +23,7 @@ class Body extends VisualNode {
         super(document, "body", "body-id");
     }
     display(): I18nKeys {
-        return "common.ok";
+        return "common.name";
     }
     boundingBox() {
         return new BoundingBox(XYZ.zero, XYZ.zero);
