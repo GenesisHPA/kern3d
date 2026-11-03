@@ -218,13 +218,14 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
             {
                 groupName: "ribbon.group.assemble",
                 items: [
+                    "assemble.newComponent",
+                    "assemble.joint",
                     "modify.moveCopy",
                     "modify.align",
-                    "modify.move",
-                    "modify.rotate",
-                    "modify.mirror",
-                    "modify.array",
-                    ["modify.detach"],
+                    "assemble.asBuiltJoint",
+                    "assemble.driveJoint",
+                    ["modify.move", "modify.rotate", "modify.mirror"],
+                    ["modify.array", "modify.detach", "assemble.activateComponent"],
                 ],
             },
             {

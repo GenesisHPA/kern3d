@@ -250,13 +250,34 @@ describe("ParametricRibbonProfiles", () => {
         const group = tab!.groups.find((g) => g.groupName === "ribbon.group.assemble");
         expect(group).toBeDefined();
         expect(flattenItems(group!.items)).toEqual([
+            "assemble.newComponent",
+            "assemble.joint",
             "modify.moveCopy",
             "modify.align",
+            "assemble.asBuiltJoint",
+            "assemble.driveJoint",
             "modify.move",
             "modify.rotate",
             "modify.mirror",
             "modify.array",
             "modify.detach",
+            "assemble.activateComponent",
+        ]);
+    });
+
+    test("leads the assemble group with the component and joint icons", () => {
+        // The toolbar shows a group's top-level single commands as icons (up to eight); the
+        // stacks hold the rest.
+        const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
+        const group = tab!.groups.find((g) => g.groupName === "ribbon.group.assemble")!;
+        const singles = group.items.filter((item) => typeof item === "string");
+        expect(singles).toEqual([
+            "assemble.newComponent",
+            "assemble.joint",
+            "modify.moveCopy",
+            "modify.align",
+            "assemble.asBuiltJoint",
+            "assemble.driveJoint",
         ]);
     });
 
