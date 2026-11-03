@@ -135,15 +135,19 @@ export class PlaneNode extends ParameterShapeNode implements IPlaneNode {
         );
     }
 
-    /** Rotation angle in degrees, only for `lineAngle` definitions; the row hides otherwise. */
+    /** Rotation angle in degrees, only for `lineAngle`/`tangent` definitions; the row hides otherwise. */
     @property("common.angle", { unit: ANGLE_UNITS })
     get angle(): number | undefined {
         const definition = this.definition;
-        return definition.kind === "lineAngle" ? definition.angle : undefined;
+        return definition.kind === "lineAngle" || definition.kind === "tangent"
+            ? definition.angle
+            : undefined;
     }
     set angle(value: number) {
         this.updateDefinition((definition) =>
-            definition.kind === "lineAngle" ? { ...definition, angle: value } : definition,
+            definition.kind === "lineAngle" || definition.kind === "tangent"
+                ? { ...definition, angle: value }
+                : definition,
         );
     }
 
@@ -427,6 +431,8 @@ export class PlaneNode extends ParameterShapeNode implements IPlaneNode {
             property !== "shape" &&
             property !== "transform" &&
             property !== "plane" &&
+            property !== "axisLine" &&
+            property !== "pointPosition" &&
             property !== "definitionJson"
         ) {
             return;
@@ -707,6 +713,9 @@ export function definitionNodeIds(definition: PlaneDefinition): Set<string> {
             break;
         case "curvePoint":
             ids.push(definition.curve.nodeId, definition.point.nodeId);
+            break;
+        case "tangent":
+            ids.push(definition.face.nodeId);
             break;
     }
     return new Set(ids.filter((id): id is string => id !== undefined));

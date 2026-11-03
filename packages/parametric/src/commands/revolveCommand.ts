@@ -13,7 +13,6 @@ import {
     type IFace,
     type ILine,
     type IStep,
-    isReferenceGeometryNode,
     Line,
     LineEdgeFilter,
     MultistepCommand,
@@ -43,6 +42,7 @@ import {
     targetCandidate,
 } from "./booleanTargets";
 import { SelectSketchProfilesStep } from "./extrudeCommand";
+import { AXIS_OR_MODEL_NODES } from "./patternSources";
 
 const OPERATION_NEW: I18nKeys = "option.command.operation.new";
 
@@ -176,6 +176,9 @@ export class RevolveFeatureCommand extends MultistepCommand {
             new SelectSketchProfilesStep((node) => node instanceof SketchNode),
             new SelectShapeStep(ShapeTypes.edge, "prompt.select.axis", {
                 shapeFilter: new LineEdgeFilter(),
+                // A construction axis is the one reference geometry a revolve may turn about.
+                allowReferenceGeometry: true,
+                nodeFilter: AXIS_OR_MODEL_NODES,
                 keepSelection: true,
                 highlightState: VisualStates.edgeHighlight,
                 selectedState: VisualStates.edgeSelected,
@@ -285,7 +288,7 @@ export class RevolveFeatureCommand extends MultistepCommand {
     private axisSource(): Pick<RevolveFeatureData, "axisSource"> {
         const data = this.stepDatas[1].shapes[0];
         const node = data.owner.node;
-        if (!(node instanceof ShapeNode) || isReferenceGeometryNode(node)) return {};
+        if (!(node instanceof ShapeNode) || !AXIS_OR_MODEL_NODES.allow(node)) return {};
         return {
             axisSource: { nodeId: node.id, edge: captureEdgeRef(data.shape as unknown as IEdge) },
         };

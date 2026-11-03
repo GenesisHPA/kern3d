@@ -59,7 +59,7 @@ import {
     type PatternStepHandler,
     pathFramesFromPicks,
 } from "./patternSession";
-import { capturePatternLineSource, capturePatternPathSource } from "./patternSources";
+import { AXIS_OR_MODEL_NODES, capturePatternLineSource, capturePatternPathSource } from "./patternSources";
 
 /**
  * The shared flow of the three pattern commands: pick the parametric body (or take the selected
@@ -166,6 +166,9 @@ abstract class PatternFeatureCommand extends MultistepCommand {
                 this.mode === "linear" ? "prompt.select.lineEdge" : "prompt.select.axis",
                 {
                     shapeFilter: new LineEdgeFilter(),
+                    // A construction axis is the one reference geometry a pattern runs along.
+                    allowReferenceGeometry: true,
+                    nodeFilter: AXIS_OR_MODEL_NODES,
                     keepSelection: true,
                     highlightState: VisualStates.edgeHighlight,
                     selectedState: VisualStates.edgeSelected,

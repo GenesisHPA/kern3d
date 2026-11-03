@@ -213,10 +213,14 @@ describe("RevolveFeatureCommand axis step", () => {
         expect(step.options.multiple).toBeUndefined();
     });
 
-    test("the axis step accepts line edges of any node, not just the sketch", () => {
+    test("the axis step accepts line edges of any node and construction axes, not datum planes", () => {
         const step = axisStep() as any;
-        // Reference geometry is excluded by the step's default gate.
-        expect(step.options.nodeFilter).toBeUndefined();
+        const allow = step.options.nodeFilter.allow;
+        expect(step.options.allowReferenceGeometry).toBe(true);
+        expect(allow({ isReferenceGeometry: false })).toBe(true);
+        // A datum axis is the one reference geometry admitted; a datum plane stays out.
+        expect(allow({ isReferenceGeometry: true, worldAxis: () => undefined })).toBe(true);
+        expect(allow({ isReferenceGeometry: true })).toBe(false);
     });
 
     test("the axis step accepts only line edges", () => {

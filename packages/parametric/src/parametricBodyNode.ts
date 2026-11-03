@@ -50,6 +50,7 @@ import {
     ProfileReselectSession,
     RibChainReselectSession,
 } from "./commands/reselectSession";
+import { isDatumAxisNode, isDatumPointNode } from "./datum/datumContract";
 import {
     dependencyFeatures,
     dependentFeatures,
@@ -1842,7 +1843,7 @@ export class ParametricBodyNode
             }
             if (this._watched.has(id)) continue;
             const node = this.document.modelManager.findNode((candidate) => candidate.id === id);
-            if (isPlaneNode(node)) planes.add(id);
+            if (isPlaneNode(node) || isDatumAxisNode(node) || isDatumPointNode(node)) planes.add(id);
         }
         syncNodeWatches(
             this.document,
@@ -1870,7 +1871,15 @@ export class ParametricBodyNode
      * kept for consistency with other nodes. Its display rectangle's `shape` is ignored.
      */
     private readonly handlePlaneSourceChanged = (property: string) => {
-        if (property !== "plane" && property !== "transform") return;
+        // A datum axis/point emits `axisLine`/`pointPosition` the same way, for the same reason.
+        if (
+            property !== "plane" &&
+            property !== "axisLine" &&
+            property !== "pointPosition" &&
+            property !== "transform"
+        ) {
+            return;
+        }
         this.rebuildFromUpstream();
     };
 

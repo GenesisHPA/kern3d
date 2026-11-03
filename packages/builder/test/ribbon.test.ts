@@ -245,6 +245,27 @@ describe("ParametricRibbonProfiles", () => {
         ]);
     });
 
+    test("the construct group shows plane, axis, point and the working plane as its icons", () => {
+        const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric")!;
+        const group = tab.groups.find((g) => g.groupName === "ribbon.group.construct")!;
+        // The toolbar shows a group's top-level commands as its icons, the rest in its dropdown.
+        expect(group.items.filter((item) => !Array.isArray(item))).toEqual([
+            "feature.plane",
+            "feature.axis",
+            "feature.point",
+            "workingPlane.set",
+        ]);
+        expect(flattenItems(group.items)).toEqual([
+            "feature.plane",
+            "feature.axis",
+            "feature.point",
+            "workingPlane.set",
+            "workingPlane.alignToPlane",
+            "workingPlane.fromSection",
+            "workingPlane.toggleDynamic",
+        ]);
+    });
+
     test("should keep the node placement operations in the assemble group", () => {
         const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
         const group = tab!.groups.find((g) => g.groupName === "ribbon.group.assemble");
@@ -279,6 +300,8 @@ describe("ParametricRibbonProfiles", () => {
         const allItems = flattenItems(parametricTabs[0].groups.flatMap((g) => g.items));
         for (const key of [
             "feature.plane",
+            "feature.axis",
+            "feature.point",
             "feature.variable",
             "inspect.section",
             "inspect.interference",

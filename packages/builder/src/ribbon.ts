@@ -231,10 +231,10 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                 groupName: "ribbon.group.construct",
                 items: [
                     "feature.plane",
+                    "feature.axis",
+                    "feature.point",
                     "workingPlane.set",
-                    "workingPlane.alignToPlane",
-                    "workingPlane.fromSection",
-                    ["workingPlane.toggleDynamic"],
+                    ["workingPlane.alignToPlane", "workingPlane.fromSection", "workingPlane.toggleDynamic"],
                 ],
             },
             {

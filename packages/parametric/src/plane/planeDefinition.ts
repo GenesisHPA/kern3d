@@ -7,7 +7,6 @@ import {
     type IEdge,
     type IShape,
     type IVertex,
-    Matrix4,
     Plane,
     Precision,
     Result,
@@ -15,20 +14,14 @@ import {
     XYZ,
     type XYZLike,
 } from "@chili3d/core";
-import { matchEdgeIndexes, matchEdgesAnchored } from "../features/edgeMatcher";
+import { faceNormalAt, perpendicularTo, revolutionAxisOfFace, rotateAbout } from "../datum/surfaceGeometry";
 import { captureEdgeRef, type EdgeRef } from "../features/edgeRef";
 import type { NeutralPlaneRef } from "../features/feature";
-import { distance, MATCH_TOLERANCE, plainVec } from "../features/refGeometry";
-import { matchVertex, type VertexRef } from "../features/vertexRef";
+import { MATCH_TOLERANCE, plainVec } from "../features/refGeometry";
+import type { VertexRef } from "../features/vertexRef";
 import { worldAxisXVec } from "../sketch/planeRef";
-import { shapeSourceOf } from "../sketch/shapeSource";
-import {
-    ROLLED_BACK_SOURCE,
-    resolveTimelineSource,
-    SOURCE_UNAVAILABLE,
-    type TimelineSource,
-} from "../sketch/sourceTimeline";
 import { resolvePlaneSourceInWorld } from "./planeSource";
+import { type FaceSourceRef, resolvePoint, withEdge, withFace, withNearestCurve } from "./sourceRefs";
 
 /**
  * A stable identity for a vertex on an edge: the edge's fingerprint plus which END the
@@ -174,6 +167,18 @@ export type PlaneDefinition =
           readonly point: PointRef;
           /** The captured tangent, so a rebuild's flipped curve direction does not flip the normal. */
           readonly tangent?: XYZLike;
+      } & PlaneDefinitionBase)
+    | ({
+          readonly kind: "tangent";
+          /** A cylindrical/conical (any axis-of-revolution) face the plane touches. */
+          readonly face: FaceSourceRef;
+          /**
+           * Where on the face the pick landed, in the face source's LOCAL frame: the line of
+           * contact at angle 0. A rebuild that moves the face carries the point with it.
+           */
+          readonly at: XYZLike;
+          /** Rotation of the line of contact about the face's axis, in degrees. */
+          readonly angle: number;
       } & PlaneDefinitionBase);
 
 /**
@@ -229,6 +234,8 @@ export function resolvePlaneDefinition(
                 return midPlaneDefinition(definition, document, visited);
             case "curvePoint":
                 return curvePointDefinition(definition, document, visited);
+            case "tangent":
+                return tangentDefinition(definition, document);
             default:
                 return Result.err(
                     `Unknown plane definition: ${String((definition as { kind?: string }).kind)}`,
@@ -271,7 +278,7 @@ function planePointDefinition(
 ): Result<Plane> {
     const source = sourcePlane(document, definition.source, definition.anchors, "Plane", visited);
     if (!source.isOk) return source;
-    const point = resolvePoint(document, definition.point, definition.anchors, "Plane");
+    const point = resolvePoint(document, definition.point, definition.anchors, "Plane", visited);
     if (!point.isOk) return Result.err(point.error);
     return Result.ok(applyFlip(canonicalFrame(point.value, source.value.normal), definition.flip));
 }
@@ -279,17 +286,24 @@ function planePointDefinition(
 function pointNormalDefinition(
     definition: Extract<PlaneDefinition, { kind: "pointNormal" }>,
     document: IDocument,
-    _visited: ReadonlySet<string> | undefined,
+    visited: ReadonlySet<string> | undefined,
 ): Result<Plane> {
-    const point = resolvePoint(document, definition.point, definition.anchors, "Plane");
+    const point = resolvePoint(document, definition.point, definition.anchors, "Plane", visited);
     if (!point.isOk) return Result.err(point.error);
-    const axis = withEdge(document, definition.axis, definition.anchors, "Plane", (edge, transform) => {
-        const resolved = axisOfEdge(edge);
-        if (!resolved.isOk || definition.direction === undefined) return resolved;
-        // The captured direction lives in the source's LOCAL frame, like the edge ref.
-        const captured = transform.ofVector(new XYZ(definition.direction));
-        return Result.ok(resolved.value.dot(captured) < 0 ? resolved.value.reverse() : resolved.value);
-    });
+    const axis = withEdge(
+        document,
+        definition.axis,
+        definition.anchors,
+        "Plane",
+        (edge, transform) => {
+            const resolved = axisOfEdge(edge);
+            if (!resolved.isOk || definition.direction === undefined) return resolved;
+            // The captured direction lives in the source's LOCAL frame, like the edge ref.
+            const captured = transform.ofVector(new XYZ(definition.direction));
+            return Result.ok(resolved.value.dot(captured) < 0 ? resolved.value.reverse() : resolved.value);
+        },
+        visited,
+    );
     if (!axis.isOk) return Result.err(axis.error);
     const plane = planeAtPoint(point.value, axis.value);
     return plane.isOk ? Result.ok(applyFlip(plane.value, definition.flip)) : plane;
@@ -303,25 +317,32 @@ function lineAngleDefinition(
     if (!Number.isFinite(definition.angle)) {
         return Result.err("Plane angle is not a finite number");
     }
-    const line = withEdge(document, definition.line, definition.anchors, "Plane", (edge, transform) => {
-        if (!isLineEdge(edge)) return Result.err("Line angle requires a straight edge");
-        let start = edge.startPoint();
-        let end = edge.endPoint();
-        let direction = end.sub(start);
-        // The captured direction is in the source's LOCAL frame; a rebuild may return the
-        // same geometric edge with a flipped parameterization. Aligning the direction must
-        // also move the origin to what was the captured start, or the plane origin jumps
-        // to the other end of the line.
-        const captured =
-            definition.direction === undefined
-                ? undefined
-                : transform.ofVector(new XYZ(definition.direction));
-        if (captured !== undefined && direction.dot(captured) < 0) {
-            [start, end] = [end, start];
-            direction = direction.reverse();
-        }
-        return Result.ok({ point: start, direction });
-    });
+    const line = withEdge(
+        document,
+        definition.line,
+        definition.anchors,
+        "Plane",
+        (edge, transform) => {
+            if (!isLineEdge(edge)) return Result.err("Line angle requires a straight edge");
+            let start = edge.startPoint();
+            let end = edge.endPoint();
+            let direction = end.sub(start);
+            // The captured direction is in the source's LOCAL frame; a rebuild may return the
+            // same geometric edge with a flipped parameterization. Aligning the direction must
+            // also move the origin to what was the captured start, or the plane origin jumps
+            // to the other end of the line.
+            const captured =
+                definition.direction === undefined
+                    ? undefined
+                    : transform.ofVector(new XYZ(definition.direction));
+            if (captured !== undefined && direction.dot(captured) < 0) {
+                [start, end] = [end, start];
+                direction = direction.reverse();
+            }
+            return Result.ok({ point: start, direction });
+        },
+        visited,
+    );
     if (!line.isOk) return Result.err(line.error);
     const reference = sourcePlane(document, definition.reference, definition.anchors, "Plane", visited);
     if (!reference.isOk) return Result.err(reference.error);
@@ -338,11 +359,11 @@ function lineAngleDefinition(
 function threePointDefinition(
     definition: Extract<PlaneDefinition, { kind: "threePoint" }>,
     document: IDocument,
-    _visited: ReadonlySet<string> | undefined,
+    visited: ReadonlySet<string> | undefined,
 ): Result<Plane> {
     const points: XYZ[] = [];
     for (const ref of definition.points) {
-        const point = resolvePoint(document, ref, definition.anchors, "Plane");
+        const point = resolvePoint(document, ref, definition.anchors, "Plane", visited);
         if (!point.isOk) return Result.err(point.error);
         points.push(point.value);
     }
@@ -364,9 +385,9 @@ function midPlaneDefinition(
 function curvePointDefinition(
     definition: Extract<PlaneDefinition, { kind: "curvePoint" }>,
     document: IDocument,
-    _visited: ReadonlySet<string> | undefined,
+    visited: ReadonlySet<string> | undefined,
 ): Result<Plane> {
-    const point = resolvePoint(document, definition.point, definition.anchors, "Plane");
+    const point = resolvePoint(document, definition.point, definition.anchors, "Plane", visited);
     if (!point.isOk) return Result.err(point.error);
     const tangent = withNearestCurve(
         document,
@@ -382,6 +403,7 @@ function curvePointDefinition(
                 ? Result.err("Curve tangent is degenerate")
                 : Result.ok({ direction, origin: nearest.point });
         },
+        visited,
     );
     if (!tangent.isOk) return Result.err(tangent.error);
     // The picked point selects WHERE along the curve; the plane passes through that curve
@@ -392,6 +414,31 @@ function curvePointDefinition(
         definition.tangent,
         definition.flip,
     );
+}
+
+/**
+ * A plane tangent to an axis-of-revolution face (Fusion's Tangent Plane). The stored pick
+ * point is rotated about the face's axis by `angle` and projected back onto the surface;
+ * the plane touches the face there, its normal pointing away from the axis.
+ */
+function tangentDefinition(
+    definition: Extract<PlaneDefinition, { kind: "tangent" }>,
+    document: IDocument,
+): Result<Plane> {
+    if (!Number.isFinite(definition.angle)) return Result.err("Plane angle is not a finite number");
+    return withFace(document, definition.face, definition.anchors, "Plane", (face, transform) => {
+        const axis = revolutionAxisOfFace(face);
+        if (!axis.isOk) return Result.err("Tangent plane requires a cylindrical or conical face");
+        const at = transform.ofPoint(new XYZ(definition.at));
+        const radians = (definition.angle * Math.PI) / 180;
+        const rotated = rotateAbout(at, axis.value.point, axis.value.direction, radians);
+        const touch = faceNormalAt(face, rotated);
+        if (!touch.isOk) return Result.err(touch.error);
+        const radial = perpendicularTo(touch.value.point.sub(axis.value.point), axis.value.direction);
+        const normal = radial.dot(touch.value.normal) < 0 ? touch.value.normal.reverse() : touch.value.normal;
+        const plane = planeAtPoint(touch.value.point, normal);
+        return plane.isOk ? Result.ok(applyFlip(plane.value, definition.flip)) : plane;
+    });
 }
 
 // ---------------------------------------------------------------------------------------
@@ -487,204 +534,6 @@ export function curvePointPlane(
     }
     const plane = planeAtPoint(point, normal);
     return plane.isOk ? Result.ok(applyFlip(plane.value, flip)) : plane;
-}
-
-// ---------------------------------------------------------------------------------------
-// Reference resolution
-// ---------------------------------------------------------------------------------------
-
-interface ResolvedSourceShape {
-    /** The source node's own shape; every stored point/edge ref lives in this frame. */
-    readonly local: IShape;
-    /** The source node's world placement, applied only after a ref has been matched. */
-    readonly transform: Matrix4;
-    readonly edgeIds?: readonly (string | undefined)[];
-}
-
-/**
- * The world-space shape of `nodeId`, read at `anchor` when the node is a parametric body.
- * A transformed copy is owned by the caller and disposed after use.
- */
-function resolveSourceShape(
-    document: IDocument,
-    nodeId: string,
-    anchors: PlaneDefinitionBase["anchors"],
-    label: string,
-): Result<ResolvedSourceShape> {
-    try {
-        const source = resolveTimelineSource(document, nodeId, anchors?.[nodeId]);
-        if (source === ROLLED_BACK_SOURCE) return Result.err(`${label} source is rolled back`);
-        if (source === SOURCE_UNAVAILABLE) return Result.err(`${label} source not found`);
-        const base = shapeSourceOf(document, source.node, source.shape);
-        return Result.ok({
-            local: base.shape,
-            transform: base.transform,
-            edgeIds: edgeIdsOf(source),
-        });
-    } catch (error) {
-        return Result.err(`${label} source could not be read: ${String(error)}`);
-    }
-}
-
-function edgeIdsOf(source: TimelineSource): readonly (string | undefined)[] | undefined {
-    if (source.standIn) return source.edgeIds;
-    const tracking = source.node as unknown as { edgeIdAt?: (index: number) => string | undefined };
-    if (tracking.edgeIdAt === undefined) return undefined;
-    const edgeIdAt = tracking.edgeIdAt.bind(tracking);
-    const edges = source.shape.findSubShapes(ShapeTypes.edge) as IEdge[];
-    return edges.map((_, index) => edgeIdAt(index));
-}
-
-function resolvePoint(
-    document: IDocument,
-    ref: PointRef,
-    anchors: PlaneDefinitionBase["anchors"],
-    label: string,
-): Result<XYZ> {
-    const source = resolveSourceShape(document, ref.nodeId, anchors, label);
-    if (!source.isOk) return Result.err(source.error);
-    try {
-        // Topology first: an incident edge's tracked id names the vertex across upstream
-        // parameter edits. The positional match is the fallback for an edge-less vertex
-        // (or a lost edge) and for documents saved before the incidence was captured.
-        const anchored = resolveIncidentPoint(source.value, ref.incident);
-        if (anchored !== undefined) return Result.ok(source.value.transform.ofPoint(anchored));
-        const vertex = matchVertex(source.value.local, ref.vertex);
-        return vertex === undefined
-            ? Result.err(`${label} point not found after rebuild`)
-            : Result.ok(source.value.transform.ofPoint(vertex.point()));
-    } catch (error) {
-        return Result.err(`${label} point could not be read: ${String(error)}`);
-    }
-}
-
-function withEdge<T>(
-    document: IDocument,
-    ref: EdgeSourceRef,
-    anchors: PlaneDefinitionBase["anchors"],
-    label: string,
-    use: (edge: IEdge, transform: Matrix4) => Result<T>,
-): Result<T> {
-    const source = resolveSourceShape(document, ref.nodeId, anchors, label);
-    if (!source.isOk) return Result.err(source.error);
-    try {
-        // The ref lives in the source's LOCAL frame, so a moved source still matches by
-        // id/fingerprint; only the matched edge is carried into world coordinates.
-        const indexes = matchEdgeIndexesIn(source.value.local, source.value.edgeIds, ref);
-        if (!indexes.isOk) return Result.err(`${label} edge not found after rebuild`);
-        const edges = source.value.local.findSubShapes(ShapeTypes.edge) as IEdge[];
-        const worldEdge = worldEdgeOf(edges[indexes.value[0]], source.value.transform);
-        try {
-            return use(worldEdge, source.value.transform);
-        } catch (error) {
-            return Result.err(`${label} edge could not be read: ${String(error)}`);
-        } finally {
-            if (worldEdge !== edges[indexes.value[0]]) worldEdge.dispose();
-        }
-    } catch (error) {
-        return Result.err(`${label} edge could not be read: ${String(error)}`);
-    }
-}
-
-/** The source's edge in world coordinates (itself when the source sits at identity). */
-function worldEdgeOf(edge: IEdge, transform: Matrix4): IEdge {
-    return transform.equals(Matrix4.identity()) ? edge : (edge.transformedMul(transform) as IEdge);
-}
-
-/**
- * A curve ref may have been split into several pieces sharing one tracked id. The caller
- * that needs a point on the curve (curve-point) must search ALL of them; taking the first
- * would measure against a piece the picked point is not on.
- */
-function withNearestCurve<T>(
-    document: IDocument,
-    ref: EdgeSourceRef,
-    anchors: PlaneDefinitionBase["anchors"],
-    point: XYZ,
-    label: string,
-    use: (edge: IEdge) => Result<T>,
-): Result<T> {
-    const source = resolveSourceShape(document, ref.nodeId, anchors, label);
-    if (!source.isOk) return Result.err(source.error);
-    const owned: IEdge[] = [];
-    try {
-        const indexes = matchEdgeIndexesIn(source.value.local, source.value.edgeIds, ref);
-        if (!indexes.isOk) return Result.err(`${label} curve not found after rebuild`);
-        const edges = source.value.local.findSubShapes(ShapeTypes.edge) as IEdge[];
-        let nearest: { edge: IEdge; distance: number } | undefined;
-        for (const index of indexes.value) {
-            const edge = worldEdgeOf(edges[index], source.value.transform);
-            if (edge !== edges[index]) owned.push(edge);
-            const candidate = edge.curve.nearestFromPoint(point);
-            if (nearest === undefined || candidate.distance < nearest.distance) {
-                nearest = { edge, distance: candidate.distance };
-            }
-        }
-        if (nearest === undefined) return Result.err(`${label} curve not found after rebuild`);
-        return use(nearest.edge);
-    } catch (error) {
-        return Result.err(`${label} curve could not be read: ${String(error)}`);
-    } finally {
-        for (const edge of owned) edge.dispose();
-    }
-}
-
-/** Edge matching inside one shape: tracked ids first, the geometric fingerprint second. */
-function matchEdgeIndexesIn(
-    shape: IShape,
-    edgeIds: readonly (string | undefined)[] | undefined,
-    ref: EdgeSourceRef,
-): Result<number[]> {
-    if (edgeIds !== undefined) {
-        const anchored = matchEdgesAnchored(shape, [ref.edge], edgeIds);
-        if (anchored.isOk) return Result.ok(anchored.value.indexes);
-    }
-    const matched = matchEdgeIndexes(shape, [ref.edge]);
-    return matched.isOk ? Result.ok(matched.value) : Result.err(matched.error);
-}
-
-/**
- * The vertex named by an incident edge. The stored endpoints decide which physical end
- * is the vertex even when a rebuild flipped the edge's parameterization; a split edge's
- * pieces are searched for the endpoint nearest the captured one.
- */
-function resolveIncidentPoint(
-    source: ResolvedSourceShape,
-    incident: readonly VertexAnchor[] | undefined,
-): XYZ | undefined {
-    if (incident === undefined) return undefined;
-    const edges = source.local.findSubShapes(ShapeTypes.edge) as IEdge[];
-    for (const anchor of incident) {
-        const indexes = matchEdgeIndexesIn(source.local, source.edgeIds, { nodeId: "", edge: anchor.edge });
-        if (!indexes.isOk || indexes.value.length === 0) continue;
-        if (indexes.value.length === 1) {
-            return endpointNear(edges[indexes.value[0]], anchor);
-        }
-        const captured = anchor.ends[anchor.end];
-        let best: XYZ | undefined;
-        let bestDistance = Infinity;
-        for (const index of indexes.value) {
-            for (const point of [edges[index].startPoint(), edges[index].endPoint()]) {
-                const candidate = distance(point, captured);
-                if (candidate < bestDistance) {
-                    best = point;
-                    bestDistance = candidate;
-                }
-            }
-        }
-        if (best !== undefined) return best;
-    }
-    return undefined;
-}
-
-function endpointNear(edge: IEdge, anchor: VertexAnchor): XYZ {
-    const start = edge.startPoint();
-    const end = edge.endPoint();
-    const [capturedStart, capturedEnd] = anchor.ends;
-    const direct = distance(start, capturedStart) + distance(end, capturedEnd);
-    const flipped = distance(start, capturedEnd) + distance(end, capturedStart);
-    const chosen = direct <= flipped ? anchor.end : anchor.end === 0 ? 1 : 0;
-    return chosen === 0 ? start : end;
 }
 
 function isLineEdge(edge: IEdge): boolean {
