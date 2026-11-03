@@ -114,7 +114,7 @@ function faceFrame(
 }
 
 /** A trimmed surface wraps the one whose type matters; the wrapper is disposed here. */
-function unwrapSurface(surface: ISurface): ISurface {
+export function unwrapSurface(surface: ISurface): ISurface {
     const trimmed = surface as ISurface & { basisSurface?: () => ISurface };
     if (typeof trimmed.basisSurface !== "function") return surface;
     const basis = trimmed.basisSurface();
@@ -122,7 +122,7 @@ function unwrapSurface(surface: ISurface): ISurface {
     return basis;
 }
 
-interface CylinderLike extends ISurface {
+export interface CylinderLike extends ISurface {
     readonly location: XYZ;
     readonly axis: XYZ;
     readonly radius: number;
@@ -132,7 +132,7 @@ interface CylinderLike extends ISurface {
  * Core exposes no surface-type tag, so a cylinder is recognised by shape: an elementary
  * surface with a radius that is neither a cone (`semiAngle`) nor a sphere (`volume`).
  */
-function isCylinder(surface: ISurface): surface is CylinderLike {
+export function isCylinder(surface: ISurface): surface is CylinderLike {
     const candidate = surface as Partial<CylinderLike> & { semiAngle?: number; volume?: unknown };
     return (
         typeof candidate.radius === "number" &&

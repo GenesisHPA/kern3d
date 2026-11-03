@@ -77,7 +77,14 @@ export abstract class VisualNode extends Node {
         if (visual) {
             return visual.worldTransform();
         }
-        return this.transform;
+        // Not displayed (yet): compose the groups above it — an assembly component's
+        // placement moves its bodies whether or not a viewport has drawn them.
+        let world = this.transform;
+        for (let parent = this.parent; parent !== undefined; parent = parent.parent) {
+            const placement = (parent as { transform?: unknown }).transform;
+            if (placement instanceof Matrix4) world = world.multiply(placement);
+        }
+        return world;
     }
 
     protected onVisibleChanged(): void {

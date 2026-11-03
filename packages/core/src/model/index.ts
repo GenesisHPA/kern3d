@@ -3,6 +3,7 @@
 
 export * from "./annotation";
 export * from "./annotationAssociation";
+export * from "./assemblyComponentNode";
 export * from "./bodyInstanceNode";
 export * from "./childList";
 export * from "./cloneForCopy";

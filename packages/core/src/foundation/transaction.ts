@@ -13,6 +13,11 @@ export class Transaction {
         readonly name: string,
     ) {}
 
+    /** Whether `document` has a transaction open — a change made now joins it. */
+    static isActive(document: IDocument): boolean {
+        return Transaction._transactionMap.has(document);
+    }
+
     static add(document: IDocument, record: IHistoryRecord) {
         if (document.history.disabled) return;
         const arrayRecord = Transaction._transactionMap.get(document);
