@@ -7,7 +7,15 @@ import type { INode } from "./node";
  * The section of the browser panel a node is listed under. Display-only: nothing about it is
  * stored, and a node's place in the document tree is unchanged by it.
  */
-export type NodeCategory = "body" | "sketch" | "construction" | "drawing" | "annotation" | "other";
+export type NodeCategory =
+    | "body"
+    | "sketch"
+    | "construction"
+    | "component"
+    | "joint"
+    | "drawing"
+    | "annotation"
+    | "other";
 
 /** Answers the category of the nodes it knows, and undefined for every other node. */
 export type NodeCategoryRule = (node: INode) => NodeCategory | undefined;

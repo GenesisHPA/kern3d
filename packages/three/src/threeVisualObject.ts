@@ -291,8 +291,10 @@ export class GroupVisualObject extends Group implements IVisualObject {
     }
     set transform(value: Matrix4) {
         this.matrix.fromArray(value.toArray());
-        // matrixWorld is lazy (recomputed on render), but "transform" listeners read it synchronously.
-        this.updateWorldMatrix(true, false);
+        // matrixWorld is lazy (recomputed on render), but "transform" listeners read it
+        // synchronously — and a group's children move with it: an assembly component's bodies
+        // are read in their new place (`worldTransform`) right after a joint moves it.
+        this.updateWorldMatrix(true, true);
     }
 
     worldTransform(): Matrix4 {
