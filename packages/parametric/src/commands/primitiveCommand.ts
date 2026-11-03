@@ -8,7 +8,9 @@ import {
     command,
     type I18nKeys,
     Id,
+    type IFace,
     type IStep,
+    type IView,
     LENGTH_UNITS,
     type LengthAtAxisSnapData,
     LengthAtAxisStep,
@@ -16,12 +18,13 @@ import {
     MathUtils,
     MultistepCommand,
     type ParameterValue,
-    type Plane,
+    Plane,
     PointStep,
     Precision,
     PubSub,
     property,
     type ShapeMeshData,
+    ShapeTypes,
     type SnapLengthAtPlaneData,
     type SnapResult,
     type TargetCandidate,
@@ -44,6 +47,23 @@ import { FORM_FEATURE_OPERATIONS } from "./extrudeCommand";
 import { normalizeSignedRect, type RectDragData, rectDataOnPlane, signedHeightAxis } from "./primitivePick";
 
 const OPERATION_NEW: I18nKeys = "option.command.operation.new";
+
+/**
+ * The plane of the planar face a point pick landed on, in world coordinates, with its outward
+ * normal and the primitive rebuild's own x axis (`primitiveFrameXvec`), so the dragged
+ * rectangle and the stored box share one frame. Undefined when the pick touched no planar
+ * face (empty space, an edge or vertex snap, a curved face).
+ */
+export function facePlaneOfPick(step: SnapResult): Plane | undefined {
+    const data = step.shapes.find((x) => x.shape.shapeType === ShapeTypes.face);
+    if (data === undefined || step.point === undefined) return undefined;
+    const face = data.shape as IFace;
+    if (!face.surface().isPlanar()) return undefined;
+    const [, localNormal] = face.normal(0, 0);
+    const normal = data.transform.ofVector(localNormal).normalize();
+    if (normal === undefined) return undefined;
+    return new Plane({ origin: step.point, normal, xvec: primitiveFrameXvec(normal) });
+}
 
 /**
  * The placed primitives (box/cylinder/sphere/cone), placed like the app's create commands:
@@ -99,6 +119,28 @@ abstract class PrimitiveCommandBase extends MultistepCommand {
     }
     set showTargets(value: boolean) {
         this.setProperty("showTargets", value);
+    }
+
+    /**
+     * A first pick on a planar face (a chamfer's slanted face, say) puts the base on that
+     * face, the height along its outward normal — the way the hole command drills along its
+     * face. Otherwise the workplane / dynamic axis plane decides, as before.
+     */
+    protected override findPlane(view: IView, origin: XYZ, point: XYZ | undefined): Plane {
+        const face = this.pickedFacePlane();
+        if (face !== undefined) return face.translateTo(origin);
+        return super.findPlane(view, origin, point);
+    }
+
+    private facePlaneCache: { step: SnapResult; plane: Plane | undefined } | undefined;
+
+    private pickedFacePlane(): Plane | undefined {
+        const step = this.stepDatas.at(0);
+        if (step === undefined) return undefined;
+        if (this.facePlaneCache?.step !== step) {
+            this.facePlaneCache = { step, plane: facePlaneOfPick(step) };
+        }
+        return this.facePlaneCache.plane;
     }
 
     targetCandidates(): readonly TargetCandidate[] {
