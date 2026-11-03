@@ -70,6 +70,16 @@ export class PropertyView extends HTMLElement {
             controls = PropertyUtils.getProperties(Object.getPrototypeOf(nodes[0])).map((x) =>
                 propertyControl(document, nodes, x),
             );
+        } else if (
+            nodes[0] instanceof Node &&
+            !(nodes[0] instanceof VisualNode) &&
+            this.isAllElementsOfTypeFirstElement(nodes)
+        ) {
+            // A node without geometry (an assembly joint) has no parameters group: its own
+            // properties are the whole panel.
+            controls = PropertyUtils.getProperties(Object.getPrototypeOf(nodes[0])).map((x) =>
+                propertyControl(document, nodes, x),
+            );
         } else if (nodes[0] instanceof Node) {
             controls = PropertyUtils.getOwnProperties(Node.prototype).map((x) =>
                 propertyControl(document, nodes, x),

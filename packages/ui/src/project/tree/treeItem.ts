@@ -80,6 +80,8 @@ export abstract class TreeItem extends HTMLElement {
             this.setVisibleStyle(model.parentVisible);
         } else if (property === "warningCount") {
             this.refreshWarningBadge();
+        } else if (property === "icon" && this.typeIcon !== undefined && isNodeIcon(model)) {
+            setSVGIcon(this.typeIcon, model.icon);
         }
     };
 
@@ -117,8 +119,12 @@ export abstract class TreeItem extends HTMLElement {
      */
     protected createTypeIcon(): SVGSVGElement | undefined {
         if (!isNodeIcon(this.node)) return undefined;
-        return svg({ className: style.typeIcon, icon: this.node.icon });
+        this.typeIcon = svg({ className: style.typeIcon, icon: this.node.icon });
+        return this.typeIcon;
     }
+
+    /** The icon `createTypeIcon` made; a node whose icon follows its state emits `icon`. */
+    private typeIcon: SVGSVGElement | undefined;
 
     abstract mainElement(): HTMLElement;
 

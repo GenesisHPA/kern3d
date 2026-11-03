@@ -7,6 +7,7 @@ import { ColorProperty } from "./colorProperty";
 import { FontProperty } from "./fontProperty";
 import { InputProperty } from "./input";
 import { MaterialProperty } from "./materialProperty";
+import { SelectProperty } from "./selectProperty";
 
 export function basicPropertyControl(document: IDocument, objs: any[], prop: Property) {
     if (prop === undefined || objs.length === 0) return "";
@@ -21,6 +22,10 @@ export function basicPropertyControl(document: IDocument, objs: any[], prop: Pro
 
     if (prop.type === "font" && canShowFontProperty(objs, prop)) {
         return new FontProperty(document, objs, prop);
+    }
+
+    if (prop.combobox !== undefined) {
+        return new SelectProperty(document, objs, prop);
     }
 
     const value = objs[0][prop.name];

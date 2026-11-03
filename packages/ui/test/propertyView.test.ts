@@ -164,7 +164,7 @@ describe("PropertyView", () => {
             expect(panel.childElementCount).toBe(0);
         });
 
-        test("should render property controls for a Node", () => {
+        test("should render every property of a node without geometry", () => {
             const pv = new PropertyView({ className: "test-panel" });
             const doc = createMockDocument();
             const handler = pubSubRecorder.handlers.get("showProperties");
@@ -172,9 +172,10 @@ describe("PropertyView", () => {
 
             handler!(doc, [new TestNode() as unknown as INode]);
 
-            // addModel maps the mocked own properties through the propertyControl mock
+            // A plain Node (no geometry, e.g. an assembly joint) shows its whole property
+            // chain — the mocked getProperties gives two.
             const controls = pv.querySelectorAll(".pv-panel .mock-property-control");
-            expect(controls.length).toBe(1);
+            expect(controls.length).toBe(2);
         });
 
         test("shows the direct matrix for a plainly placed visual node", () => {
@@ -442,7 +443,7 @@ describe("PropertyView", () => {
             handler!({ document: doc });
 
             const controls = pv.querySelectorAll(".pv-panel .mock-property-control");
-            expect(controls.length).toBe(1);
+            expect(controls.length).toBe(2);
         });
     });
 

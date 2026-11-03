@@ -11,6 +11,7 @@ import {
     type I18nKeys,
     type IDocument,
     type INode,
+    isAssemblyComponent,
     isReferenceGeometryNode,
     Localize,
     NodeCategories,
@@ -33,6 +34,8 @@ const SECTIONS: readonly { category: NodeCategory; title: I18nKeys }[] = [
     { category: "body", title: "browser.bodies" },
     { category: "sketch", title: "browser.sketches" },
     { category: "construction", title: "browser.construction" },
+    { category: "joint", title: "browser.joints" },
+    { category: "component", title: "browser.components" },
     { category: "drawing", title: "browser.drawings" },
     { category: "annotation", title: "ribbon.group.annotation" },
     { category: "other", title: "browser.other" },
@@ -51,6 +54,7 @@ const xyz = ([x, y, z]: Triple) => new XYZ({ x, y, z });
 
 /** What a node is when no feature package claimed it. */
 function defaultCategory(node: INode): NodeCategory {
+    if (isAssemblyComponent(node)) return "component";
     if (isReferenceGeometryNode(node)) return "construction";
     if (node instanceof Annotation) return "annotation";
     if (node instanceof VisualNode) return "body";
@@ -64,18 +68,46 @@ export function browserCategory(node: INode): NodeCategory {
 /**
  * The nodes the browser lists, in document order: everything a folder holds, with folders
  * opened up (they group nodes, they are not one). A parametric body's children are its
- * consumed tools and stay with it.
+ * consumed tools and stay with it. An assembly component IS one thing: it is listed, and what it
+ * holds is listed under it (`componentRows`), not among the document's own bodies.
  */
 export function listedNodes(root: INode | undefined): INode[] {
     const result: INode[] = [];
     const visit = (node: INode | null | undefined) => {
         for (let current = node; current; current = current.nextSibling) {
-            if (current instanceof FolderNode) visit(current.firstChild);
+            if (current instanceof FolderNode && !isAssemblyComponent(current)) visit(current.firstChild);
             else result.push(current);
         }
     };
     if (root instanceof FolderNode) visit(root.firstChild);
     return result;
+}
+
+/** A component's contents as indented rows: nested components one level deeper, folders opened. */
+export function componentRows(component: FolderNode, depth = 1): { node: INode; depth: number }[] {
+    const result: { node: INode; depth: number }[] = [];
+    const visit = (node: INode | undefined, level: number) => {
+        for (let current = node; current; current = current.nextSibling) {
+            if (isAssemblyComponent(current)) {
+                result.push({ node: current, depth: level });
+                visit(current.firstChild, level + 1);
+            } else if (current instanceof FolderNode) {
+                visit(current.firstChild, level);
+            } else {
+                result.push({ node: current, depth: level });
+            }
+        }
+    };
+    visit(component.firstChild, depth);
+    return result;
+}
+
+/** A component directly in the document (the section eye toggles those; nested ones follow). */
+function isTopLevelComponent(node: INode): boolean {
+    for (let parent = node.parent; parent !== undefined; parent = parent.parent) {
+        if (isAssemblyComponent(parent)) return false;
+    }
+    return isAssemblyComponent(node);
 }
 
 class BrowserSection {
@@ -141,6 +173,8 @@ class BrowserSection {
  */
 export class BrowserView extends HTMLElement {
     private readonly rows = new Map<INode, TreeModel>();
+    /** The section each row is in — a body inside a component is in the component's. */
+    private readonly rowSections = new Map<INode, NodeCategory>();
     private readonly sections = new Map<NodeCategory, BrowserSection>();
     private selected = new Set<INode>();
 
@@ -240,29 +274,38 @@ export class BrowserView extends HTMLElement {
 
     /** Brings the rows in line with the document: adds, removes and reorders, nothing else. */
     readonly reconcile = () => {
-        const wanted = new Map<NodeCategory, INode[]>();
+        const wanted = new Map<NodeCategory, { node: INode; depth: number }[]>();
+        let components = 0;
         for (const node of listedNodes(this.document.modelManager.rootNode)) {
             const category = browserCategory(node);
             const list = wanted.get(category) ?? [];
-            list.push(node);
+            list.push({ node, depth: 0 });
+            if (isAssemblyComponent(node)) {
+                components += 1;
+                list.push(...componentRows(node));
+            }
             wanted.set(category, list);
         }
         const keep = new Set<INode>();
         for (const [category, section] of this.sections) {
-            const nodes = wanted.get(category) ?? [];
-            nodes.forEach((node, index) => {
+            const entries = wanted.get(category) ?? [];
+            entries.forEach(({ node, depth }, index) => {
                 keep.add(node);
+                this.rowSections.set(node, category);
                 const row = this.ensureRow(node);
+                row.style.paddingLeft = depth === 0 ? "" : `${20 + depth * 14}px`;
                 if (section.rows.children[index] !== row) {
                     section.rows.insertBefore(row, section.rows.children[index] ?? null);
                 }
             });
-            section.setCount(nodes.length);
+            // The component section counts components, not every row under them.
+            section.setCount(category === "component" ? components : entries.length);
         }
         for (const [node, row] of this.rows) {
             if (keep.has(node)) continue;
             row.dispose();
             this.rows.delete(node);
+            this.rowSections.delete(node);
         }
     };
 
@@ -279,7 +322,11 @@ export class BrowserView extends HTMLElement {
     }
 
     private toggleCategory(category: NodeCategory) {
-        const nodes = Array.from(this.rows.keys()).filter((node) => browserCategory(node) === category);
+        const nodes = Array.from(this.rows.keys()).filter(
+            (node) =>
+                this.rowSections.get(node) === category &&
+                (category !== "component" || isTopLevelComponent(node)),
+        );
         if (nodes.length === 0) return;
         const visible = !nodes.every((node) => node.visible);
         Transaction.execute(this.document, "change visible", () => {
