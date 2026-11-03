@@ -222,6 +222,24 @@ describe("RibbonToggleButton", () => {
         expect(btn.classList.contains("rb-checked")).toBe(false);
     });
 
+    test("several buttons of one toggle command all follow its state", () => {
+        // the same toggle sits on two tabs, or is pinned again after a group re-renders
+        const state = new ToggleState();
+        const data: CommandData = {
+            key: TOGGLE_KEY,
+            icon: "icon-toggle",
+            toggle: new Binding(state, "checked"),
+        };
+        const first = new RibbonToggleButton(data, "large");
+        const second = new RibbonToggleButton(data, "large");
+        state.checked = true;
+        expect(first.classList.contains("rb-checked")).toBe(true);
+        expect(second.classList.contains("rb-checked")).toBe(true);
+        state.checked = false;
+        expect(first.classList.contains("rb-checked")).toBe(false);
+        expect(second.classList.contains("rb-checked")).toBe(false);
+    });
+
     test("should publish executeCommand with command key on click", () => {
         const published: string[] = [];
         const callback = (cmd: string) => published.push(cmd);

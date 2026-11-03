@@ -13,6 +13,7 @@ import {
     type IConverter,
     Localize,
     Logger,
+    PathBinding,
     PubSub,
     Result,
     ShortcutProfiles,
@@ -109,8 +110,15 @@ export class RibbonToggleButton extends RibbonPushButton {
         });
 
         if (data.toggle) {
-            data.toggle.converter = new ToggleConverter(this.className, style.checked);
-            data.toggle.setBinding(this, "className");
+            // The command's binding is one object shared by every button of the command, and a
+            // binding drives one element: the same toggle can be on several tabs (or pinned on
+            // the toolbar), and a group re-renders its buttons. Each button binds its own copy.
+            const binding = new PathBinding(
+                data.toggle.source,
+                data.toggle.path,
+                new ToggleConverter(this.className, style.checked),
+            );
+            binding.setBinding(this, "className");
         }
     }
 }
