@@ -155,12 +155,6 @@ describe("RibbonUI", () => {
         expect(appName.textContent).toContain("Chili3D - v");
     });
 
-    test("should render github link", () => {
-        const { ui } = createRibbonUI();
-        const link = mustQuery(ui, "a");
-        expect(link.getAttribute("href")).toBe("https://github.com/xiangechen/chili3d");
-    });
-
     test("should render ribbon groups for each tab", () => {
         const { ui } = createRibbonUI();
         const groups = ui.querySelectorAll("ribbon-group");
@@ -201,7 +195,7 @@ describe("RibbonUI", () => {
         // The svg mock stores handlers on `_onclick` regardless of realEvents
         const onclick = (newBtn as unknown as { _onclick?: () => void })._onclick;
         expect(onclick).toBeDefined();
-        onclick!();
+        onclick?.();
         expect(published.some((p) => p.topic === "executeCommand" && p.args[0] === "doc.new")).toBe(true);
     });
 });

@@ -18,9 +18,8 @@ import {
     type Ribbon,
     type RibbonGroup,
     type RibbonTab,
-    type RibbonTabKeys,
 } from "@chili3d/core";
-import { a, collection, createIcon, div, label, span, svg } from "@chili3d/element";
+import { collection, createIcon, div, label, span, svg } from "@chili3d/element";
 import style from "./ribbon.module.css";
 import { RibbonPushButton } from "./ribbonButton";
 import { RibbonGroupElement } from "./ribbonGroup";
@@ -180,13 +179,7 @@ export class RibbonUI extends HTMLElement {
     }
 
     private rightPanel() {
-        return div(
-            { className: style.right },
-            a(
-                { href: "https://github.com/xiangechen/chili3d", target: "_blank" },
-                svg({ title: "Github", className: style.icon, icon: "icon-github" }),
-            ),
-        );
+        return div({ className: style.right });
     }
 
     private ribbonTabs() {

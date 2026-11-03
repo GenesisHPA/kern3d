@@ -17,7 +17,7 @@ import {
     type RibbonTab,
     type RibbonWorkspaceKeys,
 } from "@chili3d/core";
-import { a, collection, div, span, svg } from "@chili3d/element";
+import { collection, div, span, svg } from "@chili3d/element";
 import { glyph } from "../glyphs";
 import { DropdownController } from "../ribbon/dropdownController";
 import { QuickButton } from "../ribbon/ribbon";
@@ -244,10 +244,6 @@ export class MainToolbar extends HTMLElement {
                 onclick: () => PubSub.default.pub("executeCommand", "doc.new"),
             }),
             div({ className: style.spacer }),
-            a(
-                { href: "https://github.com/xiangechen/chili3d", target: "_blank" },
-                svg({ title: "Github", className: style.appButton, icon: "icon-github" }),
-            ),
         );
     }
 

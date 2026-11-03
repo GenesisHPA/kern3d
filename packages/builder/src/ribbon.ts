@@ -127,7 +127,7 @@ export const DefaultRibbon: RibbonTabProfile[] = [
             },
             {
                 groupName: "ribbon.group.other",
-                items: ["wechat.group", "ai.toggleChat"],
+                items: ["ai.toggleChat"],
             },
         ],
     },
@@ -250,7 +250,7 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
             },
             {
                 groupName: "ribbon.group.insert",
-                items: ["file.import", ["file.export", "ai.toggleChat", "wechat.group"]],
+                items: ["file.import", ["file.export", "ai.toggleChat"]],
             },
         ],
     },

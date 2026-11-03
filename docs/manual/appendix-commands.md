@@ -104,7 +104,6 @@
 | 从相机创建 | `act.alignCamera` | 保存当前视角为书签 |
 | 导入 | `file.import` | STEP/IGES/BREP/STL |
 | 导出 | `file.export` | STEP/IGES/BREP/STL/PLY/OBJ |
-| 微信群 | `wechat.group` | 二维码 |
 | AI 助手 | `ai.toggleChat` | 开关右侧面板 |
 
 ## A.2 参数化标签

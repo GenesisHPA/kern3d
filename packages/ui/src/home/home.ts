@@ -12,10 +12,9 @@ import {
     PubSub,
     type RecentDocumentDTO,
 } from "@chili3d/core";
-import { a, button, collection, div, img, label, span, svg } from "@chili3d/element";
+import { button, collection, div, img, span, svg } from "@chili3d/element";
 import style from "./home.module.css";
 import { LanguageSelector } from "./languageSelector";
-import { Navigation3DSelector } from "./navigation3DSelector";
 import { OrbitModeSelector } from "./orbitModeSelector";
 import { ThemeSelector } from "./themeSelector";
 
@@ -24,25 +23,6 @@ interface ApplicationCommand {
     icon: string;
     onclick: () => void;
 }
-
-interface VideoItem {
-    title: string;
-    thumbnail: string;
-    url: string;
-    date: string;
-}
-
-interface VideoSectionData {
-    items: VideoItem[];
-    moreUrl?: string;
-}
-
-interface VideoData {
-    recent: VideoSectionData;
-    cases: VideoSectionData;
-}
-
-let videoDataCache: VideoData | null = null;
 
 const applicationCommands = new ObservableCollection<ApplicationCommand>(
     {
@@ -70,17 +50,6 @@ export class Home extends HTMLElement {
         return false;
     }
 
-    private async getVideoData(): Promise<VideoData> {
-        if (videoDataCache) return videoDataCache;
-        try {
-            const response = await fetch("/videos.json");
-            videoDataCache = (await response.json()) as VideoData;
-            return videoDataCache;
-        } catch {
-            return { recent: { items: [] }, cases: { items: [] } };
-        }
-    }
-
     private async getDocuments() {
         return new ObservableCollection(
             ...(await this.app.storage.page(Constants.DBName, Constants.RecentTable, 0)),
@@ -89,8 +58,7 @@ export class Home extends HTMLElement {
 
     async render() {
         const documents = await this.getDocuments();
-        const videoData = await this.getVideoData();
-        this.append(this.leftSection(), this.rightSection(documents, videoData));
+        this.append(this.leftSection(), this.rightSection(documents));
         this.app.mainWindow?.appendChild(this);
     }
 
@@ -105,7 +73,6 @@ export class Home extends HTMLElement {
             ),
 
             this.settings(),
-            this.links(),
         );
     }
 
@@ -175,14 +142,6 @@ export class Home extends HTMLElement {
                 { className: style.settingItem },
                 span({
                     className: style.settingLabel,
-                    textContent: new Localize("common.3DNavigation"),
-                }),
-                div({ className: style.settingControl }, Navigation3DSelector({})),
-            ),
-            div(
-                { className: style.settingItem },
-                span({
-                    className: style.settingLabel,
                     textContent: new Localize("common.orbitMode"),
                 }),
                 div({ className: `${style.settingControl} ${style.wideControl}` }, OrbitModeSelector({})),
@@ -190,35 +149,7 @@ export class Home extends HTMLElement {
         );
     }
 
-    private links() {
-        return div(
-            { className: style.socialPanel },
-            a(
-                {
-                    className: style.socialItem,
-                    href: "https://github.com/xiangechen/chili3d",
-                    target: "_blank",
-                    rel: "noopener noreferrer",
-                },
-                svg({ icon: "icon-github" }),
-                label({ textContent: "GitHub" }),
-            ),
-            button(
-                {
-                    className: style.socialItem,
-                    onclick: () => {
-                        PubSub.default.pub("executeCommand", "wechat.group");
-                    },
-                },
-                svg({
-                    icon: "icon-wechatGroup",
-                }),
-                label({ textContent: new Localize("command.wechat.group") }),
-            ),
-        );
-    }
-
-    private rightSection(documents: ObservableCollection<RecentDocumentDTO>, videoData: VideoData) {
+    private rightSection(documents: ObservableCollection<RecentDocumentDTO>) {
         return div(
             { className: style.right },
             div(
@@ -235,82 +166,7 @@ export class Home extends HTMLElement {
                         div({ className: style.sectionTitle, textContent: new Localize("home.recent") }),
                         this.documentCollection(documents),
                     ),
-                    this.videoColumn(videoData),
                 ),
-            ),
-        );
-    }
-
-    private videoColumn(videoData: VideoData) {
-        const sections = (
-            [
-                ["home.videos.recent", videoData.recent],
-                ["home.videos.cases", videoData.cases],
-            ] as [I18nKeys, VideoSectionData][]
-        ).filter(([, data]) => data.items.length > 0);
-        if (sections.length === 0) return "";
-
-        return div(
-            { className: style.videoColumn },
-            div({ className: style.sectionTitle, textContent: new Localize("home.videos") }),
-            div(
-                { className: style.videoScroll },
-                ...sections.map(([key, data]) => this.videoSection(key, data)),
-            ),
-        );
-    }
-
-    private videoSectionHeader(titleKey: I18nKeys, data: VideoSectionData) {
-        return div(
-            { className: style.videoSectionHeader },
-            div({ className: style.sectionVideo, textContent: new Localize(titleKey) }),
-            data.moreUrl
-                ? a({
-                      className: style.moreLink,
-                      href: data.moreUrl,
-                      target: "_blank",
-                      rel: "noopener noreferrer",
-                      textContent: new Localize("home.videos.more"),
-                  })
-                : "",
-        );
-    }
-
-    private videoSection(titleKey: I18nKeys, data: VideoSectionData) {
-        return div(
-            { className: style.videoSection },
-            this.videoSectionHeader(titleKey, data),
-            div({ className: style.videos }, ...data.items.map((video) => this.videoCard(video))),
-        );
-    }
-
-    private createThumbnail(src: string, alt: string): HTMLImageElement {
-        const thumbnail = document.createElement("img");
-        thumbnail.className = style.videoImg;
-        thumbnail.alt = alt;
-        thumbnail.setAttribute("referrerpolicy", "no-referrer");
-        thumbnail.src = src;
-        return thumbnail;
-    }
-
-    private videoCard(video: VideoItem) {
-        return a(
-            {
-                className: style.video,
-                href: video.url,
-                target: "_blank",
-                rel: "noopener noreferrer",
-            },
-            div(
-                { className: style.videoThumbnail },
-                this.createThumbnail(video.thumbnail, video.title),
-                div({ className: style.playOverlay }),
-                div({ className: style.playIcon }),
-            ),
-            div(
-                { className: style.videoMeta },
-                span({ className: style.videoItemTitle, textContent: video.title }),
-                span({ className: style.videoDate, textContent: video.date }),
             ),
         );
     }
