@@ -745,6 +745,12 @@
     margin-top: 8px;
 }
 
+.keyLink {
+    color: var(--primary-color);
+    text-decoration: underline;
+    word-break: break-all;
+}
+
 .settingsHint {
     color: var(--foreground-muted-color);
     font-size: 11px;

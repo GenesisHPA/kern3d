@@ -3,7 +3,11 @@
 
 export const I18N_KEYS = [
     "ai.apiKey",
-    "ai.apiKeyHint",
+    "ai.keyHint.anthropic",
+    "ai.keyHint.openai",
+    "ai.keyHint.gemini",
+    "ai.keyHint.openrouter",
+    "ai.keyHint.groq",
     "ai.ask.notAnswered",
     "ai.ask.placeholder",
     "ai.baseURL",
@@ -13,7 +17,6 @@ export const I18N_KEYS = [
     "ai.contextWindow",
     "ai.copy",
     "ai.effortDefault",
-    "ai.emptyAsk",
     "ai.emptyExample",
     "ai.emptyHint",
     "ai.emptyTitle",

@@ -10,8 +10,6 @@ export default {
     translation: {
         ...en.translation,
         "ai.apiKey": "Chave de API",
-        "ai.apiKeyHint":
-            "A chave nunca é gravada no armazenamento do navegador. Salve-a com o gerenciador de senhas quando solicitado, ou digite-a uma vez por sessão.",
         "ai.ask.notAnswered": "(sem resposta)",
         "ai.ask.placeholder": "Digite sua resposta…",
         "ai.baseURL": "URL Base",
@@ -21,7 +19,6 @@ export default {
         "ai.contextTrimmed": "As mensagens mais antigas acima não são mais enviadas ao modelo.",
         "ai.copy": "Copiar",
         "ai.effortDefault": "Padrão",
-        "ai.emptyAsk": "Ou pergunte como usar o Chili3D — ex.: “como faço um chanfro em uma aresta?”",
         "ai.emptyExample": "ex.: crie uma caixa 10×20×5 e depois um filete de 2mm",
         "ai.emptyHint": "Crie e edite modelos 3D com linguagem natural",
         "ai.emptyTitle": "Assistente de Modelagem IA",

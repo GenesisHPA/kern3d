@@ -13,6 +13,7 @@ import {
     PubSub,
 } from "@chili3d/core";
 import {
+    a,
     button,
     div,
     form,
@@ -757,7 +758,6 @@ export class ChatPanel extends HTMLElement {
             div({ className: style.emptyTitle, textContent: new Localize("ai.emptyTitle") }),
             div({ className: style.emptyHint, textContent: new Localize("ai.emptyHint") }),
             div({ className: style.emptyHint, textContent: new Localize("ai.emptyExample") }),
-            div({ className: style.emptyAsk, textContent: new Localize("ai.emptyAsk") }),
         );
     }
 
@@ -809,6 +809,26 @@ export class ChatPanel extends HTMLElement {
             this.createSettingsForm(),
         );
         return this.settingsOverlay;
+    }
+
+    /** Under the key field: where the chosen provider hands out keys (see `ProviderPreset`). */
+    private readonly keyHintElement = div({ className: style.settingsHint });
+
+    private renderKeyHint(preset: ProviderPreset | undefined) {
+        if (preset === undefined) {
+            this.keyHintElement.replaceChildren();
+            return;
+        }
+        this.keyHintElement.replaceChildren(
+            span({ textContent: `${I18n.translate(preset.keyHint)} ` }),
+            a({
+                className: style.keyLink,
+                href: preset.keyUrl,
+                target: "_blank",
+                rel: "noopener noreferrer",
+                textContent: new URL(preset.keyUrl).host,
+            }),
+        );
     }
 
     private createSettingsInputs() {
@@ -889,7 +909,7 @@ export class ChatPanel extends HTMLElement {
                 div({ className: style.settingsHint, textContent: new Localize("ai.reasoningEffortHint") }),
                 this.settingsField(new Localize("ai.contextWindow"), this.contextWindowSelect),
                 this.settingsField(new Localize("ai.apiKey"), this.apiKeyInput),
-                div({ className: style.settingsHint, textContent: new Localize("ai.apiKeyHint") }),
+                this.keyHintElement,
             ),
             this.settingsFooter(),
         );
@@ -933,6 +953,7 @@ export class ChatPanel extends HTMLElement {
             this.modelInput.value = preset.defaultModel;
         }
         this.appliedPreset = preset;
+        this.renderKeyHint(preset);
         if (this.usernameInput) this.usernameInput.value = preset.id;
     }
 
@@ -946,6 +967,7 @@ export class ChatPanel extends HTMLElement {
         this.effortSelect.value = "";
         if (this.usernameInput) this.usernameInput.value = preset.id;
         this.appliedPreset = preset;
+        this.renderKeyHint(preset);
     }
 
     /**
@@ -977,6 +999,7 @@ export class ChatPanel extends HTMLElement {
             // Which preset the shown values came from, so a switch can still tell an untouched
             // field from one the user has made their own since.
             this.appliedPreset = preset;
+            this.renderKeyHint(preset);
             this.baseURLInput.value = saved.baseURL ?? "";
             this.modelInput.value = saved.model;
             this.syncContextWindowValue(saved.contextWindow ?? DEFAULT_CONTEXT_WINDOW);

@@ -834,6 +834,16 @@ export default {
         "common.orbitMode": "Режим вращения",
         "common.orbitMode.trackball": "Свободное вращение",
         "common.orbitMode.turntable": "С фиксацией вертикали (Z вверх)",
+        "ai.keyHint.anthropic":
+            "Ключ создаётся в консоли Anthropic → API Keys. API платный: сначала пополните баланс в разделе Billing (подписка Claude.ai сюда не входит).",
+        "ai.keyHint.openai":
+            "Ключ создаётся в кабинете OpenAI → API keys, API платный. Подойдёт и любой сервис, совместимый с OpenAI: укажите его адрес в поле Base URL.",
+        "ai.keyHint.gemini":
+            "Бесплатно: войдите в Google AI Studio аккаунтом Google и нажмите «Get API key». Есть лимиты запросов; на бесплатном тарифе запросы могут использоваться для обучения моделей.",
+        "ai.keyHint.openrouter":
+            "Бесплатно: зарегистрируйтесь на OpenRouter → Keys → Create Key. Модели с пометкой :free бесплатны, но с жёсткими дневными лимитами запросов.",
+        "ai.keyHint.groq":
+            "Бесплатно: зарегистрируйтесь в GroqCloud → API Keys → Create API Key. Карта не нужна, есть лимиты запросов в минуту и в день.",
         "toolbar.moreCommands": "Все команды группы",
         "toolbar.pinCommand": "Показать на панели",
         "toolbar.unpinCommand": "Убрать с панели",

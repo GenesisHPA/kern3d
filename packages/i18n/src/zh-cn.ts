@@ -8,7 +8,16 @@ export default {
     language: "zh-CN",
     translation: {
         "ai.apiKey": "API Key",
-        "ai.apiKeyHint": "密钥不会写入浏览器存储。可在密码管理器提示时保存，否则每次会话需输入一次。",
+        "ai.keyHint.anthropic":
+            "在 Anthropic Console → API Keys 创建密钥。API 为付费服务：请先在 Billing 中充值（Claude.ai 订阅不包含 API）。",
+        "ai.keyHint.openai":
+            "在 OpenAI 控制台 → API keys 创建密钥，API 为付费服务。任何兼容 OpenAI 的服务也可使用：在 Base URL 中填写其地址。",
+        "ai.keyHint.gemini":
+            "免费：使用 Google 账号登录 Google AI Studio，点击 “Get API key”。请求有速率限制，免费层的请求可能被用于训练。",
+        "ai.keyHint.openrouter":
+            "免费：在 OpenRouter 注册 → Keys → Create Key。标有 :free 的模型免费，但每日请求限制较严。",
+        "ai.keyHint.groq":
+            "免费：在 GroqCloud 注册 → API Keys → Create API Key。无需绑卡，请求有每分钟和每日限制。",
         "ai.ask.notAnswered": "（未作答）",
         "ai.ask.placeholder": "输入回答…",
         "ai.baseURL": "Base URL",
@@ -18,7 +27,6 @@ export default {
         "ai.contextTrimmed": "以上更早的消息已不再发送给模型。",
         "ai.copy": "复制",
         "ai.effortDefault": "默认",
-        "ai.emptyAsk": "也可以直接问 Chili3D 怎么用，例如：「怎么给边倒斜角？」",
         "ai.emptyExample": "例如：创建一个 10×20×5 的盒子，再倒 2mm 圆角",
         "ai.emptyHint": "用自然语言创建和编辑 3D 模型",
         "ai.emptyTitle": "AI 建模助手",

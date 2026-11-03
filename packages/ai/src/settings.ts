@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { ObjectStorage } from "@chili3d/core";
+import { type I18nKeys, ObjectStorage } from "@chili3d/core";
 
 /**
  * How deep the model may think before it answers. Unset sends nothing at all and leaves whatever
@@ -37,6 +37,10 @@ export interface ProviderPreset {
     provider: LLMConfig["provider"];
     baseURL?: string;
     defaultModel: string;
+    /** Where the user gets a key for this service, linked under the key field. */
+    keyUrl: string;
+    /** How to get that key (paid or free, which menu), shown with the link. */
+    keyHint: I18nKeys;
 }
 
 export const DEFAULT_ANTHROPIC_MODEL = "claude-opus-5";
@@ -56,6 +60,8 @@ export const CONTEXT_WINDOW_OPTIONS = [200_000, 256_000, 400_000, 512_000, 1_000
 export const PROVIDER_PRESETS: ProviderPreset[] = [
     {
         id: "anthropic",
+        keyUrl: "https://console.anthropic.com/settings/keys",
+        keyHint: "ai.keyHint.anthropic",
         label: "Anthropic API",
         provider: "anthropic",
         baseURL: "https://api.anthropic.com",
@@ -63,6 +69,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     },
     {
         id: "openai",
+        keyUrl: "https://platform.openai.com/api-keys",
+        keyHint: "ai.keyHint.openai",
         label: "Completions API",
         provider: "completions",
         baseURL: "https://api.openai.com/v1",
@@ -70,6 +78,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     },
     {
         id: "responses",
+        keyUrl: "https://platform.openai.com/api-keys",
+        keyHint: "ai.keyHint.openai",
         label: "Responses API",
         provider: "responses",
         baseURL: "https://api.openai.com/v1",
@@ -80,6 +90,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     // names a stable alias or router rather than a dated model; the model field stays editable.
     {
         id: "gemini",
+        keyUrl: "https://aistudio.google.com/apikey",
+        keyHint: "ai.keyHint.gemini",
         label: "Google Gemini (free tier)",
         provider: "completions",
         baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
@@ -87,6 +99,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     },
     {
         id: "openrouter",
+        keyUrl: "https://openrouter.ai/keys",
+        keyHint: "ai.keyHint.openrouter",
         label: "OpenRouter (free models)",
         provider: "completions",
         baseURL: "https://openrouter.ai/api/v1",
@@ -95,6 +109,8 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     },
     {
         id: "groq",
+        keyUrl: "https://console.groq.com/keys",
+        keyHint: "ai.keyHint.groq",
         label: "Groq (free tier)",
         provider: "completions",
         baseURL: "https://api.groq.com/openai/v1",

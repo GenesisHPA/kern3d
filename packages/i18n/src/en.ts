@@ -8,8 +8,16 @@ export default {
     language: "en",
     translation: {
         "ai.apiKey": "API Key",
-        "ai.apiKeyHint":
-            "The key is never written to this browser's storage. Save it with your password manager when prompted, or enter it once per session.",
+        "ai.keyHint.anthropic":
+            "Create a key in the Anthropic Console → API Keys. The API is paid: top up your balance under Billing first (a Claude.ai subscription does not cover it).",
+        "ai.keyHint.openai":
+            "Create a key in the OpenAI dashboard → API keys; the API is paid. Any OpenAI-compatible service works here too — put its address in Base URL.",
+        "ai.keyHint.gemini":
+            "Free: sign in to Google AI Studio with a Google account and press “Get API key”. Requests are rate-limited, and on the free tier they may be used for training.",
+        "ai.keyHint.openrouter":
+            "Free: sign up at OpenRouter → Keys → Create Key. Models marked :free cost nothing but have tight daily request limits.",
+        "ai.keyHint.groq":
+            "Free: sign up at GroqCloud → API Keys → Create API Key. No card needed; requests are limited per minute and per day.",
         "ai.ask.notAnswered": "(not answered)",
         "ai.ask.placeholder": "Type your answer…",
         "ai.baseURL": "Base URL",
@@ -19,7 +27,6 @@ export default {
         "ai.contextTrimmed": "Earlier messages are no longer sent to the model.",
         "ai.copy": "Copy",
         "ai.effortDefault": "Default",
-        "ai.emptyAsk": "Or ask how to use Chili3D — e.g. “how do I chamfer an edge?”",
         "ai.emptyExample": "e.g. create a 10×20×5 box, then fillet 2mm",
         "ai.emptyHint": "Create and edit 3D models with natural language",
         "ai.emptyTitle": "AI Modeling Assistant",
