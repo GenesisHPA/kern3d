@@ -3,11 +3,14 @@
 
 import {
     type IEdge,
+    type INode,
+    type INodeFilter,
     isReferenceGeometryNode,
     ShapeNode,
     ShapeTypes,
     type VisualShapeData,
 } from "@chili3d/core";
+import { isDatumAxisNode } from "../datum/datumContract";
 import { isBodyTrackingNode } from "../features/bodyTracking";
 import { captureEdgeRef, type EdgeRef } from "../features/edgeRef";
 import type { PatternLineSource, PatternPathSource } from "../features/feature";
@@ -21,6 +24,14 @@ import { idIsShared } from "../features/trackedId";
  * `PatternPathSource` share that contract), and both go through `capturePickedEdge` so the id
  * and shared-piece rules cannot drift between the command and the re-pick sessions.
  */
+
+/**
+ * The node gate of an axis/direction pick: model edges plus construction axes — the one kind of
+ * reference geometry a revolve or a pattern may run along (a datum plane's outline may not).
+ */
+export const AXIS_OR_MODEL_NODES: INodeFilter = {
+    allow: (node: INode) => !isReferenceGeometryNode(node) || isDatumAxisNode(node),
+};
 
 /** The node's tracked edge ids, parallel to `findSubShapes(edge)` — undefined when untracked. */
 export function trackedEdgeIds(node: ShapeNode): (string | undefined)[] | undefined {
@@ -54,7 +65,7 @@ export function capturePickedEdge(
 /** A single edge pick as a line-mode reference, or undefined when it is not an ordinary node edge. */
 export function capturePatternLineSource(data: VisualShapeData): PatternLineSource | undefined {
     const node = data.owner.node;
-    if (!(node instanceof ShapeNode) || isReferenceGeometryNode(node)) return undefined;
+    if (!(node instanceof ShapeNode) || !AXIS_OR_MODEL_NODES.allow(node)) return undefined;
     return { nodeId: node.id, edge: capturePickedEdge(node, data) };
 }
 

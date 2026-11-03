@@ -5,57 +5,53 @@ import {
     ANGLE_UNITS,
     AsyncController,
     Combobox,
-    CurveUtils,
     command,
     type I18nKeys,
     type IDocument,
-    type IEdge,
-    type INode,
     type IShape,
-    type IShapeFilter,
     type IStep,
-    type IVertex,
-    isReferenceGeometryNode,
     LENGTH_UNITS,
     LineEdgeFilter,
     LineOrCircleEdgeFilter,
     MultistepCommand,
     type ParameterValue,
-    type PickShapeOptions,
     type Plane,
     PubSub,
     property,
     Result,
-    ShapeNode,
-    ShapeTypes,
     type SnapResult,
     Transaction,
-    type VisualShapeData,
     XYZ,
     type XYZLike,
 } from "@chili3d/core";
-import { captureEdgeRef, type EdgeRef, edgeMidPoint } from "../features/edgeRef";
-import { type NeutralPlaneRef, planeRefNodeId } from "../features/feature";
+import { isRevolutionFace } from "../datum/surfaceGeometry";
+import type { EdgeRef } from "../features/edgeRef";
+import type { NeutralPlaneRef } from "../features/feature";
 import { plainVec } from "../features/refGeometry";
-import { captureVertexRef } from "../features/vertexRef";
-import { ParametricBodyNode } from "../parametricBodyNode";
 import {
-    captureVertexAnchors,
     type EdgeSourceRef,
     type PlaneDefinition,
     type PointRef,
     resolvePlaneDefinition,
-    type VertexAnchor,
 } from "../plane/planeDefinition";
 import { ensurePlaneMaterial, PlaneNode } from "../plane/planeNode";
-import {
-    captureNeutralPlane,
-    type PickedNeutralPlane,
-    PlanePickHandler,
-} from "../sketch/commands/planePickHandler";
+import type { FaceSourceRef } from "../plane/sourceRefs";
 import { datumQuadAt } from "../sketch/commands/planePreview";
-import { worldShape } from "./booleanPreview";
+import {
+    centroid,
+    lineDirection,
+    midpoint,
+    pickEdge,
+    pickFace,
+    pickNeutralPlane,
+    pickPoint,
+    pickPoints,
+    recordPlaneAnchor,
+} from "./constructionPicks";
 import { type DragPreview, PreviewConfirmHandler } from "./previewConfirmHandler";
+
+/** Admits the faces a tangent plane can touch: any face with an axis of revolution. */
+export const REVOLUTION_FACE_FILTER = { allow: (shape: IShape) => isRevolutionFace(shape) };
 
 const PLANE_TYPES = [
     "feature.plane.offset",
@@ -65,6 +61,7 @@ const PLANE_TYPES = [
     "feature.plane.threePoint",
     "feature.plane.midPlane",
     "feature.plane.curvePoint",
+    "feature.plane.tangent",
 ] as const satisfies readonly I18nKeys[];
 
 type PlaneTypeKey = (typeof PLANE_TYPES)[number];
@@ -77,6 +74,7 @@ const PLANE_TYPE_KINDS: Record<PlaneTypeKey, PlaneDefinition["kind"]> = {
     "feature.plane.threePoint": "threePoint",
     "feature.plane.midPlane": "midPlane",
     "feature.plane.curvePoint": "curvePoint",
+    "feature.plane.tangent": "tangent",
 };
 
 const PREVIEW_QUAD_SIZE = 200;
@@ -90,6 +88,9 @@ interface CollectedPlaneRefs {
     points?: [PointRef, PointRef, PointRef];
     edge?: EdgeSourceRef;
     curve?: EdgeSourceRef;
+    face?: FaceSourceRef;
+    /** The tangent plane's pick point on the face, in the face source's LOCAL frame. */
+    at?: XYZLike;
     anchors: Record<string, number>;
     /** A world point of the resulting plane near the source geometry, for the display square. */
     anchor?: XYZLike;
@@ -147,6 +148,18 @@ export class PlaneCommand extends MultistepCommand {
     }
     set angle(value: ParameterValue) {
         this.setProperty("angle", value, () => this._preview?.refresh());
+    }
+
+    /** The tangent plane's rotation about the face's axis, from the picked line of contact. */
+    @property("common.angle", {
+        unit: ANGLE_UNITS,
+        dependencies: [{ property: "planeType", value: "feature.plane.tangent" }],
+    })
+    get tangentAngle(): ParameterValue {
+        return this.getPrivateValue("tangentAngle", 0);
+    }
+    set tangentAngle(value: ParameterValue) {
+        this.setProperty("tangentAngle", value, () => this._preview?.refresh());
     }
 
     @property("option.command.flip")
@@ -292,6 +305,21 @@ export class PlaneCommand extends MultistepCommand {
                     curve: refs.curve,
                     point: refs.point,
                     tangent: this.capturedCurveTangent(refs.curve, refs.point, anchors),
+                    flip: this.flip,
+                    anchor: refs.anchor,
+                    anchors,
+                });
+            }
+            case "tangent": {
+                if (refs.face === undefined || refs.at === undefined)
+                    return Result.err("Pick a cylindrical face");
+                const angle = this.resolveParameter(this.tangentAngle, ANGLE_UNITS);
+                if (!angle.isOk) return Result.err(angle.error);
+                return Result.ok({
+                    kind: "tangent",
+                    face: refs.face,
+                    at: refs.at,
+                    angle: angle.value,
                     flip: this.flip,
                     anchor: refs.anchor,
                     anchors,
@@ -553,224 +581,21 @@ async function collectRefs(
             Object.assign(anchors, point.anchors);
             return refs;
         }
+        case "tangent": {
+            const face = await pickFace(
+                document,
+                stepController,
+                "prompt.select.revolutionFace",
+                REVOLUTION_FACE_FILTER,
+            );
+            if (face === undefined) return undefined;
+            refs.face = face.ref;
+            refs.at = plainVec(face.local);
+            refs.anchor = plainVec(face.world);
+            Object.assign(anchors, face.anchors);
+            return refs;
+        }
     }
-}
-
-async function pickNeutralPlane(
-    document: IDocument,
-    stepController: AsyncController,
-): Promise<PickedNeutralPlane | undefined> {
-    const controller = new AsyncController();
-    stepController.onCancelled(() => controller.cancel());
-    document.selection.clearSelection();
-    const handler = new PlanePickHandler(document, controller);
-    try {
-        await document.picker.pickAsync(handler, "prompt.select.plane", controller, "none", "select.default");
-        return handler.result === undefined ? undefined : captureNeutralPlane(document, handler.result);
-    } finally {
-        handler.dispose();
-        document.selection.clearSelection();
-        controller.dispose();
-    }
-}
-
-interface PickedPoint {
-    readonly ref: PointRef;
-    readonly anchors: Record<string, number>;
-    /** The clicked point in world coordinates (the ref itself is node-local). */
-    readonly world: XYZ;
-}
-
-async function pickPoint(
-    document: IDocument,
-    stepController: AsyncController,
-): Promise<PickedPoint | undefined> {
-    const picked = await pickShapes(document, stepController, "prompt.select.vertexes", {
-        shapeType: ShapeTypes.vertex,
-        nodeFilter: { allow: (node) => !isReferenceGeometryNode(node) },
-    });
-    const vertex = picked?.find((candidate) => candidate.shape.shapeType === ShapeTypes.vertex);
-    if (vertex === undefined) return undefined;
-    const anchors: Record<string, number> = {};
-    const captured = capturePoints([vertex], anchors);
-    const ref = captured.refs[0];
-    return ref === undefined ? undefined : { ref, anchors, world: captured.worlds[0] };
-}
-
-interface PickedPoints {
-    readonly points: PointRef[];
-    readonly anchors: Record<string, number>;
-    readonly worlds: XYZ[];
-}
-
-async function pickPoints(
-    document: IDocument,
-    count: number,
-    stepController: AsyncController,
-): Promise<PickedPoints | undefined> {
-    const picked = await pickShapes(document, stepController, "prompt.select.vertexes", {
-        shapeType: ShapeTypes.vertex,
-        nodeFilter: { allow: (node) => !isReferenceGeometryNode(node) },
-        multi: true,
-        canFinish: (selected) => selected.length >= count,
-    });
-    const vertices = picked?.filter((candidate) => candidate.shape.shapeType === ShapeTypes.vertex) ?? [];
-    if (vertices.length < count) return undefined;
-    const anchors: Record<string, number> = {};
-    const captured = capturePoints(vertices.slice(0, count), anchors);
-    return captured.refs.length === count
-        ? { points: captured.refs, anchors, worlds: captured.worlds }
-        : undefined;
-}
-
-/**
- * One pick with its OWN controller: a selection handler settles the controller it was
- * given, so reusing a controller across picks makes every later pick return instantly.
- * The selection is cleared first (a stale selection would otherwise be captured) and the
- * success status is checked so Escape is not mistaken for an answer.
- */
-async function pickShapes(
-    document: IDocument,
-    stepController: AsyncController,
-    prompt: I18nKeys,
-    options: Omit<PickShapeOptions, "nodeFilter"> & {
-        nodeFilter?: PickShapeOptions["nodeFilter"];
-    },
-): Promise<VisualShapeData[] | undefined> {
-    const controller = new AsyncController();
-    stepController.onCancelled(() => controller.cancel());
-    document.selection.clearSelection();
-    try {
-        const picked = await document.picker.pickShape(prompt, controller, options);
-        return controller.result?.status === "success" ? picked : undefined;
-    } finally {
-        document.selection.clearSelection();
-        controller.dispose();
-    }
-}
-
-/**
- * Vertex refs in the source node's LOCAL frame (moving the source's transform must not
- * break them), plus the same points in world coordinates for the display anchor.
- */
-function capturePoints(
-    shapes: VisualShapeData[],
-    anchors: Record<string, number>,
-): { refs: PointRef[]; worlds: XYZ[] } {
-    const refs: PointRef[] = [];
-    const worlds: XYZ[] = [];
-    for (const picked of shapes) {
-        const node = picked.owner.node;
-        recordAnchor(node, anchors);
-        const vertex = picked.shape as IVertex;
-        const incident = captureVertexIncidence(node, vertex);
-        refs.push({
-            nodeId: node.id,
-            vertex: captureVertexRef(vertex),
-            ...(incident === undefined ? {} : { incident }),
-        });
-        worlds.push(picked.transform.ofPoint(vertex.point()));
-    }
-    return { refs, worlds };
-}
-
-interface PickedEdge {
-    readonly ref: EdgeSourceRef;
-    readonly anchors: Record<string, number>;
-    /** The edge's source-geometry point in WORLD coordinates, for the display anchor. */
-    readonly anchor: XYZLike;
-}
-
-async function pickEdge(
-    document: IDocument,
-    stepController: AsyncController,
-    prompt: I18nKeys,
-    filter?: IShapeFilter,
-): Promise<PickedEdge | undefined> {
-    const picked = await pickShapes(document, stepController, prompt, {
-        shapeType: ShapeTypes.edge,
-        shapeFilter: filter,
-        nodeFilter: { allow: (node) => !isReferenceGeometryNode(node) },
-    });
-    const data = picked?.find((candidate) => candidate.shape.shapeType === ShapeTypes.edge);
-    if (data === undefined) return undefined;
-    const node = data.owner.node;
-    const anchors: Record<string, number> = {};
-    recordAnchor(node, anchors);
-    const owned: IShape[] = [];
-    try {
-        const localEdge = data.shape as IEdge;
-        const worldEdge = worldShape(localEdge, data.transform, owned);
-        const edgeId = node instanceof ParametricBodyNode ? node.edgeIdAt(data.indexes[0]) : undefined;
-        const splitPiece =
-            node instanceof ParametricBodyNode && edgeId !== undefined ? node.edgeIdIsShared(edgeId) : false;
-        return {
-            // Captured in the source's LOCAL frame: a moved source still re-matches, and
-            // only the resolved geometry is carried into world coordinates.
-            ref: { nodeId: node.id, edge: captureEdgeRef(localEdge, edgeId, splitPiece) },
-            anchors,
-            anchor: worldEdgeAnchor(worldEdge),
-        };
-    } finally {
-        disposeAll(owned);
-    }
-}
-
-function recordPlaneAnchor(document: IDocument, ref: NeutralPlaneRef, anchors: Record<string, number>): void {
-    const nodeId = planeRefNodeId(ref);
-    if (nodeId === undefined) return;
-    const node = document.modelManager.findNode((candidate) => candidate.id === nodeId);
-    if (node !== undefined) recordAnchor(node, anchors);
-}
-
-function recordAnchor(node: INode, anchors: Record<string, number>): void {
-    if (!(node instanceof ParametricBodyNode)) return;
-    anchors[node.id] = node.evaluationStopIndex();
-}
-
-function disposeAll(shapes: IShape[]): void {
-    for (const shape of shapes) shape.dispose();
-}
-
-/** The picked vertex's incident edges, captured as topology (see `captureVertexAnchors`). */
-function captureVertexIncidence(node: INode, vertex: IVertex): VertexAnchor[] | undefined {
-    if (!(node instanceof ShapeNode) || !node.shape.isOk) return undefined;
-    const edgeIdAt = node instanceof ParametricBodyNode ? (index: number) => node.edgeIdAt(index) : undefined;
-    return captureVertexAnchors(node.shape.value, vertex, edgeIdAt);
-}
-
-/** A world point of the edge's plane, used as the display anchor. */
-function worldEdgeAnchor(edge: IEdge): XYZLike {
-    const basis = edge.curve.basisCurve;
-    if (CurveUtils.isCircle(basis)) return plainVec(basis.center);
-    if (CurveUtils.isLine(basis)) return plainVec(edge.startPoint());
-    return plainVec(edgeMidPoint(edge));
-}
-
-function centroid(points: readonly XYZLike[]): XYZLike {
-    let x = 0;
-    let y = 0;
-    let z = 0;
-    for (const point of points) {
-        x += point.x;
-        y += point.y;
-        z += point.z;
-    }
-    return { x: x / points.length, y: y / points.length, z: z / points.length };
-}
-
-function midpoint(first: XYZLike, second: XYZLike): XYZLike {
-    return {
-        x: (first.x + second.x) / 2,
-        y: (first.y + second.y) / 2,
-        z: (first.z + second.z) / 2,
-    };
-}
-
-function lineDirection(edge: EdgeRef): XYZLike | undefined {
-    if (edge.kind !== "line") return undefined;
-    const direction = new XYZ(edge.end).sub(new XYZ(edge.start)).normalize();
-    return direction === undefined ? undefined : { x: direction.x, y: direction.y, z: direction.z };
 }
 
 /** The axis a `pointNormal` plane captured: a straight edge's direction or a circle's axis. */

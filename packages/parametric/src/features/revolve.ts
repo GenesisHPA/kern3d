@@ -17,6 +17,7 @@ import {
     ShapeTypes,
     XYZ,
 } from "@chili3d/core";
+import { isDatumAxisNode } from "../datum/datumContract";
 import type { SketchNode } from "../sketch/sketchNode";
 import { isBodyTimelineNode, isBodyTrackingNode } from "./bodyTracking";
 import { trackedBoolean } from "./boolean";
@@ -343,6 +344,14 @@ function axisFromSourceNode(
     fallback: { axis: Line },
 ): { axis: Line; anchor?: EdgeRef } {
     const node = context.document.modelManager.findNode((n) => n.id === nodeId);
+    // A construction axis is its own definition, not an edge to re-match: its world line
+    // moves when the axis re-resolves, and a fingerprint of the old segment would not.
+    if (isDatumAxisNode(node)) {
+        const datum = node.worldAxis();
+        return datum === undefined
+            ? fallback
+            : { axis: new Line({ point: datum.point, direction: datum.direction }) };
+    }
     if (!(node instanceof ShapeNode) || !node.shape.isOk) return fallback;
     // A rolled-back source shows a transient session-preview shape lacking every
     // edge born from a hidden feature: the axis must not follow (nor re-anchor

@@ -22,6 +22,7 @@ import {
     UNITLESS,
     XYZ,
 } from "@chili3d/core";
+import { isDatumAxisNode } from "../datum/datumContract";
 import { isBodyTimelineNode, isBodyTrackingNode } from "./bodyTracking";
 import { matchEdgeIndexes, matchEdgesAnchored } from "./edgeMatcher";
 import { captureEdgeRef, type EdgeRef, withoutHoles } from "./edgeRef";
@@ -765,6 +766,13 @@ function lineFromSourceNode(
     const hostInverse = context.host.worldTransform().invert();
     if (hostInverse === undefined) return Result.err(`${label} cannot be mapped into the body`);
     const node = context.document.modelManager.findNode((n) => n.id === source.nodeId);
+    // A construction axis resolves through its own definition (see `resolveAxis` in revolve.ts).
+    if (isDatumAxisNode(node)) {
+        const datum = node.worldAxis();
+        if (datum === undefined) return Result.ok({ line: frozenLine(source.edge), lost: true });
+        const world = new Line({ point: datum.point, direction: datum.direction });
+        return Result.ok({ line: intoHostFrame(world, Matrix4.identity(), hostInverse), lost: false });
+    }
     if (!(node instanceof ShapeNode) || !node.shape.isOk) {
         // The node is gone, and its transform with it — the frozen fingerprint, taken as host-frame
         // geometry, is the best that is left (see the contract above).

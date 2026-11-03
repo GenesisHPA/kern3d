@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import "./alignCommand";
+import "./axisCommand";
 import "./booleanCommand";
 import "./detachCommand";
 import "./draftCommand";
@@ -16,6 +17,7 @@ import "./moveCopyCommand";
 import "./offsetFaceCommand";
 import "./patternCommand";
 import "./planeCommand";
+import "./pointCommand";
 import "./pressPullCommand";
 import "./primitiveCommand";
 import "./removeFeatureCommand";
