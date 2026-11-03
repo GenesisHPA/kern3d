@@ -308,6 +308,60 @@
         height: 26px;
         margin: 0;
     }
+
+    & > .iconSlot {
+        padding: 0;
+    }
+
+    & > .iconSlot > * {
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        padding: 5px;
+        border-radius: 5px;
+    }
+}
+
+/* --- rearranging icons by drag and drop --- */
+
+.iconSlot {
+    position: relative;
+    display: flex;
+    cursor: grab;
+}
+
+.iconSlot.dragging {
+    opacity: 0.35;
+}
+
+.iconSlot.dropBefore::before,
+.iconSlot.dropAfter::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    width: 3px;
+    border-radius: 2px;
+    background-color: var(--accent-color);
+    pointer-events: none;
+}
+
+.iconSlot.dropBefore::before {
+    left: -3px;
+}
+
+.iconSlot.dropAfter::after {
+    right: -3px;
+}
+
+.icons.dropZone {
+    outline: 1px dashed var(--accent-color);
+    outline-offset: 1px;
+    border-radius: 5px;
+}
+
+.icons:empty {
+    min-width: 36px;
 }
 
 .groupHeader {
@@ -421,4 +475,46 @@
     color: var(--foreground-muted-color);
     font-size: 11px;
     margin-left: 16px;
+}
+
+.menuPin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin: -3px -4px -3px 0;
+    border-radius: 4px;
+    color: var(--foreground-muted-color);
+    opacity: 0.35;
+    cursor: pointer;
+
+    & svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    &:hover {
+        opacity: 1;
+        background-color: var(--hover-background-color);
+    }
+}
+
+.menuPin.pinned {
+    color: var(--accent-color);
+    opacity: 1;
+}
+
+.menuRow[draggable="true"] {
+    cursor: grab;
+}
+
+.menuSeparator {
+    height: 1px;
+    margin: 4px 2px;
+    background-color: var(--chrome-border-color);
+}
+
+.menuReset .menuText {
+    color: var(--foreground-secondary-color);
 }

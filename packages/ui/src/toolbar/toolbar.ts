@@ -174,7 +174,7 @@ export class MainToolbar extends HTMLElement {
                 className: style.groups,
                 dataset: { tab: tab.tabName },
                 sources: tab.groups,
-                template: (group) => new ToolbarGroup(group),
+                template: (group) => new ToolbarGroup(group, tab.tabName),
             });
             this.tabPanels.set(tab, panel);
             this.groupArea.append(panel);

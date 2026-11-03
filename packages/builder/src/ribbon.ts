@@ -164,8 +164,10 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                 items: [
                     "feature.extrude",
                     "feature.revolve",
-                    ["feature.sweep", "feature.loft", "feature.rib"],
-                    ["feature.hole", "feature.thread", "feature.helix"],
+                    "feature.sweep",
+                    "feature.loft",
+                    "feature.hole",
+                    ["feature.rib", "feature.thread", "feature.helix"],
                     [
                         {
                             type: "split",
@@ -203,8 +205,10 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                         type: "split",
                         items: ["feature.chamfer", "feature.modifyChamfer"],
                     },
-                    ["feature.shell", "feature.draft", "feature.offsetFace"],
-                    ["feature.split", "feature.removeFeature"],
+                    "feature.shell",
+                    "feature.draft",
+                    "feature.split",
+                    ["feature.offsetFace", "feature.removeFeature"],
                     ["feature.fuse", "feature.cut", "feature.common"],
                     ["modify.deleteNode", "modify.paintBucket", "feature.variable"],
                 ],

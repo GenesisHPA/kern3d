@@ -70,6 +70,20 @@ export function primaryEntries(group: RibbonGroup, max: number): CommandEntry[] 
     return result;
 }
 
+/**
+ * The icons of a group the user arranged: the saved commands, in their order, that the group
+ * still has and that are registered. A saved command the group no longer has is skipped.
+ */
+export function arrangedEntries(group: RibbonGroup, commands: readonly CommandKeys[]): CommandEntry[] {
+    const all = groupEntries(group);
+    const result: CommandEntry[] = [];
+    for (const command of commands) {
+        const entry = all.find((x) => entryKey(x) === command);
+        if (entry !== undefined && CommandStore.getComandData(command) !== undefined) result.push(entry);
+    }
+    return result;
+}
+
 /** The shortcut of a command under the active navigation profile, as shown to the user. */
 export function shortcutText(command: CommandKeys): string | undefined {
     const spec = ShortcutProfiles[Config.instance.navigation3D][command];

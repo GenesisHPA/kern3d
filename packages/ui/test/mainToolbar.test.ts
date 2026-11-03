@@ -4,6 +4,7 @@
 import {
     type CommandKeys,
     CommandStore,
+    I18n,
     type IApplication,
     ObservableCollection,
     PubSub,
@@ -15,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, test } from "@rstest/core";
 import { groupEntries, primaryEntries } from "../src/toolbar/commandItems";
 import { MainToolbar } from "../src/toolbar/toolbar";
 import { ToolbarGroup } from "../src/toolbar/toolbarGroup";
+import { moveCommand, ToolbarLayout } from "../src/toolbar/toolbarLayout";
 
 const A = "test.toolbar.a" as CommandKeys;
 const B = "test.toolbar.b" as CommandKeys;
@@ -204,5 +206,74 @@ describe("MainToolbar", () => {
         ribbon.setActiveTab("ribbon.tab.basic");
         ribbon.setActiveTab("ribbon.tab.parametric");
         expect(toolbar.querySelector("chili-toolbar-group")).toBe(first);
+    });
+});
+
+describe("toolbar layout", () => {
+    beforeEach(() => {
+        localStorage.clear();
+        ToolbarLayout.clearCache();
+    });
+
+    test("moveCommand moves forward and back, and inserts a new command", () => {
+        expect(moveCommand([A, B, C], A, 3)).toEqual([B, C, A]);
+        expect(moveCommand([A, B, C], C, 0)).toEqual([C, A, B]);
+        expect(moveCommand([A, B, C], B, 2)).toEqual([A, B, C]);
+        expect(moveCommand([A, B], D, 1)).toEqual([A, D, B]);
+        expect(moveCommand([A, B], D, 99)).toEqual([A, B, D]);
+    });
+
+    test("an arrangement reorders the icons and is kept per tab", () => {
+        const group = new ToolbarGroup(makeGroup(), "ribbon.tab.parametric");
+        document.body.append(group);
+        expect(group.iconEntries()).toEqual([A, B]);
+
+        group.placeCommand(B, 0);
+        expect(group.iconEntries()).toEqual([B, A]);
+        const icons = Array.from(group.querySelectorAll<HTMLElement>("[data-icon-command]"));
+        expect(icons.map((x) => x.dataset["iconCommand"])).toEqual([B, A]);
+
+        ToolbarLayout.clearCache(); // read back from storage
+        expect(new ToolbarGroup(makeGroup(), "ribbon.tab.parametric").iconEntries()).toEqual([B, A]);
+        expect(new ToolbarGroup(makeGroup(), "ribbon.tab.basic").iconEntries()).toEqual([A, B]);
+    });
+
+    test("a pin shows a dropdown command as an icon, and hides it again", () => {
+        const group = new ToolbarGroup(makeGroup(), "t");
+        document.body.append(group);
+        group.togglePinned(D);
+        expect(group.iconEntries()).toEqual([A, B, D]);
+        group.togglePinned(A);
+        expect(group.iconEntries()).toEqual([B, D]);
+        expect(group.querySelectorAll("ribbon-button").length).toBe(2);
+    });
+
+    test("reset returns to the profile's icons", () => {
+        const group = new ToolbarGroup(makeGroup(), "t");
+        group.togglePinned(E);
+        group.resetLayout();
+        expect(group.iconEntries()).toEqual([A, B]);
+        expect(ToolbarLayout.get(group.layoutKey)).toBeUndefined();
+    });
+
+    test("a saved command the group no longer has is skipped", () => {
+        ToolbarLayout.set(ToolbarLayout.key("t", "ribbon.group.create"), [
+            "test.toolbar.gone" as CommandKeys,
+            C,
+        ]);
+        expect(new ToolbarGroup(makeGroup(), "t").iconEntries()).toEqual([C]);
+    });
+
+    test("the dropdown marks pinned commands and offers reset once arranged", () => {
+        const group = new ToolbarGroup(makeGroup(), "t");
+        document.body.append(group);
+        group.toggleMenu();
+        expect(document.body.querySelectorAll("[data-command] > :last-child").length).toBe(5);
+        expect(document.body.textContent).not.toContain("toolbar.resetLayout");
+        group.toggleMenu();
+
+        group.togglePinned(C);
+        group.toggleMenu();
+        expect(document.body.textContent).toContain(I18n.translate("toolbar.resetLayout"));
     });
 });
