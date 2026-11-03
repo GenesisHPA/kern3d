@@ -55,6 +55,7 @@ import {
     offerKeyToPasswordManager,
     PROVIDER_PRESETS,
     type ProviderPreset,
+    presetForConfig,
     REASONING_EFFORTS,
     type ReasoningEffort,
     saveConfig,
@@ -971,7 +972,7 @@ export class ChatPanel extends HTMLElement {
         if (!this.settingsOverlay) return;
         const saved = loadConfig();
         if (saved && this.providerSelect && this.baseURLInput && this.modelInput && this.apiKeyInput) {
-            const preset = PROVIDER_PRESETS.find((p) => p.provider === saved.provider);
+            const preset = presetForConfig(saved);
             if (preset) this.providerSelect.value = preset.id;
             // Which preset the shown values came from, so a switch can still tell an untouched
             // field from one the user has made their own since.

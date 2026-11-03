@@ -3,7 +3,7 @@
 
 import { ObjectStorage } from "@chili3d/core";
 import { mockLocalStorage } from "@chili3d/core/test-utils";
-import { loadConfig, saveConfig } from "../src/settings";
+import { loadConfig, PROVIDER_PRESETS, presetForConfig, saveConfig } from "../src/settings";
 
 describe("ai settings", () => {
     beforeEach(() => {
@@ -52,5 +52,33 @@ describe("ai settings", () => {
 
     test("returns undefined when nothing is stored", () => {
         expect(loadConfig()).toBeUndefined();
+    });
+});
+
+describe("provider presets", () => {
+    test("the free cloud services speak Completions at their own endpoints", () => {
+        for (const id of ["gemini", "openrouter", "groq"]) {
+            const preset = PROVIDER_PRESETS.find((p) => p.id === id);
+            expect(preset?.provider).toBe("completions");
+            expect(preset?.baseURL).toMatch(/^https:\/\//);
+            expect(preset?.defaultModel).not.toBe("");
+        }
+        expect(new Set(PROVIDER_PRESETS.map((p) => p.id)).size).toBe(PROVIDER_PRESETS.length);
+    });
+
+    test("a saved config finds its preset by endpoint, then by protocol", () => {
+        expect(
+            presetForConfig({ provider: "completions", baseURL: "https://openrouter.ai/api/v1/" })?.id,
+        ).toBe("openrouter");
+        expect(
+            presetForConfig({
+                provider: "completions",
+                baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+            })?.id,
+        ).toBe("gemini");
+        expect(presetForConfig({ provider: "completions", baseURL: "http://my-proxy/v1" })?.id).toBe(
+            "openai",
+        );
+        expect(presetForConfig({ provider: "anthropic" })?.id).toBe("anthropic");
     });
 });

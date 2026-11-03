@@ -75,7 +75,43 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
         baseURL: "https://api.openai.com/v1",
         defaultModel: DEFAULT_OPENAI_MODEL,
     },
+    // Cloud services with a free tier, all reached through their OpenAI-compatible endpoints. Free
+    // tiers come with rate limits, and the model lists behind them change often, so each preset
+    // names a stable alias or router rather than a dated model; the model field stays editable.
+    {
+        id: "gemini",
+        label: "Google Gemini (free tier)",
+        provider: "completions",
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+        defaultModel: "gemini-flash-latest",
+    },
+    {
+        id: "openrouter",
+        label: "OpenRouter (free models)",
+        provider: "completions",
+        baseURL: "https://openrouter.ai/api/v1",
+        // the router picks among the free models that support the request's features (tools)
+        defaultModel: "openrouter/free",
+    },
+    {
+        id: "groq",
+        label: "Groq (free tier)",
+        provider: "completions",
+        baseURL: "https://api.groq.com/openai/v1",
+        defaultModel: "openai/gpt-oss-120b",
+    },
 ];
+
+/**
+ * The preset a saved config came from. Several presets share a wire protocol (every free cloud
+ * service speaks Completions), so the endpoint decides first and the protocol is the fallback —
+ * a config pointed at a proxy still shows the protocol it uses.
+ */
+export function presetForConfig(config: Pick<LLMConfig, "provider" | "baseURL">): ProviderPreset | undefined {
+    const sameProvider = PROVIDER_PRESETS.filter((p) => p.provider === config.provider);
+    const normalize = (url?: string) => (url ?? "").trim().replace(/\/+$/, "");
+    return sameProvider.find((p) => normalize(p.baseURL) === normalize(config.baseURL)) ?? sameProvider[0];
+}
 
 const STORAGE_KEY = "ai.config";
 
