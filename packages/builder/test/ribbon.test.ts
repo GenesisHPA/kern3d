@@ -255,8 +255,8 @@ describe("ParametricRibbonProfiles", () => {
             "modify.move",
             "modify.rotate",
             "modify.mirror",
-            "modify.detach",
             "modify.array",
+            "modify.detach",
         ]);
     });
 
