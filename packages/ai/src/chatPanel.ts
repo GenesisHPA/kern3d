@@ -642,7 +642,7 @@ export class ChatPanel extends HTMLElement {
     private createTitle(): HTMLElement {
         this.titleEl = div(
             { className: style.title },
-            svg({ className: style.titleIcon, icon: "icon-chili" }),
+            svg({ className: style.titleIcon, icon: "icon-valpyro" }),
             span({ textContent: new Localize("ai.title") }),
         );
         return this.titleEl;
@@ -752,7 +752,7 @@ export class ChatPanel extends HTMLElement {
     private createEmptyState(): HTMLElement {
         return div(
             { className: style.emptyState },
-            svg({ className: style.emptyIcon, icon: "icon-chili" }),
+            svg({ className: style.emptyIcon, icon: "icon-valpyro" }),
             div({ className: style.emptyTitle, textContent: new Localize("ai.emptyTitle") }),
             div({ className: style.emptyHint, textContent: new Localize("ai.emptyHint") }),
             div({ className: style.emptyHint, textContent: new Localize("ai.emptyExample") }),

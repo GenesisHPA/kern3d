@@ -5,7 +5,7 @@ import { command, type IApplication, type ICommand, PubSub } from "@chili3d/core
 
 @command({
     key: "ai.toggleChat",
-    icon: "icon-chili",
+    icon: "icon-valpyro",
 })
 export class ToggleChatCommand implements ICommand {
     async execute(_application: IApplication): Promise<void> {
