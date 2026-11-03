@@ -1,13 +1,12 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { en, ptBr, zhCn } from "../src";
+import { en, ru } from "../src";
 
 describe("i18n locales", () => {
     const locales = [
         { name: "en", locale: en },
-        { name: "zhCn", locale: zhCn },
-        { name: "ptBr", locale: ptBr },
+        { name: "ru", locale: ru },
     ] as const;
 
     describe("locale structure", () => {
@@ -29,36 +28,23 @@ describe("i18n locales", () => {
     describe("locale languages", () => {
         test.each([
             { name: "en", locale: en, language: "en" },
-            { name: "zhCn", locale: zhCn, language: "zh-CN" },
-            { name: "ptBr", locale: ptBr, language: "pt-BR" },
+            { name: "ru", locale: ru, language: "ru" },
         ] as const)("$name language should be $language", ({ locale, language }) => {
             expect(locale.language).toBe(language);
         });
     });
 
-    describe("key consistency between en and zh-cn", () => {
-        test("zh-cn should have all keys present in en", () => {
-            const enKeys = new Set(Object.keys(en.translation));
-            const zhKeys = new Set(Object.keys(zhCn.translation));
-            const missing = [...enKeys].filter((k) => !zhKeys.has(k));
+    describe("ru extends en", () => {
+        test("ru has every en key (untranslated ones fall back to English)", () => {
+            const ruKeys = new Set(Object.keys(ru.translation));
+            const missing = Object.keys(en.translation).filter((k) => !ruKeys.has(k));
             expect(missing).toEqual([]);
         });
 
-        test("en should have all keys present in zh-cn", () => {
+        test("ru has no key en lacks", () => {
             const enKeys = new Set(Object.keys(en.translation));
-            const zhKeys = new Set(Object.keys(zhCn.translation));
-            const extra = [...zhKeys].filter((k) => !enKeys.has(k));
+            const extra = Object.keys(ru.translation).filter((k) => !enKeys.has(k));
             expect(extra).toEqual([]);
-        });
-    });
-
-    describe("pt-br extends en", () => {
-        test("pt-br should contain en keys via spread", () => {
-            // pt-br uses ...en.translation, so it has all en keys
-            const enKeys = new Set(Object.keys(en.translation));
-            const ptKeys = new Set(Object.keys(ptBr.translation));
-            const missingFromPt = [...enKeys].filter((k) => !ptKeys.has(k));
-            expect(missingFromPt).toEqual([]);
         });
     });
 
@@ -101,8 +87,7 @@ describe("i18n locales", () => {
         });
 
         test.each([
-            { name: "zhCn", locale: zhCn },
-            { name: "ptBr", locale: ptBr },
+            { name: "ru", locale: ru },
         ] as const)("$name translation values should be non-empty strings", ({ locale }) => {
             for (const [key, value] of Object.entries(locale.translation)) {
                 expect(typeof value).toBe("string");
@@ -115,8 +100,7 @@ describe("i18n locales", () => {
         const placeholders = (value: string): string[] => value.match(/\{\d+\}/g)?.sort() ?? [];
 
         test.each([
-            { name: "zhCn", locale: zhCn },
-            { name: "ptBr", locale: ptBr },
+            { name: "ru", locale: ru },
         ] as const)("$name should keep the same placeholders as en for every key", ({ locale }) => {
             const mismatches: string[] = [];
             for (const [key, enValue] of Object.entries(en.translation)) {

@@ -67,10 +67,18 @@ describe("I18n", () => {
 
         test("should return 'en' if browser language does not match", () => {
             Object.defineProperty(navigator, "language", {
-                value: "fr-FR",
+                value: "ja-JP",
                 writable: true,
             });
             expect(I18n.defaultLanguage()).toBe("en");
+        });
+
+        test("a region variant picks its base language (ru-RU → ru, fr-FR → fr)", () => {
+            Object.defineProperty(navigator, "language", {
+                value: "fr-FR",
+                writable: true,
+            });
+            expect(I18n.defaultLanguage()).toBe("fr");
         });
     });
 

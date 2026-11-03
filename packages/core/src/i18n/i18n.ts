@@ -40,7 +40,11 @@ export class I18n {
 
     static defaultLanguage(): string {
         const defaultLanguage = navigator.language.toLowerCase();
-        const language = languages.keys().find((key) => key.toLowerCase() === defaultLanguage);
+        const keys = Array.from(languages.keys());
+        // an exact match first ("ru"), then the browser's region variant of one ("ru-RU" → "ru")
+        const language =
+            keys.find((key) => key.toLowerCase() === defaultLanguage) ??
+            keys.find((key) => defaultLanguage.split("-")[0] === key.toLowerCase());
         if (language) {
             return language;
         }
@@ -88,7 +92,8 @@ export class I18n {
     }
 
     static translate(key: I18nKeys, ...args: any[]) {
-        const language = languages.get(I18n.currentLanguage());
+        // A language saved before it was removed (or a plugin's that is gone) reads as English.
+        const language = languages.get(I18n.currentLanguage()) ?? languages.get("en");
         if (!language) {
             console.warn(`No translation for ${key} in ${language}`);
             return key;
@@ -109,7 +114,8 @@ export class I18n {
     }
 
     static isI18nKey(key: string): key is I18nKeys {
-        return key in languages.get("zh-CN")!.translation;
+        const en = languages.get("en");
+        return en !== undefined && key in en.translation;
     }
 
     static set(dom: HTMLElement, path: I18nPath, key: I18nKeys, ...args: any[]) {
