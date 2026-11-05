@@ -77,7 +77,7 @@ const draftHandler: FeatureHandler<DraftFeatureData> = {
         const neutral = resolveNeutralPlane(feature.neutralPlane, context, "Draft");
         if (!neutral.isOk) return Result.err(neutral.error);
 
-        // The pull direction is the neutral plane's own normal — Fusion's and Onshape's default —
+        // The pull direction is the neutral plane's own normal — Onshape's default —
         // and `reverse` flips which side a positive angle takes material from, which is what the
         // UI's opposite-direction option means.
         //

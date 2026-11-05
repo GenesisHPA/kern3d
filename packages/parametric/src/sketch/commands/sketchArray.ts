@@ -811,7 +811,7 @@ function arrayPreviewMesh(editor: SketchEditor, copy: SketchEntityData): EdgeMes
  * Patterns the selected entities along a picked direction, around a picked centre, or along a
  * picked curve. The pattern is a *definition* the sketch keeps (`SketchArrayData`), not a set
  * of copies: the copies are re-derived on every solve, so editing a seed, the reference or a
- * parameter moves the whole pattern — which is what SolidWorks and Fusion document for their
+ * parameter moves the whole pattern — which is what SolidWorks documents for their
  * sketch patterns, and what Onshape leaves entirely to its feature patterns.
  *
  * One shot per invocation: the confirm commits and the command is over, so the next array

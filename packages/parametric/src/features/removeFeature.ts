@@ -12,7 +12,7 @@ import { captureProfileRef } from "./profileRef";
 import { matchSourceFaceIndexes } from "./sourceFaceMatcher";
 
 /**
- * Remove feature (Fusion's Delete Face with heal): delete the named faces of the chain
+ * Remove feature (Delete Face with heal): delete the named faces of the chain
  * input and let the kernel close the wound.
  *
  * Structured like `shell.ts` — the same relationship to its input (faces named as

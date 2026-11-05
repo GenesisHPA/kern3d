@@ -7,7 +7,7 @@ import { ParametricBodyNode } from "../parametricBodyNode";
 import type { SketchNode } from "./sketchNode";
 
 /**
- * Fusion-style session rollback: while a sketch is edited, every body whose shape depends on it
+ * Classic-CAD-style session rollback: while a sketch is edited, every body whose shape depends on it
  * is shown at the sketch's timeline position.
  *
  * - **Which state that is:** the state the body had when the sketch was created against it,

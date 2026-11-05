@@ -320,7 +320,7 @@ class JointStep implements IStep {
 }
 
 /**
- * Fusion's Joint: pick the joint origin on component 1, then on component 2; component 2 moves so
+ * Joint: pick the joint origin on component 1, then on component 2; component 2 moves so
  * its origin lands on component 1's (Z axes facing each other, as two mating faces do). The type,
  * Flip, an offset along Z and an angle about it are edited while the parts already sit in place;
  * the motion values and limits are the joint's own properties afterwards. Bodies at the document
@@ -399,7 +399,7 @@ export class JointCommand extends JointCommandBase {
 }
 
 /**
- * Fusion's As-built Joint: the components stay where they are. Pick the joint origin on component
+ * As-built Joint: the components stay where they are. Pick the joint origin on component
  * 1, then any geometry of component 2; component 2's origin is the same frame, fixed in its own
  * space, so the joint holds with every motion value at zero.
  */

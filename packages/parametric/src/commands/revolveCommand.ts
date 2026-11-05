@@ -60,7 +60,7 @@ const REVOLVE_OPERATIONS: Record<string, BooleanOperation> = {
  * sketch-space fingerprints, so editing either source rebuilds the revolve.
  *
  * Join/cut/intersect appends the feature to the auto-detected intersecting body
- * (Fusion-style, see the extrude command); "new" creates a standalone body.
+ * (as in classic CAD, see the extrude command); "new" creates a standalone body.
  */
 @command({ key: "feature.revolve", icon: "icon-revolve" })
 export class RevolveFeatureCommand extends MultistepCommand {

@@ -440,7 +440,7 @@ export class ExtrudeEndTargetStep implements IStep {
                     multi: false,
                     // The click only aims: the target is a parameter of an extrude whose
                     // depth/offset may still change, so the bar's confirm (or Enter) ends
-                    // it — the same "pick, then OK" Fusion/Onshape use.
+                    // it — the same "pick, then OK" Onshape uses.
                     finishOnClick: false,
                     // Live preview of the reach the aimed target would give.
                     onDetect: this.onDetect,
@@ -708,7 +708,7 @@ export class ExtrudeFeatureCommand
     /**
      * Only blind asks for a depth. Through-all measures its own reach, and an up-to
      * condition takes it from the target — the stored depth stays a fallback the user
-     * cannot act on there, so the row is hidden the way Fusion/Onshape hide it per end
+     * cannot act on there, so the row is hidden the way Onshape hides it per end
      * condition. (`needsDepthDrag` still guards a depth-driven commit at zero; hiding the
      * row does not change what the feature builds.)
      */
@@ -1784,7 +1784,7 @@ export class ExtrudeFeatureCommand
 
     /**
      * Join/cut/intersect: the feature is appended to every body the scope names and combines
-     * with each one's shape (Fusion-style); without a body to combine with (or for "new")
+     * with each one's shape (classic-CAD style); without a body to combine with (or for "new")
      * the extrude becomes a standalone body.
      */
     private commitFeature(

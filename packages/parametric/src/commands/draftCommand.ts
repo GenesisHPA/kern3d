@@ -61,7 +61,7 @@ export class SelectNeutralPlaneStep implements IStep {
 }
 
 /**
- * Draft (Onshape's / Fusion's Draft): taper picked faces of a parametric body about a neutral
+ * Draft (Onshape's Draft): taper picked faces of a parametric body about a neutral
  * plane, by an angle whose direction defaults to that plane's normal.
  *
  * No new body and no boolean scope — a draft rewrites the body it is applied to, exactly as a
@@ -92,7 +92,7 @@ export class DraftFeatureCommand extends MultistepCommand {
         });
     }
 
-    /** Flips the pull direction without touching the angle — Fusion's Flip Pull Direction. */
+    /** Flips the pull direction without touching the angle (Flip Pull Direction). */
     @property("option.command.oppositeDirection")
     get reverse(): boolean {
         return this.getPrivateValue("reverse", false);

@@ -7,7 +7,7 @@ import { centerRef, lineRefs } from "./solverEntities";
 
 /**
  * The two sizes a typed pair asked for, on a shape drawn from two corners — a rectangle, whose
- * width and height the two numbers are (Fusion's and Onshape's rectangle tools read the same two
+ * width and height the two numbers are (Onshape's rectangle tools read the same two
  * fields the same way).
  *
  * Each is the gap across the shape rather than a distance between the two corners, and that is

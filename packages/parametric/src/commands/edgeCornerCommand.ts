@@ -303,7 +303,7 @@ export class ChamferFeatureCommand extends EdgeCornerFeatureCommand {
     }
 
     /**
-     * Fusion-style chamfer type: one distance on both faces, a separate distance per face, or a
+     * Classic-CAD-style chamfer type: one distance on both faces, a separate distance per face, or a
      * distance and an angle. The asymmetric two measure `value` on the reference face.
      */
     @property("feature.chamfer.mode", { combobox: Combobox.from(Object.values(CHAMFER_MODE_KEYS)) })

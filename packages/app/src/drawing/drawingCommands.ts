@@ -54,7 +54,7 @@ export function createDrawingOf(document: IDocument, body: ShapeNode): DrawingNo
     return node;
 }
 
-/** Fusion's "Drawing from design": the picked (or selected) body, laid out and opened. */
+/** "Drawing from design": the picked (or selected) body, laid out and opened. */
 @command({
     key: "drawing.create",
     icon: "icon-file-plus",

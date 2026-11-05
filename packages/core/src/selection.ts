@@ -35,7 +35,7 @@ export interface PickShapeOptions {
      * Whether a click that selected something finishes a single pick (default true). False
      * turns the pick into "select, then confirm": the click only selects, the confirm bar
      * (shown automatically) or Enter settles it — what a target the user may still adjust
-     * other parameters against needs, and how Fusion/Onshape end an up-to pick. Ignored in
+     * other parameters against needs, and how Onshape ends an up-to pick. Ignored in
      * multi mode, which is settled by its own bar.
      */
     finishOnClick?: boolean;

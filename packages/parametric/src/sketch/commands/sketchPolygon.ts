@@ -22,7 +22,7 @@ import { type SketchPointSnapData, SketchPointStep } from "./sketchPointStep";
 /**
  * Which point the second pick defines. Inscribed: the pick is a vertex and its
  * distance is the circumradius. Circumscribed: the pick is an edge midpoint and its
- * distance is the apothem — the same split Fusion's polygon tool makes.
+ * distance is the apothem — the usual polygon-tool split.
  */
 export const POLYGON_INSCRIBED: I18nKeys = "option.command.polygonMode.inscribed";
 export const POLYGON_CIRCUMSCRIBED: I18nKeys = "option.command.polygonMode.circumscribed";
@@ -45,7 +45,7 @@ export interface RegularPolygonLayout {
 
 /**
  * The regular polygon `center` and `picked` describe. `circumscribed` reads the
- * pick the way Fusion's circumscribed mode does — the distance to an edge rather
+ * pick the way a circumscribed mode does — the distance to an edge rather
  * than to a vertex — so the circumradius is that over cos(π/N), and the first
  * vertex starts half a step before the picked direction, which is where the first
  * edge's midpoint sits. Inscribed needs neither: the pick is the first vertex.

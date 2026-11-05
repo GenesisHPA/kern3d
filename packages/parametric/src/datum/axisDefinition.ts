@@ -20,7 +20,7 @@ export interface DatumDefinitionBase {
 }
 
 /**
- * How a construction axis is defined (Fusion's CONSTRUCT ▸ Axis). Every reference is
+ * How a construction axis is defined (CONSTRUCT ▸ Axis). Every reference is
  * captured like a datum plane's — in the source node's LOCAL frame, anchored to its timeline
  * position — so the axis follows its geometry when the model rebuilds.
  */

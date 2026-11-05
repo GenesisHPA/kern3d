@@ -256,7 +256,7 @@ export class CreateSketch extends MultistepCommand {
     private _pushingToOffset = false;
 
     /**
-     * Fusion-style placement on a face: the sketch origin goes where the face was clicked,
+     * Classic-CAD-style placement on a face: the sketch origin goes where the face was clicked,
      * snapped onto a vertex, edge midpoint or arc centre within a few pixels. Off gives the
      * default — the world origin projected onto the face.
      */

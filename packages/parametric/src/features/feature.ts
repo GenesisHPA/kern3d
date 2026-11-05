@@ -203,7 +203,7 @@ export interface ExtrudeFeatureData extends FeatureBase {
     readonly draftAngle?: ParameterValue;
     /**
      * How the prism combines with the preceding feature's shape on the host body —
-     * Fusion-style join (fuse) / cut / intersect (common). Undefined creates standalone
+     * Classic-CAD-style join (fuse) / cut / intersect (common). Undefined creates standalone
      * geometry; set when the extrude command appends the feature to a target body.
      */
     readonly operation?: BooleanOperation;
@@ -267,7 +267,7 @@ export interface PrimitiveFeatureData extends FeatureBase {
     readonly axis?: XYZLike;
     /**
      * How the primitive combines with the preceding feature's shape on the host body —
-     * Fusion-style join (fuse) / cut / intersect (common). Undefined creates standalone
+     * Classic-CAD-style join (fuse) / cut / intersect (common). Undefined creates standalone
      * geometry; a primitive that opens a chain carries none, and one asked to combine with
      * nothing is a rebuild error rather than a silent standalone.
      */
@@ -309,7 +309,7 @@ export interface RevolveFeatureData extends FeatureBase {
     readonly profiles?: ProfileRef[];
     /**
      * How the revolved shape combines with the preceding feature's shape on the host
-     * body — Fusion-style join (fuse) / cut / intersect (common). Undefined creates
+     * body — classic-CAD-style join (fuse) / cut / intersect (common). Undefined creates
      * standalone geometry; set when the revolve command appends the feature to a
      * target body.
      */
@@ -392,7 +392,7 @@ export interface LoftFeatureData extends FeatureBase {
     readonly continuity: Continuity;
     /**
      * How the lofted shape combines with the preceding feature's shape on the host
-     * body — Fusion-style join (fuse) / cut / intersect (common). Undefined creates
+     * body — classic-CAD-style join (fuse) / cut / intersect (common). Undefined creates
      * standalone geometry; set when the loft command appends the feature to a target
      * body. A shell has no volume to combine with, so a shell loft (`isSolid: false`)
      * carrying one fails to build rather than ignoring it.
@@ -437,7 +437,7 @@ export interface SweepFeatureData extends FeatureBase {
     readonly profileControl?: SweepProfileMode;
     /**
      * How the swept shape combines with the preceding feature's shape on the host body —
-     * Fusion-style join (fuse) / cut / intersect (common). Undefined creates standalone
+     * Classic-CAD-style join (fuse) / cut / intersect (common). Undefined creates standalone
      * geometry; set when the sweep command appends the feature to a target body.
      */
     readonly operation?: BooleanOperation;
@@ -471,7 +471,7 @@ export interface ThickenFeatureData extends FeatureBase {
     readonly reverse?: boolean;
     /**
      * How the thickened solid combines with the preceding feature's shape on the host body —
-     * Fusion-style join (fuse) / cut / intersect (common). Undefined creates standalone geometry.
+     * Classic-CAD-style join (fuse) / cut / intersect (common). Undefined creates standalone geometry.
      * A face is what a thicken is built from, so the solid it makes need not touch the body: a
      * `cut` takes it out of the input wherever it passes. A shell has no volume to combine with,
      * so a source with no enclosed space carrying one fails to build rather than ignoring it.
@@ -501,7 +501,7 @@ export interface ShellFeatureData extends FeatureBase {
     readonly thickness: ParameterValue;
     /**
      * Hollow outward instead of inward — the wall is added outside the input's boundary rather
-     * than carved out of it (Onshape's negative thickness, Fusion's outside direction).
+     * than carved out of it (Onshape's negative thickness).
      */
     readonly outward?: boolean;
     /**
@@ -513,7 +513,7 @@ export interface ShellFeatureData extends FeatureBase {
 }
 
 /**
- * Offset Face (Fusion's and Onshape's Move Face › Offset): move the named faces along their own
+ * Offset Face (Onshape's Move Face › Offset): move the named faces along their own
  * outward normals, the faces that run smoothly into them following — a flat face grows or sinks
  * like a pad, a curved wall changes its radius, which is how a cylinder or a hole is resized.
  *
@@ -536,7 +536,7 @@ export interface OffsetFaceFeatureData extends FeatureBase {
     /**
      * Keep the radius of the rounds of a fillet that run into a moved face: they are taken off and
      * made again at their own radius, so moving a wall neither re-radiuses them nor drags the
-     * faces past them along (Fusion's behavior, and what an imported `.f3d` expects).
+     * faces past them along (the usual CAD behavior).
      *
      * A REQUIREMENT, not a best effort. When the rounds beside a moving face cannot be re-made the
      * offset is REFUSED (kernel status 7), the feature's error is worded, and the body keeps the
@@ -579,7 +579,7 @@ export function planeRefNodeId(ref: NeutralPlaneRef): string | undefined {
 }
 
 /**
- * Draft (Onshape's / Fusion's Draft): taper the named faces about their intersection with a
+ * Draft (Onshape's Draft): taper the named faces about their intersection with a
  * neutral plane, so a part can leave its mould.
  *
  * The faces are named and resolved exactly as a shell's are — `ProfileRef` fingerprints matched
@@ -596,13 +596,13 @@ export interface DraftFeatureData extends FeatureBase {
     /** The plane the tapers rotate about. */
     readonly neutralPlane: NeutralPlaneRef;
     /**
-     * Taper angle in degrees (Onshape's and Fusion's unit). A negative angle keeps OCCT's
+     * Taper angle in degrees (Onshape's unit). A negative angle keeps OCCT's
      * meaning — material added on the pull direction's side rather than removed — so it is not
      * clamped.
      */
     readonly angle: ParameterValue;
     /**
-     * Flip the pull direction, which defaults to the neutral plane's normal (Fusion's Flip Pull
+     * Flip the pull direction, which defaults to the neutral plane's normal (Flip Pull
      * Direction / Onshape's angle-direction toggle). Which side material is taken from is the
      * only thing that changes: the taper's magnitude is the same either way.
      */
@@ -772,7 +772,7 @@ export interface HoleSketchPoints {
  * from the world origin would drift when the body is merely moved.
  *
  * Depth convention: a blind `depth` measures from the plane to the drill POINT (the tip apex),
- * the way Fusion's "include drill tip" callout reads; the full-diameter part is therefore
+ * the way an "include drill tip" callout reads; the full-diameter part is therefore
  * `depth − r/tan(φ/2)`. `throughAll` (no `depth`) instead extends the hole solid so the
  * FULL-DIAMETER part clears the input's far side — the tip pokes out like a real drilled
  * through hole, and the removed material is a clean cylinder.
@@ -860,7 +860,7 @@ export interface RibFeatureData extends FeatureBase {
 }
 
 /**
- * Remove feature (Fusion's Delete Face with heal, Onshape's Delete face): delete the named
+ * Remove feature (Onshape's Delete face): delete the named
  * faces of the chain input and let the kernel close the wound — removing a fillet's face
  * un-fillets the corner, removing a hole's wall faces plugs the hole.
  *
@@ -961,7 +961,7 @@ export interface HelixFeatureData extends FeatureBase {
 }
 
 /**
- * Thread (Fusion's Thread): a screw thread on a cylindrical face of the chain input — an external
+ * Thread: a screw thread on a cylindrical face of the chain input — an external
  * one on a shaft, an internal one in a bore, told apart by the face's own orientation at every
  * rebuild (nothing stored decides it).
  *

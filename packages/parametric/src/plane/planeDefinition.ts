@@ -417,7 +417,7 @@ function curvePointDefinition(
 }
 
 /**
- * A plane tangent to an axis-of-revolution face (Fusion's Tangent Plane). The stored pick
+ * A plane tangent to an axis-of-revolution face (Tangent Plane). The stored pick
  * point is rotated about the face's axis by `angle` and projected back onto the surface;
  * the plane touches the face there, its normal pointing away from the axis.
  */

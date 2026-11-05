@@ -28,7 +28,7 @@ export interface DatumPointNodeOptions extends DatumNodeOptions<PointDefinition>
 }
 
 /**
- * A construction point (Fusion's CONSTRUCT ▸ Point). Named `DatumPointNode` because the
+ * A construction point (CONSTRUCT ▸ Point). Named `DatumPointNode` because the
  * direct-modeling `PointNode` already owns that serialized class name. Datum planes and axes
  * accept it wherever they take a vertex.
  */

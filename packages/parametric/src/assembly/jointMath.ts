@@ -4,7 +4,7 @@
 import { type I18nKeys, Matrix4, XYZ, type XYZLike } from "@chili3d/core";
 
 /**
- * The joint kinds, Fusion's set. Each one leaves component 2 some degrees of freedom relative to
+ * The joint kinds, the usual set. Each one leaves component 2 some degrees of freedom relative to
  * component 1, all measured in joint origin 1's frame (Z = the joint axis):
  *
  * - `rigid` — none.

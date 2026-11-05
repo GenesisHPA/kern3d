@@ -37,7 +37,7 @@ The built-in assistant runs entirely in the browser and calls the LLM endpoint d
 
 ### Parametric Modeling
 
-Parametric bodies are feature-list models in the Onshape/Fusion style: a body stores no baked shape, only an ordered list of features, and the list is replayed top to bottom on every rebuild. Editing any upstream feature — a dimension, a sketch line, a suppressed step — re-evaluates everything downstream of it.
+Parametric bodies are feature-list models in the Onshape style: a body stores no baked shape, only an ordered list of features, and the list is replayed top to bottom on every rebuild. Editing any upstream feature — a dimension, a sketch line, a suppressed step — re-evaluates everything downstream of it.
 
 <p align="center">
   <img src="./screenshots/parametric-modeling.gif" alt="Editing a dimension in a fully constrained sketch and watching the feature chain rebuild in Chili3D" width="100%">

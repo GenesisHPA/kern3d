@@ -69,7 +69,7 @@ const LOFT_OPERATIONS: Record<string, BooleanOperation> = {
  * re-matches every section against its node's rebuilt shape.
  *
  * A solid loft's join/cut/intersect appends the feature to the auto-detected
- * intersecting body (Fusion-style, see the extrude command); "new" creates a standalone
+ * intersecting body (as in classic CAD, see the extrude command); "new" creates a standalone
  * body. A shell drops the operation — it has no volume to combine with.
  */
 @command({ key: "feature.loft", icon: "icon-loft" })

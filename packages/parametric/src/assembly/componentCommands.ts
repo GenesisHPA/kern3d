@@ -45,7 +45,7 @@ export function createComponent(document: IDocument, nodes: readonly INode[]): A
 }
 
 /**
- * Fusion's New Component: the selected bodies (sketches, planes, components…) move into a new
+ * New Component: the selected bodies (sketches, planes, components…) move into a new
  * component; with nothing selected the component starts empty and becomes the active one, so
  * the next bodies are created inside it.
  */

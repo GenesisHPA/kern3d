@@ -26,7 +26,7 @@ import { centerRef, lineRefs } from "./solverEntities";
  * circle's center symmetry plus one `EqualRadius` are its three — so whatever relations
  * the source entities have between them (a shared corner, a tangency, a parallel) hold
  * across the reflection too, without a second constraint saying so. It is the same shape
- * Onshape and Fusion document: the copy is driven by the parent.
+ * Onshape documents: the copy is driven by the parent.
  *
  * Points that the source itself joins by a coincidence are the one exception, and they
  * need care in both directions. Garlic removes a coincidence by substituting its two

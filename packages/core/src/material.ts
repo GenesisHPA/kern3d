@@ -86,7 +86,7 @@ export interface MaterialOptions {
 
 export interface MaterialPreset {
     /** Names the preset in the picker and the material it creates. English, like the rest of a
-     *  document's materials, and like the appearance names in Fusion's library. */
+     *  document's materials, and like common CAD appearance-library names. */
     readonly name: string;
     readonly color: number;
     readonly roughness: number;

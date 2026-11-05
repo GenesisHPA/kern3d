@@ -76,7 +76,7 @@ export interface CollectedAxisRefs {
 }
 
 /**
- * Creates a construction axis (Fusion's CONSTRUCT ▸ Axis): pick the geometry the type asks
+ * Creates a construction axis (CONSTRUCT ▸ Axis): pick the geometry the type asks
  * for, check the dashed preview, confirm. The axis is a standalone `AxisNode` — see there.
  * Changing the type restarts the picks, as the plane command does.
  */

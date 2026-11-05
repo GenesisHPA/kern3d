@@ -23,7 +23,7 @@ import { worldAxisXVec } from "../sketch/planeRef";
 import type { JointFrame } from "./jointMath";
 
 /**
- * Where on the picked geometry a joint origin sits, Fusion's snap points:
+ * Where on the picked geometry a joint origin sits, the usual snap points:
  *
  * - `faceCenter` — a planar face's centre (orientation: the outward normal), a cylindrical face's
  *   axis at mid-height (orientation: the axis).

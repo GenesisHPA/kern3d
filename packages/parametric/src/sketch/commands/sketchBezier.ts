@@ -27,7 +27,7 @@ const CURVE_POINTS = 4;
  * The poles are the points the user clicked, and the curve is drawn *by* them rather than
  * through them: a clamped B-spline starts and ends at its first and last control point and
  * passes through none of the others, which is what a control-point spline is (Onshape's and
- * Fusion's control-point spline, SolidWorks' style spline). Its spans are what the chain is
+ * SolidWorks' style spline). Its spans are what the chain is
  * made of — a clamped B-spline's span *is* a Bézier — and consecutive spans meet smoothly: at
  * an interior knot of multiplicity one the two handles are one tangent seen from its two
  * sides, and the joint between them is their midpoint.

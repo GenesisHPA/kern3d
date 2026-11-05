@@ -42,7 +42,7 @@ const DEFAULT_SIZE = "M8";
 const DEFAULT_ROW = threadRow(DEFAULT_SIZE) ?? THREAD_STANDARDS[0];
 
 /**
- * Thread (Fusion's Thread): pick a cylindrical face of a parametric body — a shaft or a bore,
+ * Thread: pick a cylindrical face of a parametric body — a shaft or a bore,
  * told apart automatically — and thread it to a standard size.
  *
  * Follows `offsetFaceCommand.ts`: one face pick that stays open until confirmed, the values in the

@@ -65,7 +65,7 @@ const SWEEP_OPERATIONS: Record<string, BooleanOperation> = {
  * node-local) are live references, so editing either source moves the sweep.
  *
  * Join/cut/intersect appends the feature to the auto-detected intersecting body
- * (Fusion-style, see the extrude command); "new" creates a standalone body.
+ * (as in classic CAD, see the extrude command); "new" creates a standalone body.
  */
 @command({ key: "feature.sweep", icon: "icon-sweep" })
 export class SweepFeatureCommand extends MultistepCommand {

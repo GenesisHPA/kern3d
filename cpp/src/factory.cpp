@@ -70,18 +70,18 @@
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_BezierCurve.hxx>
+#include <Geom_Circle.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
-#include <Geom_Circle.hxx>
 #include <Geom_Ellipse.hxx>
 #include <Geom_Hyperbola.hxx>
 #include <Geom_Line.hxx>
 #include <Geom_OffsetCurve.hxx>
+#include <Geom_Parabola.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
 #include <Geom_Surface.hxx>
 #include <Geom_ToroidalSurface.hxx>
-#include <Geom_Parabola.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <HelixBRep_BuilderHelix.hxx>
 #include <NCollection_Array1.hxx>
@@ -1441,7 +1441,7 @@ private:
 // **Why this exists.** OCCT offsets a face's smooth neighbours with it, so a round beside a moved
 // face travels too and comes back with a CHANGED radius (measured: a 40 × 30 × 20 block with its
 // two vertical edges rounded 3 mm, the x = 40 face moved +1 mm, gave 4 mm rounds on the old axes
-// and pushed the front and back faces out as well). Fusion keeps the round's radius and moves its
+// and pushed the front and back faces out as well). The expected behavior keeps the round's radius and moves its
 // axis instead, and so does this: the moving faces are found as OCCT finds them but WITHOUT
 // passing through a round, so a face past a round does not move.
 //

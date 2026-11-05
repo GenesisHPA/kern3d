@@ -33,7 +33,7 @@ import {
 const ALIGN_SHAPE_TYPES = (ShapeTypes.face | ShapeTypes.edge | ShapeTypes.vertex) as ShapeType;
 
 /**
- * Fusion's Align: pick geometry on the part to move, then geometry to bring it onto. Two
+ * Align: pick geometry on the part to move, then geometry to bring it onto. Two
  * planar faces end up flush (normals opposite, keypoints coincident), two straight edges or
  * cylinder axes collinear, two circles concentric and coplanar; any other pairing — a vertex
  * on either side — is a pure translation of keypoint onto keypoint. The moved part hangs in

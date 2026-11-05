@@ -180,7 +180,7 @@ function cornerOpeningOf(
 }
 
 /**
- * Press Pull (Fusion's Press Pull, Onshape's Move Face): one command that does what pushing or
+ * Press Pull (Onshape's Move Face): one command that does what pushing or
  * pulling the selection ought to do. It has no geometry and no feature of its own — it opens the
  * command that fits what is picked, which reads the pick up off the selection (every target
  * preselects from it) and asks for its size, or is handed the one this command was given

@@ -123,7 +123,7 @@ test("an extrude follows a circle dragged in the sketch editor", () => {
     editor.commit();
 
     // The body stays rolled back for the whole session — its only feature consumes
-    // the sketch, so the extrude is hidden until the session ends (Fusion-style).
+    // the sketch, so the extrude is hidden until the session ends (classic-CAD style).
     expect(body.rollbackIndex).toBe(0);
     expect(body.shape.unchecked()!.findSubShapes(ShapeTypes.face).length).toBe(0);
 

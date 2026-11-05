@@ -10,7 +10,7 @@ import { type DatumDefinitionBase, threePlanePoint } from "./axisDefinition";
 import { revolutionAxisOfFace } from "./surfaceGeometry";
 
 /**
- * How a construction point is defined (Fusion's CONSTRUCT ▸ Point). References are captured
+ * How a construction point is defined (CONSTRUCT ▸ Point). References are captured
  * like a datum plane's, so the point follows its geometry when the model rebuilds.
  */
 export type PointDefinition = (
@@ -133,7 +133,7 @@ function edgePlanePoint(
 
 /**
  * Where `edge` crosses the plane: analytic for a straight edge (taken as its whole line, the
- * way Fusion extends it), sampled-and-bisected along any other curve. Several crossings pick
+ * usual way), sampled-and-bisected along any other curve. Several crossings pick
  * the one nearest `near` (the pick), else the first along the edge.
  */
 export function edgePlaneCrossing(edge: IEdge, origin: XYZ, normal: XYZ, near: XYZ | undefined): Result<XYZ> {

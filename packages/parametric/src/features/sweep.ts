@@ -372,7 +372,7 @@ function sourceSweepProfile(
 }
 
 /**
- * Join/cut/intersect against the chain input (Fusion-style): the swept profiles are the
+ * Join/cut/intersect against the chain input (classic-CAD style): the swept profiles are the
  * tool, the preceding feature's shape the target. Tracked when the kernel supports it
  * (downstream refs keep their stable ids across the boolean); the plain path leaves
  * them to re-match geometrically after a rebuild.

@@ -60,7 +60,7 @@ export function moveCopyMatrix(values: MoveCopyValues, pivot: XYZ): Matrix4 {
 }
 
 /**
- * Fusion's Move/Copy (free move by values): select bodies, then type ΔX ΔY ΔZ and turns
+ * Move/Copy (free move by values): select bodies, then type ΔX ΔY ΔZ and turns
  * about X/Y/Z while the moved bodies show where they will land; confirm commits. The turns
  * pivot on the selection's bounding-box centre, or on a picked point.
  */

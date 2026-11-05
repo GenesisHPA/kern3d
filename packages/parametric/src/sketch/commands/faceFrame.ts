@@ -24,7 +24,7 @@ export interface FaceFrameOptions {
 const SNAP_PIXELS = 12;
 
 /**
- * The sketch frame for a face picked at `pick`, Fusion-style: the origin where the user
+ * The sketch frame for a face picked at `pick`, classic-CAD-style: the origin where the user
  * clicked (snapped onto a feature point nearby) and the axes along the face's nearest
  * straight edge. `base` is the face's default frame (`sketchPlaneOfFace`); `face` must be in
  * world coordinates. Options off, or no pick point, give `base` back unchanged.

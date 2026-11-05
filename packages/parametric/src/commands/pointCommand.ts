@@ -96,7 +96,7 @@ export interface CollectedPointRefs {
 }
 
 /**
- * Creates a construction point (Fusion's CONSTRUCT ▸ Point): pick the geometry the type asks
+ * Creates a construction point (CONSTRUCT ▸ Point): pick the geometry the type asks
  * for, check the preview dot, confirm. The point is a standalone `DatumPointNode`.
  */
 @command({ key: "feature.point", icon: "icon-datumPoint" })

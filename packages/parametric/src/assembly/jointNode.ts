@@ -217,7 +217,7 @@ export class JointNode extends Node {
 
     // ------------------------------------------------------------------ Limits
 
-    /** Whether the type's rotation can be limited — Fusion limits revolute-like rotations only. */
+    /** Whether the type's rotation can be limited — only revolute-like rotations are limited. */
     private get rotationLimitable(): boolean {
         return jointDofs(this.jointType).rotation && this.jointType !== "ball";
     }

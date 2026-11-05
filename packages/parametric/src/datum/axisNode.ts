@@ -26,7 +26,7 @@ export interface AxisNodeOptions extends DatumNodeOptions<AxisDefinition> {
 }
 
 /**
- * A construction axis (Fusion's CONSTRUCT ▸ Axis): an infinite line, drawn as a finite dashed
+ * A construction axis (CONSTRUCT ▸ Axis): an infinite line, drawn as a finite dashed
  * segment fitted to the geometry it was made from. A revolve, a circular pattern and the
  * datum-plane/point definitions accept it wherever they take a straight edge.
  */

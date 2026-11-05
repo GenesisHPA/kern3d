@@ -14,7 +14,7 @@ export interface AssemblyComponentNodeOptions extends FolderNodeOptions {
 }
 
 /**
- * A Fusion-style assembly component: a group with its own placement that holds bodies, sketches,
+ * A classic-CAD-style assembly component: a group with its own placement that holds bodies, sketches,
  * planes and further components. Everything inside lives in the component's local space — the
  * renderer composes the component's `transform` onto its children — so moving a component moves
  * all it contains without touching their definitions.

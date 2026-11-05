@@ -117,7 +117,7 @@ export function datumReading(
 }
 
 /**
- * The same text for a driven dimension, in the parentheses SolidWorks, Fusion and Onshape
+ * The same text for a driven dimension, in the parentheses SolidWorks and Onshape
  * all read a reference value with — so the text alone says the number is the geometry's
  * rather than the user's, in a screenshot or through a colour vision deficiency, neither
  * of which the tone colour survives. The tone is still drawn; this is what carries it.

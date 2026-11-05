@@ -57,7 +57,7 @@ export class SelectOffsetFacesStep extends SelectBodyFacesStep {
 }
 
 /**
- * Offset Face (Fusion's and Onshape's Move Face › Offset): move the picked faces of a parametric
+ * Offset Face (Onshape's Move Face › Offset): move the picked faces of a parametric
  * body along their own outward normals, the faces that run smoothly into them following — a flat
  * face grows or sinks like a pad, a curved wall changes its radius.
  *
@@ -87,7 +87,7 @@ export class OffsetFaceFeatureCommand extends MultistepCommand implements PickSe
     }
 
     /**
-     * Fusion's behavior, and on for a new offset: a round a Fillet left next to a moved face is
+     * the usual CAD behavior, and on for a new offset: a round a Fillet left next to a moved face is
      * taken off and made again at its own radius, instead of travelling with the face and coming
      * back at a different radius. Off, the rounds move with the face (OCCT's own behavior) — which
      * is what an offset saved before this option does.

@@ -277,7 +277,7 @@ export interface IShapeFactory {
      *
      * `rounds` names the ROUND faces of a fillet whose radius must be kept. They are taken off
      * the body before the move and made again at their own radius between the faces they ran
-     * between, so moving a wall does not re-radius the rounds beside it — Fusion's behavior.
+     * between, so moving a wall does not re-radius the rounds beside it — the usual CAD behavior.
      * Omit them for OCCT's own, where a round is a smooth neighbour like any other and travels
      * with the face, growing or shrinking by the distance. Only a cylinder or a torus among the
      * faces given counts as a round; the rest are ignored.

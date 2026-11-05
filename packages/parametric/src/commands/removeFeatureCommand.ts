@@ -18,7 +18,7 @@ import { ParametricBodyNode } from "../parametricBodyNode";
 import { SelectBodyFacesStep } from "./selectBodyFacesStep";
 
 /**
- * Remove feature (Fusion's Delete Face with heal): delete picked faces of a parametric body
+ * Remove feature (Delete Face with heal): delete picked faces of a parametric body
  * and let the kernel close the wound — the parametric counterpart of `modify.removeFeature`.
  * No new body: the removal rewrites the body it is applied to, exactly as a shell does, so
  * the command is `shellCommand.ts` stripped to its pick step — no parameters, no preview.

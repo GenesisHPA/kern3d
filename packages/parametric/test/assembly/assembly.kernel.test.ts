@@ -101,7 +101,7 @@ function partBottom(component: AssemblyComponentNode) {
     return nodeWorldTransform(component).ofPoint(xyz(105, 5, 0));
 }
 
-describe("joint origins snap like Fusion's", () => {
+describe("joint origins snap to the usual points", () => {
     test("a face: its centre, oriented by the outward normal", () => {
         const doc = scene();
         const body = box(doc, [40, 20, 10]);
