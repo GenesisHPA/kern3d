@@ -116,6 +116,8 @@ export interface ShapeMeshData {
     color?: number | number[];
     /** A preview mesh drawn see-through (0–1); undefined keeps the preview's own opacity. */
     opacity?: number;
+    /** A preview mesh drawn over the model (seen through the solid it sits in), like an x-ray. */
+    onTop?: boolean;
 }
 
 export interface MeshLike {

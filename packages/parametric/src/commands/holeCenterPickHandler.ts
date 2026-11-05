@@ -83,6 +83,8 @@ export function sketchPointGlyphAt(
 export class HoleCenterPickHandler extends ShapeSelectionHandler {
     /** The face a click captured — the step's "place the holes on this face" answer. */
     faceResult: PickedHoleFace | undefined;
+    /** Where on the face the click landed (world), the hole's center when it lands on the face. */
+    facePoint: XYZ | undefined;
 
     private _hovered: SketchPointGlyphHit | undefined;
     private _hoverMeshId: number | undefined;
@@ -146,6 +148,7 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
         const body = face?.owner.node;
         if (face === undefined || !(body instanceof ParametricBodyNode)) return 0;
         this.faceResult = capturePickedHoleFace(body, face.shape as IFace, face.transform, face.indexes[0]);
+        this.facePoint = this.faceResult?.worldFrame.intersectRay(view.rayAt(event.offsetX, event.offsetY));
         return 1;
     }
 

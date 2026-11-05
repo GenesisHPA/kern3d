@@ -21,6 +21,7 @@ import {
     type IView,
     LENGTH_UNITS,
     LengthAtAxisStep,
+    LengthAtPlaneStep,
     MultistepCommand,
     type ParameterValue,
     PointOnPlaneStep,
@@ -59,6 +60,23 @@ import { createHolePanel } from "./holePanel";
  * center then follows the entity on every rebuild. The first bound point pins the sketch —
  * later picks snap to its points only, and one near another sketch's point stays a raw pick.
  */
+/** The center of the circular edge of `face` whose disc `point` lies in — an existing hole under a click. */
+export function openingCenterNear(face: IFace, point: XYZ): XYZ | undefined {
+    for (const edge of face.findSubShapes(ShapeTypes.edge) as IEdge[]) {
+        try {
+            // the edge owns its cached curve: read it, never dispose it
+            const curve: ICurve = edge.curve;
+            const basis = CurveUtils.isTrimmed(curve) ? curve.basisCurve : curve;
+            if (CurveUtils.isCircle(basis) && basis.center.distanceTo(point) <= basis.radius * 1.15) {
+                return basis.center;
+            }
+        } catch {
+            // a degenerate edge has no curve
+        }
+    }
+    return undefined;
+}
+
 /** Whether `point` is the center of a circular edge of `face` — an existing hole's rim. */
 export function isOpeningCenterOf(face: IFace, point: XYZ): boolean {
     for (const edge of face.findSubShapes(ShapeTypes.edge) as IEdge[]) {
@@ -247,7 +265,21 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                 if (handler.faceResult !== undefined) {
                     this.picked = handler.faceResult;
                     this.bindCenterPicks();
-                    return (await this.collectRawPoints()) && (await this.pickDepth());
+                    // the click on the face is the hole's center (a click by an existing hole's
+                    // rim takes that hole's axis); without one, pick it on the face
+                    const center =
+                        handler.facePoint === undefined ? undefined : this.centerAt(handler.facePoint);
+                    if (center !== undefined) {
+                        this.stepDatas.push({
+                            view: this.document.application.activeView!,
+                            point: center,
+                            shapes: [],
+                            type: "input",
+                        });
+                    } else if (!(await this.collectRawPoints())) {
+                        return false;
+                    }
+                    return (await this.pickDiameter()) && (await this.pickDepth());
                 }
                 if (this.centerPicks.length === 0) {
                     PubSub.default.pub("showToast", "error.default:{0}", "Pick at least one hole center");
@@ -268,7 +300,7 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                 }
                 this.picked = deduced;
                 this.bindCenterPicks();
-                return await this.pickDepth();
+                return (await this.pickDiameter()) && (await this.pickDepth());
             }
         } finally {
             this.picked?.worldFace.dispose();
@@ -302,11 +334,67 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
             }
             // A pick snapped to a sketch point binds to it rather than adding a raw center.
             if (!this.bindSketchPoint(data)) this.stepDatas.push(data);
+            // one click places the hole: straight on to its depth (a blind hole) or done
+            return true;
         }
     }
 
     /** While the depth is dragged: the depth the preview builds with (the panel keeps its own). */
     private draggedDepth: number | undefined;
+    /** While the diameter is dragged: the diameter the preview builds with. */
+    private draggedDiameter: number | undefined;
+
+    /**
+     * The hole's center for a click at `point` on the picked face: the point itself when it is
+     * on the face, or the axis of an existing hole when the click is within its rim (so a wider
+     * hole can be drilled over it). Undefined when the click is off the face.
+     */
+    private centerAt(point: XYZ): XYZ | undefined {
+        const frame = this.picked!.worldFrame;
+        const projected = frame.project(point);
+        const rim = openingCenterNear(this.picked!.worldFace, projected);
+        if (rim !== undefined) return rim;
+        return this.pointOnFace(projected) ? projected : undefined;
+    }
+
+    /**
+     * After the center: drag the diameter out from it on the face — or type it — with the hole
+     * previewed at that size. Enter / Space with nothing typed keeps the panel's diameter.
+     */
+    private async pickDiameter(): Promise<boolean> {
+        const centers = this.pickedCenters();
+        if (centers.length === 0) return true;
+        const center = centers[0];
+        const frame = this.picked!.worldFrame;
+        const diameterOf = (point: XYZ) => frame.project(point).distanceTo(center) * 2;
+        this.isConfirm = false;
+        this.controller = new AsyncController();
+        const step = new LengthAtPlaneStep("prompt.pickDiameter", () => ({
+            point: () => center,
+            plane: () => frame.translateTo(center),
+            inputScale: 0.5,
+            preview: (end: XYZ | undefined) => {
+                this.draggedDiameter = end === undefined ? undefined : diameterOf(end);
+                return this.holeMeshes(centers);
+            },
+            prompt: (snaped) =>
+                snaped.point === undefined ? "" : formatMeasurement("diameter", diameterOf(snaped.point)),
+            validator: (point: XYZ) => diameterOf(point) > 1e-6,
+            onKeyDown: (e) => {
+                this.isConfirm = e.code === "Space" || e.code === "Enter";
+            },
+        }));
+        try {
+            const data = await step.execute(this.document, this.controller);
+            if (data?.point !== undefined && this.controller.result?.status === "success") {
+                this.diameter = Number(diameterOf(data.point).toFixed(4));
+                return true;
+            }
+            return this.isConfirm;
+        } finally {
+            this.draggedDiameter = undefined;
+        }
+    }
 
     /** Every center picked so far (raw and bound), on the face plane in world coordinates. */
     private pickedCenters(): XYZ[] {
@@ -319,11 +407,11 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
 
     /**
      * The last step of a blind hole: drag the depth out of the face along the drill axis — or
-     * type it — with the holes previewed at that depth. Enter (or Space) with nothing typed
-     * keeps the panel's depth; Escape cancels the command. Through-all holes skip it.
+     * type it — with the holes previewed at that depth. A drag or a typed depth makes the hole
+     * blind at it; Enter (or Space) with nothing typed keeps the panel's choice (through all
+     * included); Escape cancels the command.
      */
     private async pickDepth(): Promise<boolean> {
-        if (this.depth === "") return true;
         const centers = this.pickedCenters();
         if (centers.length === 0) return true;
         const start = centers[0];
@@ -445,8 +533,10 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
         const meshes: ShapeMeshData[] = [];
         for (const tool of tools.value) {
             const mesh = tool.mesh;
-            if (mesh.faces) meshes.push({ ...mesh.faces, color: HOLE_PREVIEW_COLOR, opacity: 0.35 });
-            if (mesh.edges) meshes.push({ ...mesh.edges, color: HOLE_PREVIEW_COLOR });
+            // drawn over the model, so the whole depth shows through the material
+            if (mesh.faces)
+                meshes.push({ ...mesh.faces, color: HOLE_PREVIEW_COLOR, opacity: 0.35, onTop: true });
+            if (mesh.edges) meshes.push({ ...mesh.edges, color: HOLE_PREVIEW_COLOR, onTop: true });
             tool.dispose();
         }
         return meshes;
@@ -612,7 +702,7 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
             points,
             ...(sketchPoints === undefined ? {} : { sketchPoints }),
             style,
-            diameter: this.diameter,
+            diameter: this.draggedDiameter ?? this.diameter,
             ...(this.draggedDepth !== undefined
                 ? { depth: this.draggedDepth }
                 : this.depth === ""

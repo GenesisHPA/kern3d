@@ -287,6 +287,10 @@ describe("HoleFeatureCommand step flow", () => {
         (doc.application as any).activeView = view;
         const command = new HoleFeatureCommand();
         (command as any)._application = { activeView: view };
+        // these tests are about picking the centers; the diameter and depth drags that follow
+        // a pick are interactive steps of their own
+        (command as any).pickDiameter = async () => true;
+        (command as any).pickDepth = async () => true;
         return { doc, command, view };
     }
 

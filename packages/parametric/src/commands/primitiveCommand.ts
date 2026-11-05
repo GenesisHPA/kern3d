@@ -360,6 +360,15 @@ abstract class RoundPrimitiveCommandBase extends PrimitiveCommandBase {
         return this.stepDatas[1].plane!.projectDistance(this.stepDatas[0].point!, this.stepDatas[1].point!);
     }
 
+    /**
+     * The radius the height preview draws: the panel's diameter (the drag wrote it there when
+     * the radius step committed, and an edit since then is what will be built), else the drag.
+     */
+    protected previewRadius(): number {
+        const resolved = this.resolvedSize(this.diameter);
+        return resolved !== undefined && resolved > Precision.Distance ? resolved / 2 : this.pickedRadius();
+    }
+
     protected buildRoundFeature(radius2?: ParameterValue): PrimitiveFeatureData | undefined {
         const { axis, height } = signedHeightAxis(
             this.stepDatas[1].plane!.normal,
@@ -484,7 +493,17 @@ export class PrimitiveBoxCommand extends PrimitiveCommandBase {
 
     private readonly previewBox = (end: XYZ | undefined) => {
         if (!end) return this.previewRect(this.stepDatas[1].point);
-        const { plane, dx, dy } = this.rectData(this.stepDatas[1].point!);
+        const rect = this.rectData(this.stepDatas[1].point!);
+        const { plane } = rect;
+        // the sides the panel holds now (the drag wrote them; an edit since is what gets built)
+        const side = (panel: ParameterValue, dragged: number) => {
+            const resolved = this.resolvedSize(panel);
+            return resolved !== undefined && resolved > Precision.Distance
+                ? Math.sign(dragged || 1) * resolved
+                : dragged;
+        };
+        const dx = side(this.dx, rect.dx);
+        const dy = side(this.dy, rect.dy);
         return [
             this.meshPoint(this.stepDatas[0].point!),
             this.meshPoint(this.stepDatas[1].point!),
@@ -551,7 +570,7 @@ export class PrimitiveCylinderCommand extends RoundPrimitiveCommandBase {
                 "cylinder",
                 height < 0 ? plane.normal.reverse() : plane.normal,
                 this.stepDatas[0].point!,
-                this.pickedRadius(),
+                this.previewRadius(),
                 Math.abs(height),
             ),
         ];
@@ -643,7 +662,7 @@ export class PrimitiveConeCommand extends RoundPrimitiveCommandBase {
         // The app's wireframe cone: the base circle plus four generators up to the apex.
         const center = this.stepDatas[0].point!;
         const plane = this.stepDatas[1].plane!;
-        const radius = this.pickedRadius();
+        const radius = this.previewRadius();
         const apex = center.add(plane.normal.multiply(this.signedHeight(end)));
         return [
             this.meshPoint(center),

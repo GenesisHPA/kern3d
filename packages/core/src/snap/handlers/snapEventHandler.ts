@@ -37,6 +37,19 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
         controller.onCancelled(() => this.handleCancel());
         controller.onCompleted(() => this.handleSuccess());
         data.onPreviewReady?.(this.redrawPreview);
+        SnapEventHandler.active = this.redrawPreview;
+    }
+
+    /** The redraw of the step being picked right now (see `redrawActivePreview`). */
+    private static active: (() => void) | undefined;
+
+    /**
+     * Redraws the preview of the step being picked now — what a command calls when one of its
+     * panel options changed, so the edit shows at once instead of on the next pointer move.
+     * Harmless with no step up (the redraw of a finished step does nothing).
+     */
+    static redrawActivePreview(): void {
+        SnapEventHandler.active?.();
     }
 
     get snaped() {
@@ -232,16 +245,18 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
             this._tempPoint = this.document.visual.context.displayMesh([data], this.tempPointOption);
         }
 
-        this._tempShapes = this.data
-            .preview?.(point)
-            ?.map((shape) =>
-                this.document.visual.context.displayMesh(
-                    [shape],
-                    shape.opacity === undefined
-                        ? this.facePreviewOpion
-                        : { ...this.facePreviewOpion, meshOpacity: shape.opacity },
-                ),
-            );
+        this._tempShapes = this.data.preview?.(point)?.map((shape) =>
+            this.document.visual.context.displayMesh(
+                [shape],
+                shape.opacity === undefined && shape.onTop === undefined
+                    ? this.facePreviewOpion
+                    : {
+                          ...this.facePreviewOpion,
+                          ...(shape.opacity === undefined ? {} : { meshOpacity: shape.opacity }),
+                          ...(shape.onTop === undefined ? {} : { onTop: shape.onTop }),
+                      },
+            ),
+        );
     }
 
     /**

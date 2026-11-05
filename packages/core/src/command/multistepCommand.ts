@@ -6,7 +6,7 @@ import { AsyncController, Result } from "../foundation";
 import type { XYZ } from "../math";
 import type { IShape, IShapeFactory, LineType } from "../shape";
 import { MeshDataUtils } from "../shape";
-import type { SnapResult } from "../snap";
+import { SnapEventHandler, type SnapResult } from "../snap";
 import type { IStep } from "../step";
 import type { IView, VisualState } from "../visual";
 import { ViewUtils } from "../visual";
@@ -21,6 +21,21 @@ export abstract class MultistepCommand extends CancelableCommand {
 
     protected override onRestarting(): void {
         this.resetStepDatas();
+    }
+
+    /** A panel edit redraws the step's preview at once; OK commits it, Cancel drops it. */
+    private readonly redrawOnOption = () => {
+        SnapEventHandler.redrawActivePreview();
+    };
+
+    protected override beforeExecute(): void {
+        super.beforeExecute();
+        this.onPropertyChanged(this.redrawOnOption);
+    }
+
+    protected override afterExecute(): void {
+        this.removePropertyChanged(this.redrawOnOption);
+        super.afterExecute();
     }
 
     protected async executeAsync(): Promise<void> {
