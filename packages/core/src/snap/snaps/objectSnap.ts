@@ -28,7 +28,10 @@ interface InvisibleSnapInfo {
 
 export class ObjectSnap extends BaseSnap {
     private readonly _intersectionInfos: Map<string, SnapResult[]> = new Map();
-    private readonly _invisibleInfos: Map<VisualShapeData, InvisibleSnapInfo> = new Map();
+    /** Revealed circle centers, keyed by where they are (one marker per center, however often hovered). */
+    private readonly _invisibleInfos: Map<string, InvisibleSnapInfo> = new Map();
+    /** Sub-shapes already searched for circles — a face's edges are walked once, not per move. */
+    private readonly _scanned = new WeakSet<object>();
     private _lastDetected?: [IView, SnapResult];
     private _hintVertex?: [IVisualContext, number];
 
@@ -79,16 +82,17 @@ export class ObjectSnap extends BaseSnap {
         if (!Config.instance.enableSnap) return undefined;
 
         const shapes = this.visibleOnly(data);
-        let snap: SnapResult | undefined;
+        // hovering a round edge, or a face bounded by one (a cylinder's end, a hole's rim),
+        // shows that circle's center; coming near a shown center snaps to it
+        for (const shape of shapes.slice(0, 2)) this.showInvisibleSnaps(data.view, shape);
+        let snap: SnapResult | undefined = this.snapeInvisible(data.view, data.mx, data.my);
         if (
+            snap === undefined &&
             shapes.some(
                 (x) => x.shape.shapeType === ShapeTypes.edge || x.shape.shapeType === ShapeTypes.vertex,
             )
         ) {
-            this.showInvisibleSnaps(data.view, shapes[0]);
             snap = this.snapOnShape(data.view, data.mx, data.my, shapes);
-        } else {
-            snap = this.snapeInvisible(data.view, data.mx, data.my);
         }
         if (this.referencePoint && snap?.point) {
             snap.distance = this.referencePoint().distanceTo(snap.point);
@@ -265,25 +269,40 @@ export class ObjectSnap extends BaseSnap {
     }
 
     private showInvisibleSnaps(view: IView, shape: VisualShapeData) {
+        if (!ObjectSnapTypeUtils.hasType(this._snapType, ObjectSnapTypes.center)) return;
+        if (this._scanned.has(shape.shape)) return;
+        this._scanned.add(shape.shape);
         if (shape.shape.shapeType === ShapeTypes.edge) {
-            if (this._invisibleInfos.has(shape)) return;
-            const curve = (shape.shape as IEdge).curve;
-            const basisCurve = curve.basisCurve;
-            if (CurveUtils.isCircle(basisCurve)) {
-                this.showCircleCenter(basisCurve, view, shape);
-            }
+            this.revealCircleOf(shape.shape as IEdge, view, shape);
+        } else if (shape.shape.shapeType === ShapeTypes.face) {
+            // a face bounded by circles: a cylinder's end, a plate with a hole, a cylinder's side
+            const edges = (shape.shape as IFace).findSubShapes(ShapeTypes.edge) as IEdge[];
+            if (edges.length > 64) return; // a busy face: hover its edges instead
+            for (const edge of edges) this.revealCircleOf(edge, view, shape);
+        }
+    }
+
+    private revealCircleOf(edge: IEdge, view: IView, shape: VisualShapeData) {
+        try {
+            // the edge owns its cached curve: read it, never dispose it
+            const basisCurve = edge.curve.basisCurve;
+            if (CurveUtils.isCircle(basisCurve)) this.showCircleCenter(basisCurve, view, shape);
+        } catch {
+            // a degenerate edge has no curve
         }
     }
 
     private showCircleCenter(curve: ICircle, view: IView, shape: VisualShapeData) {
         const center = shape.transform.ofPoint(curve.center);
+        const key = `${center.x.toFixed(4)},${center.y.toFixed(4)},${center.z.toFixed(4)}`;
+        if (this._invisibleInfos.has(key)) return;
         const temporary = MeshDataUtils.createVertexMesh(
             center,
             VisualConfig.hintVertexSize,
             VisualConfig.hintVertexColor,
         );
         const id = view.document.visual.context.displayMesh([temporary]);
-        this._invisibleInfos.set(shape, {
+        this._invisibleInfos.set(key, {
             view,
             snaps: [
                 {

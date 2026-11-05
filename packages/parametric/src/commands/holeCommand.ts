@@ -60,14 +60,18 @@ import { createHolePanel } from "./holePanel";
  * center then follows the entity on every rebuild. The first bound point pins the sketch —
  * later picks snap to its points only, and one near another sketch's point stays a raw pick.
  */
-/** The center of the circular edge of `face` whose disc `point` lies in — an existing hole under a click. */
-export function openingCenterNear(face: IFace, point: XYZ): XYZ | undefined {
+/**
+ * The center of a circular edge of `face` within `tolerance` of `point` — a click next to a
+ * round edge's center (an existing hole, a cylinder's end) snaps onto it; anywhere else on the
+ * face stays where it was clicked.
+ */
+export function openingCenterNear(face: IFace, point: XYZ, tolerance: number): XYZ | undefined {
     for (const edge of face.findSubShapes(ShapeTypes.edge) as IEdge[]) {
         try {
             // the edge owns its cached curve: read it, never dispose it
             const curve: ICurve = edge.curve;
             const basis = CurveUtils.isTrimmed(curve) ? curve.basisCurve : curve;
-            if (CurveUtils.isCircle(basis) && basis.center.distanceTo(point) <= basis.radius * 1.15) {
+            if (CurveUtils.isCircle(basis) && basis.center.distanceTo(point) <= tolerance) {
                 return basis.center;
             }
         } catch {
@@ -268,7 +272,11 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                     // the click on the face is the hole's center (a click by an existing hole's
                     // rim takes that hole's axis); without one, pick it on the face
                     const center =
-                        handler.facePoint === undefined ? undefined : this.centerAt(handler.facePoint);
+                        handler.facePoint === undefined
+                            ? undefined
+                            : handler.faceSnapped
+                              ? this.picked.worldFrame.project(handler.facePoint)
+                              : this.centerAt(handler.facePoint);
                     if (center !== undefined) {
                         this.stepDatas.push({
                             view: this.document.application.activeView!,
@@ -352,7 +360,12 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
     private centerAt(point: XYZ): XYZ | undefined {
         const frame = this.picked!.worldFrame;
         const projected = frame.project(point);
-        const rim = openingCenterNear(this.picked!.worldFace, projected);
+        // the usual snap reach on screen, as a distance on the face
+        const view = this.document.application.activeView;
+        const pixel = view === undefined ? undefined : ViewUtils.viewPixelSize(view, projected);
+        const tolerance = (pixel ?? 0) * Config.instance.SnapDistance;
+        const rim =
+            tolerance > 0 ? openingCenterNear(this.picked!.worldFace, projected, tolerance) : undefined;
         if (rim !== undefined) return rim;
         return this.pointOnFace(projected) ? projected : undefined;
     }

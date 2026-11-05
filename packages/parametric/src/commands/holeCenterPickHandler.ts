@@ -4,9 +4,12 @@
 import {
     type AsyncController,
     Config,
+    CurveUtils,
     type IDocument,
+    type IEdge,
     type IFace,
     type IView,
+    MeshDataUtils,
     PubSub,
     ShapeSelectionHandler,
     ShapeTypes,
@@ -14,7 +17,7 @@ import {
     ViewUtils,
     VisualConfig,
     VisualStates,
-    type XYZ,
+    XYZ,
 } from "@chili3d/core";
 import { ParametricBodyNode } from "../parametricBodyNode";
 import { pointCrossMesh } from "../sketch/curveMesh";
@@ -80,13 +83,71 @@ export function sketchPointGlyphAt(
  * `selectedPoints` is the COMMAND's list, handed in so a re-entered step (a failed face
  * deduction asks for a face next) keeps what was picked; the handler mutates it in place.
  */
+/** The area centroid of a face, from its display triangles (the face's own coordinates). */
+export function faceCentroid(face: IFace): XYZ | undefined {
+    const mesh = face.mesh?.faces;
+    if (mesh === undefined || mesh.index.length < 3) return undefined;
+    const p = mesh.position;
+    let area = 0;
+    let cx = 0;
+    let cy = 0;
+    let cz = 0;
+    for (let i = 0; i + 2 < mesh.index.length; i += 3) {
+        const [a, b, c] = [mesh.index[i] * 3, mesh.index[i + 1] * 3, mesh.index[i + 2] * 3];
+        const ux = p[b] - p[a];
+        const uy = p[b + 1] - p[a + 1];
+        const uz = p[b + 2] - p[a + 2];
+        const vx = p[c] - p[a];
+        const vy = p[c + 1] - p[a + 1];
+        const vz = p[c + 2] - p[a + 2];
+        const w = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+        area += w;
+        cx += (w * (p[a] + p[b] + p[c])) / 3;
+        cy += (w * (p[a + 1] + p[b + 1] + p[c + 1])) / 3;
+        cz += (w * (p[a + 2] + p[b + 2] + p[c + 2])) / 3;
+    }
+    if (area <= 0) return undefined;
+    return new XYZ({ x: cx / area, y: cy / area, z: cz / area });
+}
+
+/**
+ * The points a hole is aimed at on a face: the face's own center, then the centers of its
+ * circular edges (a cylinder's end, an existing hole) — in the face's own coordinates.
+ */
+function circleCentersOf(face: IFace): XYZ[] {
+    const centers: XYZ[] = [];
+    const own = faceCentroid(face);
+    if (own !== undefined) centers.push(own);
+    const edges = (face.findSubShapes?.(ShapeTypes.edge) ?? []) as IEdge[];
+    if (edges.length > 64) return centers;
+    for (const edge of edges) {
+        try {
+            // the edge owns its cached curve: read it, never dispose it
+            const basis = edge.curve.basisCurve;
+            if (CurveUtils.isCircle(basis) && !centers.some((c) => c.distanceTo(basis.center) < 1e-6)) {
+                centers.push(basis.center);
+            }
+        } catch {
+            // a degenerate edge has no curve
+        }
+    }
+    return centers;
+}
+
 export class HoleCenterPickHandler extends ShapeSelectionHandler {
     /** The face a click captured — the step's "place the holes on this face" answer. */
     faceResult: PickedHoleFace | undefined;
     /** Where on the face the click landed (world), the hole's center when it lands on the face. */
     facePoint: XYZ | undefined;
+    /** True when the click was within snap reach of a shown center and `facePoint` is that center. */
+    faceSnapped = false;
 
     private _hovered: SketchPointGlyphHit | undefined;
+    /** The hovered face's round-edge centers (world) and their markers. */
+    private _centerFace: object | undefined;
+    private _centers: XYZ[] = [];
+    private _centerMeshIds: number[] = [];
+    private _nearMeshId: number | undefined;
     private _hoverMeshId: number | undefined;
     private _selectedMeshIds: number[] = [];
 
@@ -118,11 +179,74 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
             super.setHighlight(view, event);
         }
         this.setHoveredPoint(view, hit);
+        this.showCenters(view, event);
+    }
+
+    /**
+     * The hovered face's circle centers (a cylinder's end, an existing hole), drawn as points so
+     * they can be aimed at; the one under the cursor's snap reach is drawn larger — a click there
+     * puts the hole exactly on it.
+     */
+    private showCenters(view: IView, event: PointerEvent): void {
+        const face = this._highlights?.[0];
+        const context = this.document.visual.context;
+        if (face?.shape !== this._centerFace) {
+            this._centerMeshIds.forEach((id) => context.removeMesh(id));
+            this._centerMeshIds = [];
+            this._centers = [];
+            this._centerFace = face?.shape;
+            if (face !== undefined) {
+                this._centers = circleCentersOf(face.shape as IFace).map((c) => face.transform.ofPoint(c));
+                this._centerMeshIds = this._centers.map((c) =>
+                    context.displayMesh(
+                        [
+                            MeshDataUtils.createVertexMesh(
+                                c,
+                                VisualConfig.hintVertexSize,
+                                VisualConfig.hintVertexColor,
+                            ),
+                        ],
+                        { onTop: true },
+                    ),
+                );
+            }
+        }
+        if (this._nearMeshId !== undefined) {
+            context.removeMesh(this._nearMeshId);
+            this._nearMeshId = undefined;
+        }
+        const near = this._centers.find(
+            (c) => screenDistance(view, event.offsetX, event.offsetY, c) < Config.instance.SnapDistance,
+        );
+        if (near !== undefined) {
+            this._nearMeshId = context.displayMesh(
+                [
+                    MeshDataUtils.createVertexMesh(
+                        near,
+                        VisualConfig.editVertexSize * 1.6,
+                        VisualConfig.selectedEdgeColor,
+                    ),
+                ],
+                { onTop: true },
+            );
+        }
+        view.update();
+    }
+
+    private clearCenters(): void {
+        const context = this.document.visual.context;
+        this._centerMeshIds.forEach((id) => context.removeMesh(id));
+        this._centerMeshIds = [];
+        if (this._nearMeshId !== undefined) context.removeMesh(this._nearMeshId);
+        this._nearMeshId = undefined;
+        this._centers = [];
+        this._centerFace = undefined;
     }
 
     override pointerOut(view: IView, event: PointerEvent): void {
         super.pointerOut(view, event);
         this.setHoveredPoint(view, undefined);
+        this.clearCenters();
     }
 
     private setHoveredPoint(view: IView, hit: SketchPointGlyphHit | undefined): void {
@@ -148,7 +272,12 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
         const body = face?.owner.node;
         if (face === undefined || !(body instanceof ParametricBodyNode)) return 0;
         this.faceResult = capturePickedHoleFace(body, face.shape as IFace, face.transform, face.indexes[0]);
-        this.facePoint = this.faceResult?.worldFrame.intersectRay(view.rayAt(event.offsetX, event.offsetY));
+        const near = this._centers.find(
+            (c) => screenDistance(view, event.offsetX, event.offsetY, c) < Config.instance.SnapDistance,
+        );
+        this.faceSnapped = near !== undefined;
+        this.facePoint =
+            near ?? this.faceResult?.worldFrame.intersectRay(view.rayAt(event.offsetX, event.offsetY));
         return 1;
     }
 
@@ -202,6 +331,7 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
 
     protected override disposeInternal(): void {
         super.disposeInternal();
+        this.clearCenters();
         const context = this.document.visual.context;
         if (this._hoverMeshId !== undefined) {
             context.removeMesh(this._hoverMeshId);

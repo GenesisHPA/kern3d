@@ -16,7 +16,7 @@ import { createMockEdgeCurve, createMockView, createMouseAndDetected } from "../
 /** Internal state shape for accessing ObjectSnap private members in tests. */
 interface ObjectSnapInternals {
     _intersectionInfos: Map<string, SnapResult[]>;
-    _invisibleInfos: Map<VisualShapeData, { view: object; snaps: SnapResult[]; displays: number[] }>;
+    _invisibleInfos: Map<string, { view: object; snaps: SnapResult[]; displays: number[] }>;
     _lastDetected?: [object, SnapResult];
     _hintVertex?: [object, number];
 }
@@ -902,7 +902,9 @@ describe("ObjectSnap", () => {
             snap.snap(data);
             // After snapping with an edge, invisible infos should be populated
             const internal = internalsOf(snap);
-            const info = internal._invisibleInfos.get(edgeShape);
+            // keyed by where the center is: one marker per center, however often it is hovered
+            const info = [...internal._invisibleInfos.values()][0];
+            expect(internal._invisibleInfos.size).toBe(1);
             expect(info).not.toBeNull();
             expect(info!.snaps.length).toBe(1);
             expect(info!.snaps[0].type).toBe("center");
@@ -1187,7 +1189,7 @@ describe("ObjectSnap", () => {
 
             // Simulate invisible infos being set
             const shape = createEdgeShapeData();
-            internal._invisibleInfos.set(shape, {
+            internal._invisibleInfos.set("0,0,0", {
                 view,
                 snaps: [{ view, type: "center", shapes: [shape] }],
                 displays: [42, 43],
