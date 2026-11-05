@@ -25,6 +25,20 @@ export interface SnapLengthAtPlaneData extends SnapData {
      * for a diameter while it picks the radius point. Coordinate pairs are not scaled.
      */
     inputScale?: number;
+    /**
+     * Typed numbers are a rectangle's two sides rather than a distance and a position: one
+     * number is a square of that side, two are its sides along the plane's x and y — each laid
+     * off on the side the pointer is on. Separators: comma, space, `x`, `*` or `;`.
+     */
+    inputAsRect?: boolean;
+}
+
+/** "40 30", "40x30", "40*30", "40;30" all read as "40,30". */
+function normalizeSizes(text: string): string {
+    return text
+        .trim()
+        .replace(/\s*[xX×хХ*;]\s*/g, ",")
+        .replace(/\s+/g, ",");
 }
 
 export class SnapLengthAtAxisHandler extends SnapEventHandler<LengthAtAxisSnapData> {
@@ -83,21 +97,29 @@ export class SnapLengthAtPlaneHandler extends SnapEventHandler<SnapLengthAtPlane
     }
 
     protected getPointFromInput(view: IView, text: string): SnapResult {
-        const plane = this.workplane ?? view.workplane;
+        const plane = this.workplane ?? this.lengthData.plane(this._snaped?.point) ?? view.workplane;
         const point = this.calculatePoint(text, plane);
         return { point, view, shapes: [], plane, type: "input" };
     }
 
     private calculatePoint(text: string, plane: Plane): XYZ {
-        const numbers = text.split(",").map(Number);
+        const numbers = (this.data.inputAsRect ? normalizeSizes(text) : text).split(",").map(Number);
+        if (this.data.inputAsRect) {
+            const [a, b] = numbers.length === 1 ? [numbers[0], numbers[0]] : numbers;
+            return this.calculatePointFromCoordinates([a, b], plane);
+        }
         return numbers.length === 1
-            ? this.calculatePointFromDistance(numbers[0])
+            ? this.calculatePointFromDistance(numbers[0], plane)
             : this.calculatePointFromCoordinates(numbers, plane);
     }
 
-    private calculatePointFromDistance(distance: number): XYZ {
-        const vector = this._snaped?.point!.sub(this.data.point()).normalize();
-        return this.data.point().add(vector!.multiply(distance * (this.data.inputScale ?? 1)));
+    /**
+     * The point `distance` away from the start, toward the pointer — or along the plane's x when
+     * the pointer gives no direction yet (a number typed right after the first click).
+     */
+    private calculatePointFromDistance(distance: number, plane: Plane): XYZ {
+        const toward = this._snaped?.point?.sub(this.data.point()).normalize() ?? plane.xvec;
+        return this.data.point().add(toward.multiply(distance * (this.data.inputScale ?? 1)));
     }
 
     private calculatePointFromCoordinates(coords: number[], plane: Plane): XYZ {
@@ -108,10 +130,11 @@ export class SnapLengthAtPlaneHandler extends SnapEventHandler<SnapLengthAtPlane
     }
 
     protected inputError(text: string): I18nKeys | undefined {
-        const numbers = text.split(",").map(Number);
+        const numbers = (this.data.inputAsRect ? normalizeSizes(text) : text).split(",").map(Number);
         if (numbers.some(Number.isNaN) || (numbers.length !== 1 && numbers.length !== 2)) {
             return "error.input.invalidNumber";
         }
+        if (this.data.inputAsRect && numbers.some((x) => x === 0)) return "error.input.invalidNumber";
         return undefined;
     }
 }

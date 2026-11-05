@@ -783,6 +783,7 @@ export default {
         "prompt.pickPoint": "Pick point, ESC key to cancel",
         "prompt.pickRadius": "input radius, ESC key to cancel",
         "prompt.pickDiameter": "input diameter, ESC key to cancel",
+        "prompt.hole.depth": "drag or type the hole depth — Enter keeps the panel's depth",
         "prompt.pickSketchEntity": "pick a sketch entity, ESC key to cancel",
         "prompt.pickDimension":
             "pick geometry to dimension; click empty space to place it, ESC key to cancel",

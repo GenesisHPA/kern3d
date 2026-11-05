@@ -754,6 +754,7 @@ export const I18N_KEYS = [
     "prompt.pickPoint",
     "prompt.pickRadius",
     "prompt.pickDiameter",
+    "prompt.hole.depth",
     "prompt.pickSketchEntity",
     "prompt.pickDimension",
     "prompt.pickSketchPoint",

@@ -662,6 +662,7 @@ export default {
         "prompt.pickPoint": "выберите точку, ESC для отмены",
         "prompt.pickRadius": "введите радиус, ESC для отмены",
         "prompt.pickDiameter": "введите диаметр, ESC для отмены",
+        "prompt.hole.depth": "потяните или введите глубину отверстия — Enter оставит глубину из окна",
         "prompt.pickSketchEntity": "выберите элемент эскиза, ESC для отмены",
         "prompt.pickDimension":
             "выберите геометрию для размера; щёлкните по пустому месту, чтобы поставить, ESC для отмены",

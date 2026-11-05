@@ -427,6 +427,8 @@ export class PrimitiveBoxCommand extends PrimitiveCommandBase {
             point: () => point!,
             preview: this.previewRect,
             plane: (tmp: XYZ | undefined) => this.findPlane(view, point!, tmp),
+            // "40" is a 40×40 base, "40,30" (or "40 30", "40x30") its two sides
+            inputAsRect: true,
             validator: (end: XYZ) => {
                 const data = this.rectData(end);
                 return !MathUtils.anyEqualZero(data.dx, data.dy);

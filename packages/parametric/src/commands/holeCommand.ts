@@ -10,6 +10,7 @@ import {
     command,
     Dimensions,
     type EdgeMeshData,
+    formatMeasurement,
     type I18nKeys,
     type ICommandPanelProvider,
     type ICurve,
@@ -19,6 +20,7 @@ import {
     type IStep,
     type IView,
     LENGTH_UNITS,
+    LengthAtAxisStep,
     MultistepCommand,
     type ParameterValue,
     PointOnPlaneStep,
@@ -245,7 +247,7 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                 if (handler.faceResult !== undefined) {
                     this.picked = handler.faceResult;
                     this.bindCenterPicks();
-                    return await this.collectRawPoints();
+                    return (await this.collectRawPoints()) && (await this.pickDepth());
                 }
                 if (this.centerPicks.length === 0) {
                     PubSub.default.pub("showToast", "error.default:{0}", "Pick at least one hole center");
@@ -266,7 +268,7 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                 }
                 this.picked = deduced;
                 this.bindCenterPicks();
-                return true;
+                return await this.pickDepth();
             }
         } finally {
             this.picked?.worldFace.dispose();
@@ -300,6 +302,59 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
             }
             // A pick snapped to a sketch point binds to it rather than adding a raw center.
             if (!this.bindSketchPoint(data)) this.stepDatas.push(data);
+        }
+    }
+
+    /** While the depth is dragged: the depth the preview builds with (the panel keeps its own). */
+    private draggedDepth: number | undefined;
+
+    /** Every center picked so far (raw and bound), on the face plane in world coordinates. */
+    private pickedCenters(): XYZ[] {
+        const frame = this.picked!.worldFrame;
+        return [
+            ...this.stepDatas.map((data) => frame.project(data.point!)),
+            ...this.boundCenters.map((x) => x.center),
+        ];
+    }
+
+    /**
+     * The last step of a blind hole: drag the depth out of the face along the drill axis — or
+     * type it — with the holes previewed at that depth. Enter (or Space) with nothing typed
+     * keeps the panel's depth; Escape cancels the command. Through-all holes skip it.
+     */
+    private async pickDepth(): Promise<boolean> {
+        if (this.depth === "") return true;
+        const centers = this.pickedCenters();
+        if (centers.length === 0) return true;
+        const start = centers[0];
+        const direction = this.picked!.worldFrame.normal.reverse();
+        const depthOf = (point: XYZ) => Math.max(0, point.sub(start).dot(direction));
+        this.isConfirm = false;
+        this.controller = new AsyncController();
+        const step = new LengthAtAxisStep("prompt.hole.depth", () => ({
+            point: start,
+            direction,
+            preview: (end: XYZ | undefined) => {
+                this.draggedDepth = end === undefined ? undefined : depthOf(end);
+                return this.holeMeshes(centers);
+            },
+            prompt: (snaped) =>
+                snaped.point === undefined ? "" : formatMeasurement("length", depthOf(snaped.point)),
+            validator: (point: XYZ) => depthOf(point) > 1e-6,
+            onKeyDown: (e) => {
+                this.isConfirm = e.code === "Space" || e.code === "Enter";
+            },
+        }));
+        try {
+            const data = await step.execute(this.document, this.controller);
+            if (data?.point !== undefined && this.controller.result?.status === "success") {
+                this.depth = Number(depthOf(data.point).toFixed(4));
+                return true;
+            }
+            // Enter / Space keeps the panel's depth; Escape is a cancel
+            return this.isConfirm;
+        } finally {
+            this.draggedDepth = undefined;
         }
     }
 
@@ -558,7 +613,11 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
             ...(sketchPoints === undefined ? {} : { sketchPoints }),
             style,
             diameter: this.diameter,
-            ...(this.depth === "" ? {} : { depth: this.depth }),
+            ...(this.draggedDepth !== undefined
+                ? { depth: this.draggedDepth }
+                : this.depth === ""
+                  ? {}
+                  : { depth: this.depth }),
             drillAngle: this.drillAngle,
             ...(this.tip === TIP_FLAT ? { tip: "flat" as const } : {}),
             ...(style === "counterbore"
