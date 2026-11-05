@@ -37,6 +37,12 @@ export interface PlaneFaceRef {
      * the default frame, so refs written before this field existed resolve exactly as before.
      */
     local?: PlaneLocalFrame;
+    /**
+     * The plane is not a planar face to find again but the plane TANGENT to a curved face at
+     * the picked point (a hole drilled into a cylinder): it is built from `normal` + `offset`
+     * alone, and nothing is reported lost for it.
+     */
+    tangent?: boolean;
 }
 
 /**

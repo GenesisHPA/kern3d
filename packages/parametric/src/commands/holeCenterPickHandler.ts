@@ -23,7 +23,7 @@ import { ParametricBodyNode } from "../parametricBodyNode";
 import { pointCrossMesh } from "../sketch/curveMesh";
 import { toUV, toWorld } from "../sketch/sketchModel";
 import { SketchNode } from "../sketch/sketchNode";
-import { capturePickedHoleFace, type PickedHoleFace } from "./holeFace";
+import { capturePickedHoleFace, captureTangentHoleFace, type PickedHoleFace } from "./holeFace";
 
 /**
  * A sketch's standalone point the handler hit-tested — under the cursor right now, or
@@ -83,6 +83,15 @@ export function sketchPointGlyphAt(
  * `selectedPoints` is the COMMAND's list, handed in so a re-entered step (a failed face
  * deduction asks for a face next) keeps what was picked; the handler mutates it in place.
  */
+function isPlanarFace(face: IFace): boolean {
+    const surface = face.surface();
+    try {
+        return surface.isPlanar();
+    } finally {
+        (surface as { dispose?: () => void }).dispose?.();
+    }
+}
+
 /** The area centroid of a face, from its display triangles (the face's own coordinates). */
 export function faceCentroid(face: IFace): XYZ | undefined {
     const mesh = face.mesh?.faces;
@@ -161,7 +170,8 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
             ShapeTypes.face,
             false,
             controller,
-            { allow: (shape) => (shape as IFace).surface().isPlanar() },
+            // planar faces, and curved ones — a hole into a curved face drills along its normal
+            undefined,
             { allow: (node) => node instanceof ParametricBodyNode },
         );
         this.highlightState = VisualStates.faceHighlight;
@@ -195,7 +205,7 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
             this._centerMeshIds = [];
             this._centers = [];
             this._centerFace = face?.shape;
-            if (face !== undefined) {
+            if (face !== undefined && isPlanarFace(face.shape as IFace)) {
                 this._centers = circleCentersOf(face.shape as IFace).map((c) => face.transform.ofPoint(c));
                 this._centerMeshIds = this._centers.map((c) =>
                     context.displayMesh(
@@ -271,7 +281,21 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
         const face = this._highlights?.[0];
         const body = face?.owner.node;
         if (face === undefined || !(body instanceof ParametricBodyNode)) return 0;
-        this.faceResult = capturePickedHoleFace(body, face.shape as IFace, face.transform, face.indexes[0]);
+        const localFace = face.shape as IFace;
+        const planar = isPlanarFace(localFace);
+        if (!planar) {
+            // the point under the cursor on the curved face is the hole's center
+            const ray = view.rayAt(event.offsetX, event.offsetY);
+            const worldFace = localFace.transformedMul(face.transform) as IFace;
+            const hit = face.point ?? worldFace.intersectLine(ray.point, ray.direction);
+            worldFace.dispose();
+            if (hit === undefined) return 0;
+            this.faceResult = captureTangentHoleFace(body, localFace, face.transform, hit);
+            this.faceSnapped = true;
+            this.facePoint = hit;
+            return this.faceResult === undefined ? 0 : 1;
+        }
+        this.faceResult = capturePickedHoleFace(body, localFace, face.transform, face.indexes[0]);
         const near = this._centers.find(
             (c) => screenDistance(view, event.offsetX, event.offsetY, c) < Config.instance.SnapDistance,
         );

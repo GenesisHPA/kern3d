@@ -9,9 +9,10 @@ import { createMockApplication, createMockVisualWithDocument, TestDocument } fro
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { isOpeningCenterOf } from "../src/commands/holeCommand";
 import type { HoleFeatureData } from "../src/features/feature";
+import { holePointUV } from "../src/features/hole";
 import { captureProfileRef } from "../src/features/profileRef";
 import { ParametricBodyNode } from "../src/parametricBodyNode";
-import { captureFaceRef } from "../src/sketch/planeRef";
+import { captureFaceRef, stablePlaneFrame } from "../src/sketch/planeRef";
 import type { SketchData } from "../src/sketch/sketchModel";
 import { SketchNode } from "../src/sketch/sketchNode";
 
@@ -131,5 +132,68 @@ describe("a flat-bottomed hole", () => {
         const body = plate();
         addHole(body, "h1", { diameter: 6, depth: 8, drillAngle: 0 });
         expect(errors(body)[1]).toContain("flat");
+    });
+});
+
+describe("a hole into a curved face (radial, into a cylinder)", () => {
+    function cylinderBody() {
+        const doc = new TestDocument({ application: createMockApplication() });
+        doc.visual = createMockVisualWithDocument(doc) as any;
+        const body = new ParametricBodyNode({
+            document: doc,
+            features: [
+                {
+                    id: "c1",
+                    type: "primitive",
+                    primitive: "cylinder",
+                    origin: { x: 0, y: 0, z: 0 },
+                    radius: 10,
+                    height: 20,
+                    axis: { x: 0, y: 0, z: 1 },
+                },
+            ],
+        });
+        doc.modelManager.addNode(body);
+        return body;
+    }
+
+    /** The tangent plane at (10, 0, 10) on the side, normal +X, and the center there. */
+    function radialHole(body: ParametricBodyNode, patch: Partial<HoleFeatureData>) {
+        const normal = new XYZ({ x: 1, y: 0, z: 0 });
+        const frame = stablePlaneFrame(normal.multiply(10), normal);
+        const uv = holePointUV(frame, new XYZ({ x: 10, y: 0, z: 10 }));
+        body.setFeaturesEmitShapeChanged([
+            ...body.features,
+            {
+                id: "h1",
+                type: "hole",
+                face: { nodeId: body.id, normal: { x: 1, y: 0, z: 0 }, offset: 10, tangent: true },
+                points: [uv as [number, number]],
+                style: "simple",
+                diameter: 4,
+                ...patch,
+            } satisfies HoleFeatureData,
+        ]);
+    }
+
+    test("a blind radial hole cuts in without a lost-face warning", () => {
+        const body = cylinderBody();
+        const before = body.shape.unchecked()!.volume();
+        radialHole(body, { depth: 6, tip: "flat" });
+        expect(errors(body)).toEqual([undefined, undefined]);
+        expect(body.featureItems()[1].warning).toBeUndefined();
+        const removed = before - body.shape.unchecked()!.volume();
+        // a Ø4 × 6 cylinder from the tangent plane, a sliver less where the side curves away
+        expect(removed).toBeGreaterThan(Math.PI * 4 * 5.5);
+        expect(removed).toBeLessThan(Math.PI * 4 * 6 + 1e-6);
+    });
+
+    test("a through radial hole goes out the far side", () => {
+        const body = cylinderBody();
+        const before = body.shape.unchecked()!.volume();
+        radialHole(body, {});
+        expect(errors(body)).toEqual([undefined, undefined]);
+        const removed = before - body.shape.unchecked()!.volume();
+        expect(removed).toBeGreaterThan(Math.PI * 4 * 19);
     });
 });

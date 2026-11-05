@@ -5,7 +5,7 @@ import { type IDocument, type IFace, type Matrix4, type Plane, ShapeTypes, type 
 import { reportSilentIdLoss } from "../features/idDiagnostics";
 import { directionsParallel, MATCH_TOLERANCE } from "../features/refGeometry";
 import { ParametricBodyNode } from "../parametricBodyNode";
-import { captureFaceRef, type PlaneFaceRef, sketchPlaneOfFace } from "../sketch/planeRef";
+import { captureFaceRef, type PlaneFaceRef, sketchPlaneOfFace, stablePlaneFrame } from "../sketch/planeRef";
 import { toWorld } from "../sketch/sketchModel";
 import type { SketchNode } from "../sketch/sketchNode";
 
@@ -51,6 +51,50 @@ export function capturePickedHoleFace(
         ref.faceId = faceId;
     }
     const frame = sketchPlaneOfFace(localFace);
+    return { body, ref, frame, worldFrame: frame.transformed(worldTransform), worldFace };
+}
+
+/**
+ * A curved face (a cylinder's side, a sphere…) picked at `worldPoint`: the holes start on the
+ * plane TANGENT to it there and drill along the surface normal — radially into a cylinder. The
+ * ref is that plane's fingerprint (`tangent`), built the way a frozen hole plane is rebuilt, so
+ * the command and every evaluation share the UV frame. Undefined when the point is off the face.
+ */
+export function captureTangentHoleFace(
+    body: ParametricBodyNode,
+    localFace: IFace,
+    worldTransform: Matrix4,
+    worldPoint: XYZ,
+): PickedHoleFace | undefined {
+    const inverse = worldTransform.invert();
+    if (inverse === undefined) return undefined;
+    const localPoint = inverse.ofPoint(worldPoint);
+    const surface = localFace.surface();
+    let normal: XYZ | undefined;
+    let onSurface: XYZ | undefined;
+    try {
+        const uv = surface.parameter(localPoint, 0.5);
+        if (uv === undefined) return undefined;
+        const [point, n] = localFace.normal(uv.u, uv.v);
+        normal = n.normalize();
+        onSurface = point;
+    } finally {
+        surface.dispose();
+    }
+    if (normal === undefined || onSurface === undefined) return undefined;
+    const worldNormal = worldTransform.ofVector(normal).normalize();
+    if (worldNormal === undefined) return undefined;
+    const worldOnSurface = worldTransform.ofPoint(onSurface);
+    const offset = worldOnSurface.dot(worldNormal);
+    const ref: PlaneFaceRef = {
+        nodeId: body.id,
+        normal: { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z },
+        offset,
+        tangent: true,
+    };
+    // the frame `resolveHolePlane` rebuilds from that fingerprint, in the body's local frame
+    const frame = stablePlaneFrame(normal.multiply(onSurface.dot(normal)), normal);
+    const worldFace = localFace.transformedMul(worldTransform) as IFace;
     return { body, ref, frame, worldFrame: frame.transformed(worldTransform), worldFace };
 }
 

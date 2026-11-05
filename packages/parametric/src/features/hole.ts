@@ -424,18 +424,21 @@ export function resolveHolePlane(ref: PlaneFaceRef, context: FeatureContext): Re
     if (!source.isOk) return Result.err(source.error);
     const { faces, transform } = source.value;
     const ids = source.value.faceIds;
-    const face = matchFace(
-        faces,
-        transform,
-        ref,
-        ids === undefined
-            ? undefined
-            : (id) => {
-                  const index = ids.indexOf(id);
-                  return index < 0 ? undefined : index;
-              },
-        ids === undefined ? undefined : (id) => indexesOfOverlappingId(ids, id),
-    );
+    // a tangent plane (a hole into a curved face) is its fingerprint, nothing to match
+    const face = ref.tangent
+        ? undefined
+        : matchFace(
+              faces,
+              transform,
+              ref,
+              ids === undefined
+                  ? undefined
+                  : (id) => {
+                        const index = ids.indexOf(id);
+                        return index < 0 ? undefined : index;
+                    },
+              ids === undefined ? undefined : (id) => indexesOfOverlappingId(ids, id),
+          );
     // Source-local → host-local: the host's own face is already matched in host space (the map
     // is identity there); a foreign node's face is carried over rigidly. The plane is mapped
     // outright; the face hands out a mapped copy per call (see `ResolvedHolePlane.face`).
@@ -458,6 +461,7 @@ export function resolveHolePlane(ref: PlaneFaceRef, context: FeatureContext): Re
         sourceInverse.ofPoint(normal.multiply(ref.offset)),
         sourceInverse.ofVector(normal),
     );
+    if (ref.tangent) return Result.ok({ plane: frozen.transformed(map) });
     return Result.ok({ plane: frozen.transformed(map), lost: { key: "face", refIndexes: [0] } });
 }
 
