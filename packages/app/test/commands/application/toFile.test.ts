@@ -6,6 +6,11 @@ import { createMockApplication, createMockDocument } from "@chili3d/core/test-ut
 import { describe, expect, rs, test } from "@rstest/core";
 import { SaveDocumentToFile } from "../../../src/commands/application/toFile";
 
+/** Answers the "save as" name prompt with its first button (confirm), keeping the typed name. */
+function confirmSaveDialog(channel: string, args: any[]) {
+    if (channel === "showDialog") (args[2] as { onclick?: () => void }[])[0].onclick?.();
+}
+
 describe("SaveDocumentToFile", () => {
     test("should have command metadata", () => {
         const data = (SaveDocumentToFile as any).prototype.data;
@@ -17,7 +22,8 @@ describe("SaveDocumentToFile", () => {
     test("should do nothing when no active document", async () => {
         let published = false;
         const originalPub = PubSub.default.pub;
-        PubSub.default.pub = ((channel: string) => {
+        PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             if (channel === "showPermanent") {
                 published = true;
             }
@@ -40,7 +46,8 @@ describe("SaveDocumentToFile", () => {
     test("should not publish showPermanent when activeView has no document", async () => {
         let published = false;
         const originalPub = PubSub.default.pub;
-        PubSub.default.pub = ((channel: string) => {
+        PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             if (channel === "showPermanent") {
                 published = true;
             }
@@ -62,7 +69,8 @@ describe("SaveDocumentToFile", () => {
     test("should publish showPermanent event when document exists", async () => {
         let publishedChannel = "";
         const originalPub = PubSub.default.pub;
-        PubSub.default.pub = ((channel: string, ..._args: any[]) => {
+        PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             publishedChannel = channel;
         }) as any;
 
@@ -97,6 +105,7 @@ describe("SaveDocumentToFile", () => {
         let templateArg = "";
         const originalPub = PubSub.default.pub;
         PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             if (channel === "showPermanent") {
                 templateArg = args[1] as string;
             }
@@ -121,6 +130,7 @@ describe("SaveDocumentToFile", () => {
         let callbackArg: unknown;
         const originalPub = PubSub.default.pub;
         PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             if (channel === "showPermanent") {
                 callbackArg = args[0];
             }
@@ -145,7 +155,8 @@ describe("SaveDocumentToFile", () => {
     test("should not publish showPermanent when activeView is undefined", async () => {
         let published = false;
         const originalPub = PubSub.default.pub;
-        PubSub.default.pub = ((channel: string) => {
+        PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             if (channel === "showPermanent") {
                 published = true;
             }
@@ -183,6 +194,7 @@ describe("SaveDocumentToFile callback", () => {
 
         const originalPub = PubSub.default.pub;
         PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             if (channel === "showPermanent") {
                 state.callback = args[0] as () => Promise<void>;
             }
@@ -302,6 +314,7 @@ describe("SaveDocumentToFile callback", () => {
         const callbacks: Array<() => Promise<void>> = [];
         const originalPub = PubSub.default.pub;
         PubSub.default.pub = ((channel: string, ...args: any[]) => {
+            confirmSaveDialog(channel, args);
             if (channel === "showPermanent") callbacks.push(args[0] as () => Promise<void>);
         }) as any;
         rs.useFakeTimers();
