@@ -591,6 +591,7 @@ export default {
         "feature.point.ratio": "Ratio",
         "feature.primitive.direction": "Direction",
         "feature.primitive.radius2": "Top radius",
+        "feature.primitive.diameter2": "Top diameter",
         "feature.revolve.angle2": "Angle 2",
         "feature.sweep.path": "Path",
         "feature.sweep.profileControl": "Profile control",
@@ -774,6 +775,7 @@ export default {
         "prompt.pickOppositeCorner": "pick the opposite corner, or type width,height, ESC key to cancel",
         "prompt.pickPoint": "Pick point, ESC key to cancel",
         "prompt.pickRadius": "input radius, ESC key to cancel",
+        "prompt.pickDiameter": "input diameter, ESC key to cancel",
         "prompt.pickSketchEntity": "pick a sketch entity, ESC key to cancel",
         "prompt.pickDimension":
             "pick geometry to dimension; click empty space to place it, ESC key to cancel",
@@ -1102,6 +1104,7 @@ export default {
         "toolbox.hint": "Enter runs, Esc closes",
         "commandPanel.ok": "OK",
         "commandPanel.cancel": "Cancel",
+        "commandPanel.drag": "Drag to move the panel",
         "command.assemble.newComponent": "New Component",
         "command.assemble.joint": "Joint",
         "command.assemble.asBuiltJoint": "As-built Joint",

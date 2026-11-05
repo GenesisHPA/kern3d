@@ -47,6 +47,24 @@ import { FORM_FEATURE_OPERATIONS } from "./extrudeCommand";
 import { normalizeSignedRect, type RectDragData, rectDataOnPlane, signedHeightAxis } from "./primitivePick";
 
 const OPERATION_NEW: I18nKeys = "option.command.operation.new";
+const OPERATION_JOIN: I18nKeys = "option.command.operation.join";
+
+/**
+ * Half of a size the panel holds as a diameter. A number is halved; an expression keeps its
+ * text and is divided, so a variable-driven diameter stays driven.
+ */
+export function halfOf(value: ParameterValue): ParameterValue {
+    if (typeof value === "number") return value / 2;
+    const text = value.trim();
+    const numeric = Number(text);
+    if (text !== "" && Number.isFinite(numeric)) return numeric / 2;
+    return `(${text}) / 2`;
+}
+
+/** The float tip while the radius point is dragged: the circle's diameter. */
+function diameterPrompt(radius: number): string {
+    return `Ø ${(radius * 2).toFixed(2)}`;
+}
 
 /**
  * The plane of the planar face a point pick landed on, in world coordinates, with its outward
@@ -139,8 +157,30 @@ abstract class PrimitiveCommandBase extends MultistepCommand {
         if (step === undefined) return undefined;
         if (this.facePlaneCache?.step !== step) {
             this.facePlaneCache = { step, plane: facePlaneOfPick(step) };
+            this.applyFaceDefaults(step);
         }
         return this.facePlaneCache.plane;
+    }
+
+    /**
+     * A primitive started on a face of a parametric body becomes the next operation of that
+     * body — joined to it — instead of a new body beside it. The panel still offers cut,
+     * intersect or a new body, and the targets list stays editable.
+     */
+    private applyFaceDefaults(step: SnapResult): void {
+        const body = this.bodyOfPick(step);
+        if (body === undefined) return;
+        this.operation = OPERATION_JOIN;
+        this.targets = { auto: false, ids: [body.id] };
+    }
+
+    /** The parametric body whose face the first pick landed on, if any. */
+    private bodyOfPick(step: SnapResult): ParametricBodyNode | undefined {
+        const data = step.shapes.find((x) => x.shape.shapeType === ShapeTypes.face);
+        if (data === undefined) return undefined;
+        const owner = this.document.visual.context.getNode(data.owner);
+        if (owner === undefined) return undefined;
+        return candidateBodies(this.document).find((body) => body === owner);
     }
 
     targetCandidates(): readonly TargetCandidate[] {
@@ -243,12 +283,13 @@ abstract class PrimitiveCommandBase extends MultistepCommand {
  * edits (nothing picks it).
  */
 abstract class RoundPrimitiveCommandBase extends PrimitiveCommandBase {
-    @property("circle.radius", { unit: LENGTH_UNITS })
-    get radius(): ParameterValue {
-        return this.getPrivateValue("radius", 5);
+    /** The base circle is sized by its diameter (the feature stores the radius, half of it). */
+    @property("dimension.diameter", { unit: LENGTH_UNITS })
+    get diameter(): ParameterValue {
+        return this.getPrivateValue("diameter", 10);
     }
-    set radius(value: ParameterValue) {
-        this.setProperty("radius", value);
+    set diameter(value: ParameterValue) {
+        this.setProperty("diameter", value);
     }
 
     @property("common.height", { unit: LENGTH_UNITS })
@@ -262,7 +303,7 @@ abstract class RoundPrimitiveCommandBase extends PrimitiveCommandBase {
     protected override getSteps(): IStep[] {
         return [
             new PointStep("prompt.pickCircleCenter"),
-            new LengthAtPlaneStep("prompt.pickRadius", this.getRadiusData),
+            new LengthAtPlaneStep("prompt.pickDiameter", this.getRadiusData),
             new LengthAtAxisStep("prompt.pickNextPoint", this.getHeightStepData),
         ];
     }
@@ -273,6 +314,13 @@ abstract class RoundPrimitiveCommandBase extends PrimitiveCommandBase {
             point: () => point!,
             preview: this.circlePreview,
             plane: (tmp: XYZ | undefined) => this.findPlane(view, point!, tmp),
+            inputScale: 0.5,
+            prompt: (snaped) =>
+                snaped.point
+                    ? diameterPrompt(
+                          this.findPlane(view, point!, snaped.point).projectDistance(point!, snaped.point),
+                      )
+                    : "",
             validator: (p: XYZ) => {
                 if (p.distanceTo(point!) < Precision.Distance) return false;
                 const plane = this.findPlane(view, point!, p);
@@ -295,7 +343,7 @@ abstract class RoundPrimitiveCommandBase extends PrimitiveCommandBase {
     private readonly getHeightStepData = (): LengthAtAxisSnapData => {
         // The radius step just committed: write its measurement to the option panel, so the
         // user sees — and can still override — the dragged radius while picking the height.
-        this.radius = this.pickedRadius();
+        this.diameter = this.pickedRadius() * 2;
         return {
             point: this.stepDatas[0].point!,
             direction: this.stepDatas[1].plane!.normal,
@@ -332,14 +380,14 @@ abstract class RoundPrimitiveCommandBase extends PrimitiveCommandBase {
         // written when its own step committed, keeps its window). The write still lands so
         // the panel shows what was placed.
         this.height = height;
-        if (!this.sizesArePositive(this.radius, this.height)) return undefined;
+        if (!this.sizesArePositive(this.diameter, this.height)) return undefined;
         const center = this.stepDatas[0].point!;
         return {
             id: Id.generate(),
             type: "primitive",
             primitive: this.primitive,
             origin: { x: center.x, y: center.y, z: center.z },
-            radius: this.radius,
+            radius: halfOf(this.diameter),
             ...(radius2 === undefined ? {} : { radius2 }),
             height: this.height,
             axis: { x: axis.x, y: axis.y, z: axis.z },
@@ -526,18 +574,18 @@ export class PrimitiveCylinderCommand extends RoundPrimitiveCommandBase {
 export class PrimitiveSphereCommand extends PrimitiveCommandBase {
     readonly primitive = "sphere";
 
-    @property("circle.radius", { unit: LENGTH_UNITS })
-    get radius(): ParameterValue {
-        return this.getPrivateValue("radius", 5);
+    @property("dimension.diameter", { unit: LENGTH_UNITS })
+    get diameter(): ParameterValue {
+        return this.getPrivateValue("diameter", 10);
     }
-    set radius(value: ParameterValue) {
-        this.setProperty("radius", value);
+    set diameter(value: ParameterValue) {
+        this.setProperty("diameter", value);
     }
 
     protected override getSteps(): IStep[] {
         return [
             new PointStep("prompt.pickCircleCenter"),
-            new LengthAtPlaneStep("prompt.pickRadius", this.getRadiusData),
+            new LengthAtPlaneStep("prompt.pickDiameter", this.getRadiusData),
         ];
     }
 
@@ -547,6 +595,8 @@ export class PrimitiveSphereCommand extends PrimitiveCommandBase {
             point: () => point,
             preview: this.previewSphere,
             plane: () => this.stepDatas[0].view.workplane.translateTo(point),
+            inputScale: 0.5,
+            prompt: (snaped) => (snaped.point ? diameterPrompt(snaped.point.distanceTo(point)) : ""),
             validator: (p: XYZ) => p.distanceTo(point) > Precision.Distance,
         };
     };
@@ -567,15 +617,15 @@ export class PrimitiveSphereCommand extends PrimitiveCommandBase {
         // There is no third step: the commit follows the radius pick with no window to edit
         // the panel value in between, so the picked radius always wins — it is written to
         // the property (and read back) only so the panel shows what was placed.
-        this.radius = this.stepDatas[0].point!.distanceTo(this.stepDatas[1].point!);
-        if (!this.sizesArePositive(this.radius)) return undefined;
+        this.diameter = this.stepDatas[0].point!.distanceTo(this.stepDatas[1].point!) * 2;
+        if (!this.sizesArePositive(this.diameter)) return undefined;
         const center = this.stepDatas[0].point!;
         return {
             id: Id.generate(),
             type: "primitive",
             primitive: "sphere",
             origin: { x: center.x, y: center.y, z: center.z },
-            radius: this.radius,
+            radius: halfOf(this.diameter),
         };
     }
 }
@@ -589,12 +639,12 @@ export class PrimitiveConeCommand extends RoundPrimitiveCommandBase {
      * wireframe preview draws — while the feature data's own default (2) still governs a
      * feature written without the command. A frustum is a panel edit, before or after.
      */
-    @property("feature.primitive.radius2", { unit: LENGTH_UNITS })
-    get radius2(): ParameterValue {
-        return this.getPrivateValue("radius2", 0);
+    @property("feature.primitive.diameter2", { unit: LENGTH_UNITS })
+    get diameter2(): ParameterValue {
+        return this.getPrivateValue("diameter2", 0);
     }
-    set radius2(value: ParameterValue) {
-        this.setProperty("radius2", value);
+    set diameter2(value: ParameterValue) {
+        this.setProperty("diameter2", value);
     }
 
     protected previewWithHeight(end: XYZ): ShapeMeshData[] {
@@ -616,11 +666,11 @@ export class PrimitiveConeCommand extends RoundPrimitiveCommandBase {
     protected buildFeature(): PrimitiveFeatureData | undefined {
         // radius2 is panel-only — nothing picks it. A negative literal is caught here; an
         // unresolvable expression passes, for the feature's rebuild to report.
-        const top = this.resolvedSize(this.radius2);
+        const top = this.resolvedSize(this.diameter2);
         if (top !== undefined && top < 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Cone top radius must be non-negative");
+            PubSub.default.pub("showToast", "error.default:{0}", "Cone top diameter must be non-negative");
             return undefined;
         }
-        return this.buildRoundFeature(this.radius2);
+        return this.buildRoundFeature(halfOf(this.diameter2));
     }
 }

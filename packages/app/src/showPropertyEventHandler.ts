@@ -19,6 +19,10 @@ import {
     Transaction,
     type XYZ,
 } from "@chili3d/core";
+import { hoverReadout } from "./hoverMeasure";
+
+/** Hover readouts are refreshed at most this often while the pointer moves. */
+const HOVER_READOUT_MS = 60;
 
 /** Screen-pixel radius around a grip point that grabs that point instead of the text. */
 const GRIP_HIT_PX = 12;
@@ -44,6 +48,9 @@ interface ActiveDimensionDrag extends PendingDimensionDrag {
 export class ShowPropertyEventHandler extends NodeSelectionHandler {
     private _pendingDrag?: PendingDimensionDrag;
     private _drag?: ActiveDimensionDrag;
+    /** The hover readout on screen (edge length / Ø), so only a change is published. */
+    private _readout?: string;
+    private _readoutAt = 0;
 
     constructor(document: IDocument) {
         super(document, true);
@@ -85,6 +92,32 @@ export class ShowPropertyEventHandler extends NodeSelectionHandler {
             return;
         }
         super.pointerMove(view, event);
+        if (!this.mouse.isDown) this.updateReadout(view, event);
+    }
+
+    /**
+     * The size of the edge (or cylindrical face) under the cursor, next to the cursor: a
+     * line's length, a circle's Ø, an arc's R. Only while nothing is being dragged.
+     */
+    private updateReadout(view: IView, event: PointerEvent) {
+        const now = performance.now();
+        if (now - this._readoutAt < HOVER_READOUT_MS) return;
+        this._readoutAt = now;
+        const detected = view.detectShapes(
+            (ShapeTypes.edge | ShapeTypes.face) as ShapeType,
+            event.offsetX,
+            event.offsetY,
+            undefined,
+            NOT_REFERENCE_GEOMETRY_FILTER,
+        );
+        this.showReadout(hoverReadout(detected));
+    }
+
+    private showReadout(text: string | undefined) {
+        if (text === this._readout) return;
+        this._readout = text;
+        if (text === undefined) PubSub.default.pub("clearFloatTip");
+        else PubSub.default.pub("showFloatTip", { level: "info", msg: text });
     }
 
     /** Where the dragged grip goes: a snapped feature point if one is near, else the drag plane. */
@@ -130,6 +163,7 @@ export class ShowPropertyEventHandler extends NodeSelectionHandler {
     override pointerOut(view: IView, event: PointerEvent): void {
         // The pointer left the canvas mid-drag: keep what was dragged so far.
         this.endDrag("commit");
+        this.showReadout(undefined);
         super.pointerOut(view, event);
     }
 
@@ -143,6 +177,7 @@ export class ShowPropertyEventHandler extends NodeSelectionHandler {
 
     override disposeInternal() {
         this.endDrag("rollback");
+        this.showReadout(undefined);
         this.document.selection.onNodeChanged.remove(this.handleSelectionChanged);
         super.disposeInternal();
     }

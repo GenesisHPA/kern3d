@@ -20,6 +20,11 @@ export interface LengthAtAxisSnapData extends SnapData {
 export interface SnapLengthAtPlaneData extends SnapData {
     point: () => XYZ;
     plane: (point: XYZ | undefined) => Plane;
+    /**
+     * A single typed number times this is the distance from `point` — 0.5 when the step asks
+     * for a diameter while it picks the radius point. Coordinate pairs are not scaled.
+     */
+    inputScale?: number;
 }
 
 export class SnapLengthAtAxisHandler extends SnapEventHandler<LengthAtAxisSnapData> {
@@ -92,7 +97,7 @@ export class SnapLengthAtPlaneHandler extends SnapEventHandler<SnapLengthAtPlane
 
     private calculatePointFromDistance(distance: number): XYZ {
         const vector = this._snaped?.point!.sub(this.data.point()).normalize();
-        return this.data.point().add(vector!.multiply(distance));
+        return this.data.point().add(vector!.multiply(distance * (this.data.inputScale ?? 1)));
     }
 
     private calculatePointFromCoordinates(coords: number[], plane: Plane): XYZ {

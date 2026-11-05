@@ -54,7 +54,15 @@ export interface CommandContextOptions {
     docked?: boolean;
 }
 
+/** Where the user last dragged a docked panel to, relative to the viewport (shared by all commands). */
+let dockedPosition: { left: number; top: number } | undefined;
+
 export class CommandContext extends HTMLElement implements IDisposable {
+    /** Forgets the dragged position: the next docked panel opens in its default place. */
+    static resetDockedPosition() {
+        dockedPosition = undefined;
+    }
+
     private readonly propMap: Map<string | number | symbol, [Property, HTMLElement][]> = new Map();
     /**
      * The dropdowns, so a property the COMMAND writes (a drag deciding an operation) reaches
@@ -98,14 +106,13 @@ export class CommandContext extends HTMLElement implements IDisposable {
         const data = CommandStore.getComandData(this.command);
         const icon = createIcon(data!.icon);
         icon.classList.add(style.icon);
-        this.container.append(
-            div(
-                { className: style.command },
-                icon,
-                label({ className: style.title, textContent: new Localize(`command.${data!.key}`) }),
-            ),
-            this.groupsContainer,
+        const header = div(
+            { className: style.command },
+            icon,
+            label({ className: style.title, textContent: new Localize(`command.${data!.key}`) }),
         );
+        if (this.docked) this.makeDraggable(header);
+        this.container.append(header, this.groupsContainer);
         this.initContext();
         if (isCancelableCommand(this.command)) {
             this.closeIcon = div(
@@ -212,6 +219,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
             this.command.onPropertyChanged(this.onPropertyChanged);
         }
         this.observeWidth();
+        if (this.docked && dockedPosition) this.placeAt(dockedPosition.left, dockedPosition.top);
     }
 
     disconnectedCallback(): void {
@@ -225,6 +233,49 @@ export class CommandContext extends HTMLElement implements IDisposable {
         if (this.command instanceof Observable) {
             this.command.removePropertyChanged(this.onPropertyChanged);
         }
+    }
+
+    /** A docked panel is moved over the viewport by its title row; the place is kept for the next one. */
+    private makeDraggable(handle: HTMLElement) {
+        handle.classList.add(style.dragHandle);
+        handle.title = I18n.translate("commandPanel.drag");
+        handle.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            const host = this.offsetParent as HTMLElement | null;
+            if (!host) return;
+            e.preventDefault();
+            const start = this.getBoundingClientRect();
+            const dx = e.clientX - start.left;
+            const dy = e.clientY - start.top;
+            handle.setPointerCapture?.(e.pointerId);
+            const move = (ev: PointerEvent) => {
+                const box = host.getBoundingClientRect();
+                this.placeAt(ev.clientX - box.left - dx, ev.clientY - box.top - dy);
+            };
+            const up = (ev: PointerEvent) => {
+                handle.releasePointerCapture?.(ev.pointerId);
+                handle.removeEventListener("pointermove", move);
+                handle.removeEventListener("pointerup", up);
+                handle.removeEventListener("pointercancel", up);
+            };
+            handle.addEventListener("pointermove", move);
+            handle.addEventListener("pointerup", up);
+            handle.addEventListener("pointercancel", up);
+        });
+    }
+
+    /** Puts the panel at (left, top) inside the viewport, keeping its title row reachable. */
+    private placeAt(left: number, top: number) {
+        const host = this.offsetParent as HTMLElement | null;
+        if (!host) return;
+        const maxLeft = Math.max(0, host.clientWidth - this.offsetWidth);
+        const maxTop = Math.max(0, host.clientHeight - 40);
+        const x = Math.min(Math.max(0, left), maxLeft);
+        const y = Math.min(Math.max(0, top), maxTop);
+        this.style.left = `${x}px`;
+        this.style.top = `${y}px`;
+        this.style.right = "auto";
+        dockedPosition = { left: x, top: y };
     }
 
     dispose() {

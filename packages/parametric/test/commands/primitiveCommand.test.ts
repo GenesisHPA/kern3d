@@ -5,6 +5,7 @@ import { Plane, PubSub, XYZ } from "@chili3d/core";
 import { createMockApplication, TestDocument } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
 import {
+    halfOf,
     PrimitiveBoxCommand,
     PrimitiveConeCommand,
     PrimitiveCylinderCommand,
@@ -37,16 +38,27 @@ function roundCmd<T>(ctor: new () => T, step2 = at(5, 5, 12)): T {
     return cmd as T;
 }
 
+describe("halfOf", () => {
+    test.each([
+        [10, 5],
+        ["12", 6],
+        ["d", "(d) / 2"],
+        ["d + 4", "(d + 4) / 2"],
+    ])("%j -> %j", (input, expected) => {
+        expect(halfOf(input)).toBe(expected);
+    });
+});
+
 describe("primitive command option-panel sizes", () => {
     test("the size properties default to the feature data's defaults", () => {
         const box = new PrimitiveBoxCommand();
         expect([box.dx, box.dy, box.dz]).toEqual([10, 10, 10]);
         const cylinder = new PrimitiveCylinderCommand();
-        expect([cylinder.radius, cylinder.height]).toEqual([5, 10]);
+        expect([cylinder.diameter, cylinder.height]).toEqual([10, 10]);
         const cone = new PrimitiveConeCommand();
-        expect([cone.radius, cone.height, cone.radius2]).toEqual([5, 10, 0]);
+        expect([cone.diameter, cone.height, cone.diameter2]).toEqual([10, 10, 0]);
         const sphere = new PrimitiveSphereCommand();
-        expect(sphere.radius).toBe(5);
+        expect(sphere.diameter).toBe(10);
     });
 
     test("box: the committed rectangle writes its spans to the panel at the height step", () => {
@@ -93,12 +105,12 @@ describe("primitive command option-panel sizes", () => {
         expect(feature.dz).toBe(5);
     });
 
-    test("cylinder: the committed radius writes to the panel; a later panel edit wins", () => {
+    test("cylinder: the committed diameter writes to the panel; a later panel edit wins", () => {
         const cmd = roundCmd(PrimitiveCylinderCommand);
         (cmd as any).getHeightStepData();
-        expect(cmd.radius).toBe(5);
+        expect(cmd.diameter).toBe(10);
 
-        cmd.radius = 7;
+        cmd.diameter = 14;
         const feature = (cmd as any).buildFeature() as PrimitiveFeatureData;
         expect(feature).toMatchObject({
             primitive: "cylinder",
@@ -110,7 +122,7 @@ describe("primitive command option-panel sizes", () => {
         expect(feature.radius2).toBeUndefined();
     });
 
-    test("cone: radius2 defaults to the pointed cone and takes a panel value", () => {
+    test("cone: the top diameter defaults to the pointed cone and takes a panel value", () => {
         const pointed = roundCmd(PrimitiveConeCommand);
         (pointed as any).getHeightStepData();
         const feature = (pointed as any).buildFeature() as PrimitiveFeatureData;
@@ -118,34 +130,34 @@ describe("primitive command option-panel sizes", () => {
 
         const frustum = roundCmd(PrimitiveConeCommand);
         (frustum as any).getHeightStepData();
-        frustum.radius2 = 3;
+        frustum.diameter2 = 6;
         expect(((frustum as any).buildFeature() as PrimitiveFeatureData).radius2).toBe(3);
     });
 
-    test("cone: a negative radius2 is a toast, not a feature", () => {
+    test("cone: a negative top diameter is a toast, not a feature", () => {
         const pub = rs.spyOn(PubSub.default, "pub").mockImplementation(() => {});
         try {
             const cmd = roundCmd(PrimitiveConeCommand);
-            cmd.radius2 = -1;
+            cmd.diameter2 = -1;
             expect((cmd as any).buildFeature()).toBeUndefined();
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Cone top radius must be non-negative",
+                "Cone top diameter must be non-negative",
             );
         } finally {
             pub.mockRestore();
         }
     });
 
-    test("sphere: the picked radius wins over a stale panel value", () => {
+    test("sphere: the picked size wins over a stale panel value", () => {
         const cmd = new PrimitiveSphereCommand() as any;
         cmd.stepDatas = [pick(at(1, 2, 3)), pick(at(1, 2, 16))];
-        cmd.radius = 99; // left over from an earlier run's panel
+        cmd.diameter = 99; // left over from an earlier run's panel
 
         const feature = cmd.buildFeature() as PrimitiveFeatureData;
         expect(feature.radius).toBe(13);
-        expect(cmd.radius).toBe(13);
+        expect(cmd.diameter).toBe(26);
         expect(feature.axis).toBeUndefined();
     });
 

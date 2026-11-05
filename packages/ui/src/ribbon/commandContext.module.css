@@ -335,6 +335,13 @@
     display: none;
 }
 
+/* the title row of a docked panel moves it over the viewport */
+.docked .dragHandle {
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+}
+
 .docked .container {
     flex-direction: column;
     align-items: stretch;

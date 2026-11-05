@@ -510,6 +510,7 @@ export default {
         "feature.pattern.spacing2": "Шаг 2",
         "feature.primitive.direction": "Направление",
         "feature.primitive.radius2": "Верхний радиус",
+        "feature.primitive.diameter2": "Верхний диаметр",
         "feature.revolve.angle2": "Угол 2",
         "feature.sweep.path": "Путь",
         "feature.sweep.profileControl": "Управление профилем",
@@ -653,6 +654,7 @@ export default {
         "prompt.pickNextPoint": "выберите следующую точку, ESC для отмены",
         "prompt.pickPoint": "выберите точку, ESC для отмены",
         "prompt.pickRadius": "введите радиус, ESC для отмены",
+        "prompt.pickDiameter": "введите диаметр, ESC для отмены",
         "prompt.pickSketchEntity": "выберите элемент эскиза, ESC для отмены",
         "prompt.pickDimension":
             "выберите геометрию для размера; щёлкните по пустому месту, чтобы поставить, ESC для отмены",
@@ -938,6 +940,7 @@ export default {
         "toolbox.hint": "Enter — выполнить, Esc — закрыть",
         "commandPanel.ok": "ОК",
         "commandPanel.cancel": "Отмена",
+        "commandPanel.drag": "Потяните, чтобы переместить окно",
         "command.assemble.newComponent": "Новый компонент",
         "command.assemble.joint": "Сочленение",
         "command.assemble.asBuiltJoint": "Сочленение по месту",
