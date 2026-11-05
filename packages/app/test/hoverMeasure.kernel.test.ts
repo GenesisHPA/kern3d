@@ -37,4 +37,14 @@ describe("hover readouts on real shapes", () => {
             .value as unknown as IEdge;
         expect(edgeReadout(arc)).toBe("R5 · 7.85");
     });
+
+    test("reading an edge leaves its cached curve usable (snapping reads it next)", () => {
+        const cylinder = factory.cylinder(XYZ.unitZ, XYZ.zero, 6, 15).value;
+        for (const edge of cylinder.findSubShapes(ShapeTypes.edge) as IEdge[]) {
+            edgeReadout(edge);
+            // a disposed shared curve made this abort the whole wasm module ("null function")
+            expect(edge.curve.startPoint()).toBeDefined();
+            expect(edge.curve.endPoint()).toBeDefined();
+        }
+    });
 });

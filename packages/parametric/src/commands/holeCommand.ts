@@ -58,9 +58,9 @@ import { deduceHoleFace, type PickedHoleFace } from "./holeFace";
 /** Whether `point` is the center of a circular edge of `face` — an existing hole's rim. */
 export function isOpeningCenterOf(face: IFace, point: XYZ): boolean {
     for (const edge of face.findSubShapes(ShapeTypes.edge) as IEdge[]) {
-        let curve: ICurve | undefined;
         try {
-            curve = edge.curve;
+            // the edge owns its cached curve: read it, never dispose it
+            const curve: ICurve = edge.curve;
             const basis = CurveUtils.isTrimmed(curve) ? curve.basisCurve : curve;
             if (
                 CurveUtils.isCircle(basis) &&
@@ -70,8 +70,6 @@ export function isOpeningCenterOf(face: IFace, point: XYZ): boolean {
             }
         } catch {
             // a degenerate edge has no curve
-        } finally {
-            (curve as { dispose?: () => void } | undefined)?.dispose?.();
         }
     }
     return false;

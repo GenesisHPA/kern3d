@@ -14,30 +14,26 @@ import {
 
 const FULL_TURN = Math.PI * 2 - 1e-6;
 
-function disposeQuietly(value: unknown) {
-    (value as { dispose?: () => void } | undefined)?.dispose?.();
-}
-
-/** A line's length, a full circle's diameter, an arc's radius — what an edge reads when hovered. */
+/**
+ * A line's length, a full circle's diameter, an arc's radius — what an edge reads when hovered.
+ * `edge.curve` is cached on the edge and shared (snapping reads the same object), so it is
+ * NOT disposed here: freeing it would leave the edge holding a dead curve.
+ */
 export function edgeReadout(edge: IEdge): string | undefined {
-    let curve: ICurve | undefined;
+    let curve: ICurve;
     try {
         curve = edge.curve;
     } catch {
         return undefined; // a degenerate edge has no curve
     }
-    try {
-        const basis = CurveUtils.isTrimmed(curve) ? curve.basisCurve : curve;
-        if (CurveUtils.isCircle(basis)) {
-            const sweep = Math.abs(curve.lastParameter() - curve.firstParameter());
-            return sweep >= FULL_TURN
-                ? formatMeasurement("diameter", basis.radius * 2)
-                : `${formatMeasurement("radius", basis.radius)} · ${formatMeasurement("length", edge.length())}`;
-        }
-        return formatMeasurement("length", edge.length());
-    } finally {
-        disposeQuietly(curve);
+    const basis = CurveUtils.isTrimmed(curve) ? curve.basisCurve : curve;
+    if (CurveUtils.isCircle(basis)) {
+        const sweep = Math.abs(curve.lastParameter() - curve.firstParameter());
+        return sweep >= FULL_TURN
+            ? formatMeasurement("diameter", basis.radius * 2)
+            : `${formatMeasurement("radius", basis.radius)} · ${formatMeasurement("length", edge.length())}`;
     }
+    return formatMeasurement("length", edge.length());
 }
 
 /** The radius of a cylindrical surface (unwrapping a trimmed one), read structurally. */
