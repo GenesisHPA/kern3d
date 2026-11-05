@@ -13,7 +13,7 @@ import {
     ShapeNode,
     type VisualNode,
 } from "@chili3d/core";
-import { makeEditable } from "@chili3d/parametric";
+import { makeEditable, solidifyMeshes } from "@chili3d/parametric";
 import { buildThreeMf, type ThreeMfObject } from "./threeMf";
 
 export class DefaultDataExchange implements IDataExchange {
@@ -61,9 +61,16 @@ export class DefaultDataExchange implements IDataExchange {
         const node = nodeResult.value;
         node.name = name;
         document.modelManager.addNode(node);
-        // imported solids become parametric bodies starting with the imported shape, so holes,
-        // cuts and fillets apply to them; an STL mesh stays a mesh
-        if (!name.endsWith(".stl")) makeEditable([node]);
+        // an STL's triangles become a solid with merged planar faces first; then every imported
+        // body becomes a parametric one starting with the imported shape, so holes, cuts and
+        // fillets apply to it
+        if (name.toLowerCase().endsWith(".stl")) {
+            solidifyMeshes([node]);
+            // the file holds one body with no name of its own: it takes the file's
+            const only = (node as { firstChild?: INode }).firstChild;
+            if (only !== undefined && only.nextSibling === undefined) only.name = name.replace(/\.stl$/i, "");
+        }
+        makeEditable([node]);
         document.visual.update();
     }
 

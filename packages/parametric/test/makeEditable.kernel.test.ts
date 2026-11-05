@@ -133,3 +133,21 @@ describe.skipIf(!STEP)("a real STEP part made editable", () => {
         require("node:fs").writeFileSync(process.env["PROBE_OUT"] ?? "probe.out", report.join("\n"));
     });
 });
+
+describe("an STL made a part", () => {
+    test("a cube's twelve triangles become a solid of six faces, editable", async () => {
+        const { OccShape } = await import("../../wasm/src/shape");
+        const { meshToSolid } = await import("../src/commands/meshToSolid");
+        const box = shapeFactory.box(Plane.XY, 20, 20, 20).value;
+        const stl = shapeConverter.convertToSTL([box], { binary: false } as any);
+        const node = (globalThis as any).wasm.Converter.convertFromStl(stl.value);
+        const triangles = OccShape.wrap(node.shape);
+        expect(triangles.findSubShapes(ShapeTypes.face).length).toBe(12);
+        const solid = meshToSolid(triangles).value;
+        expect(solid.shapeType === ShapeTypes.solid || solid.shapeType === ShapeTypes.compoundSolid).toBe(
+            true,
+        );
+        expect(solid.findSubShapes(ShapeTypes.face).length).toBe(6);
+        expect(solid.volume()).toBeCloseTo(8000, 0);
+    });
+});

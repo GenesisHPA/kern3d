@@ -2,7 +2,8 @@
 // See LICENSE file in the project root for full license information.
 
 export * from "./assembly";
-export { editableBodyOf, isImportedBody, makeEditable } from "./commands/makeEditableCommand";
+export { editableBodyOf, isImportedBody, makeEditable, solidifyMeshes } from "./commands/makeEditableCommand";
+export { meshToSolid } from "./commands/meshToSolid";
 export * from "./datum";
 export * from "./features";
 export * from "./parametricBodyNode";

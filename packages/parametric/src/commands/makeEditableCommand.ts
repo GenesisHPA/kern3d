@@ -17,6 +17,7 @@ import {
 } from "@chili3d/core";
 import type { ImportedFeatureData } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
+import { meshToSolid } from "./meshToSolid";
 
 /** The shapes a body can grow from: solids and the shells and faces an IGES file brings. */
 const EDITABLE_TYPES = new Set<ShapeType>([
@@ -26,6 +27,10 @@ const EDITABLE_TYPES = new Set<ShapeType>([
     ShapeTypes.shell,
     ShapeTypes.face,
 ]);
+
+function hasSolid(node: EditableShapeNode): boolean {
+    return node.shape.isOk && node.shape.value.findSubShapes(ShapeTypes.solid).length > 0;
+}
 
 export function isImportedBody(node: INode): node is EditableShapeNode {
     return (
@@ -104,6 +109,8 @@ export class MakeEditableCommand implements ICommand {
         if (nodes.length === 0) return;
         let count = 0;
         Transaction.execute(document, "modify.makeEditable", () => {
+            // triangles only (an STL imported before): made a solid with real faces first
+            solidifyMeshes(nodes.filter((n) => n instanceof EditableShapeNode && !hasSolid(n)));
             count = makeEditable(nodes);
         });
         document.visual.update();
@@ -118,4 +125,29 @@ async function pickImported(document: IDocument): Promise<INode[]> {
         nodeFilter: { allow: isImportedBody },
     });
     return picked.filter(isImportedBody);
+}
+
+/**
+ * The imported bodies under `nodes` that are an STL's triangles, rebuilt as solids with merged
+ * planar faces (see `meshToSolid`); a body that will not sew stays as it was.
+ */
+export function solidifyMeshes(nodes: readonly INode[]): void {
+    const visit = (node: INode) => {
+        if (node instanceof EditableShapeNode && node.shape.isOk) {
+            try {
+                const solid = meshToSolid(node.shape.value);
+                if (solid.isOk) node.shape = solid;
+            } catch {
+                // left as triangles
+            }
+            return;
+        }
+        let child = (node as { firstChild?: INode }).firstChild;
+        while (child !== undefined) {
+            const next = child.nextSibling;
+            visit(child);
+            child = next;
+        }
+    };
+    nodes.forEach(visit);
 }
