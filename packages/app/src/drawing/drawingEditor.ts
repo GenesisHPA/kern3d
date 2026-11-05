@@ -1,7 +1,17 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { download, I18n, type I18nKeys, type INode, PubSub, ShapeNode, Transaction } from "@chili3d/core";
+import {
+    download,
+    I18n,
+    type I18nKeys,
+    type INode,
+    PubSub,
+    ShapeNode,
+    Transaction,
+    type WorkspaceTab,
+    workspaceTabs,
+} from "@chili3d/core";
 import {
     composeDrawing,
     fromSheet,
@@ -81,23 +91,33 @@ function t(key: string): string {
 }
 
 /**
- * The full-screen sheet editor: a modal dialog over the 3D view with a toolbar, the sheet,
- * and a property panel for whatever is selected. Every change is written back to the node in
+ * The sheet editor: a workspace over the 3D view with a toolbar, the sheet, and a property
+ * panel for whatever is selected. It lives in a tab beside the document tabs — clicking the
+ * document's tab goes back to the model, the drawing's tab comes back to the sheet, and its ×
+ * closes it; several drawings can be open at once. Every change is written back to the node in
  * one transaction (so undo/redo in the editor are the document's), and the views are
  * projected again from the model whenever it changes.
  */
 export class DrawingEditor {
-    private static current: DrawingEditor | undefined;
+    private static readonly editors = new Map<string, DrawingEditor>();
 
     static open(node: DrawingNode) {
-        DrawingEditor.current?.close();
-        DrawingEditor.current = new DrawingEditor(node);
-        DrawingEditor.current.show();
+        let editor = DrawingEditor.editors.get(node.id);
+        if (editor === undefined) {
+            editor = new DrawingEditor(node);
+            DrawingEditor.editors.set(node.id, editor);
+            editor.mount();
+        }
+        workspaceTabs.open(editor.tab);
     }
 
+    /** Whether a drawing is in front of the 3D view. */
     static get isOpen() {
-        return DrawingEditor.current !== undefined;
+        const active = workspaceTabs.active;
+        return active !== undefined && DrawingEditor.editors.has(active);
     }
+
+    private readonly tab: WorkspaceTab;
 
     private readonly dialog: HTMLDialogElement;
     private readonly svg: SVGSVGElement;
@@ -123,6 +143,14 @@ export class DrawingEditor {
     private refreshPending = false;
 
     private constructor(private readonly node: DrawingNode) {
+        this.tab = {
+            id: node.id,
+            title: () => this.node.name,
+            icon: "icon-file-plus",
+            show: () => this.reveal(),
+            hide: () => this.conceal(),
+            close: () => this.close(),
+        };
         this.data = node.data;
         this.committed = node.content;
         const document = node.document;
@@ -151,7 +179,8 @@ export class DrawingEditor {
 
     // ---- lifecycle ------------------------------------------------------------------------
 
-    private show() {
+    /** Builds the editor once; `reveal` / `conceal` then show and hide it as its tab is picked. */
+    private mount() {
         window.document.body.append(this.dialog);
         this.dialog.addEventListener("cancel", this.onCancel);
         this.dialog.addEventListener("keydown", this.onKeyDown);
@@ -161,10 +190,24 @@ export class DrawingEditor {
         this.svg.addEventListener("wheel", this.onWheel, { passive: false });
         this.svg.addEventListener("contextmenu", (e) => e.preventDefault());
         this.node.onPropertyChanged(this.onNodeChanged);
-        this.dialog.showModal();
         this.refresh();
-        this.fit();
+    }
+
+    private fitted = false;
+
+    /** In front of the 3D view (non-modal: the tab strip above stays usable). */
+    private reveal() {
+        if (!this.dialog.open) this.dialog.show();
+        if (!this.fitted) {
+            this.fitted = true;
+            this.fit();
+        }
         (this.dialog.firstElementChild as HTMLElement).focus();
+    }
+
+    /** Out of the way so the model is seen; the sheet keeps its state. */
+    private conceal() {
+        if (this.dialog.open) this.dialog.close();
     }
 
     close() {
@@ -172,7 +215,8 @@ export class DrawingEditor {
         this.node.removePropertyChanged(this.onNodeChanged);
         this.dialog.close();
         this.dialog.remove();
-        if (DrawingEditor.current === this) DrawingEditor.current = undefined;
+        DrawingEditor.editors.delete(this.node.id);
+        workspaceTabs.remove(this.node.id);
     }
 
     private readonly onCancel = (e: Event) => {
@@ -181,6 +225,7 @@ export class DrawingEditor {
     };
 
     private readonly onNodeChanged = (property: string | number | symbol) => {
+        if (property === "name") workspaceTabs.changed();
         if (property !== "content" || this.node.content === this.committed) return;
         // undo / redo replaced the description under us
         this.committed = this.node.content;
@@ -448,6 +493,7 @@ export class DrawingEditor {
             this.button("drawing.export.pdf", () => void this.exportPdf()),
             this.button("drawing.export.dxf", () => this.exportDxf()),
             this.separator(),
+            this.button("drawing.toModel", () => workspaceTabs.activate(undefined)),
             this.button("drawing.close", () => this.close()),
         );
         return bar;
@@ -486,7 +532,8 @@ export class DrawingEditor {
     private escape() {
         if (this.tool.kind !== "select") this.setTool({ kind: "select" });
         else if (this.selection !== undefined) this.select(undefined);
-        else this.close();
+        // nothing left to drop: back to the model, the drawing stays open in its tab
+        else workspaceTabs.activate(undefined);
     }
 
     // ---- selection & editing ------------------------------------------------------------------

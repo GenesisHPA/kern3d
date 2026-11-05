@@ -98,6 +98,20 @@
     box-shadow: inset 0 2px 0 var(--accent-color);
 }
 
+/* a drawing (workspace) tab is in front: the document's tab is not the one being looked at */
+.docTabs[data-workspace-front] .docTab.active {
+    background-color: transparent;
+    box-shadow: none;
+    color: inherit;
+}
+
+.docIcon {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    margin-right: 4px;
+}
+
 .docName {
     flex: 1 1 auto;
     overflow: hidden;

@@ -16,6 +16,7 @@ import {
     type Ribbon,
     type RibbonTab,
     type RibbonWorkspaceKeys,
+    workspaceTabs,
 } from "@chili3d/core";
 import { collection, div, span, svg } from "@chili3d/element";
 import { glyph } from "../glyphs";
@@ -86,9 +87,15 @@ export class MainToolbar extends HTMLElement {
         this.ribbon.tabs.onCollectionChanged(this.onTabsChanged);
         this.ribbon.tabs.forEach((tab) => tab.onPropertyChanged(this.onTabChanged));
         Config.instance.onPropertyChanged(this.onConfigChanged);
+        this.unsubscribeWorkspaceTabs = workspaceTabs.onChange(this.renderWorkspaceTabs);
+        this.renderWorkspaceTabs();
     }
 
+    private unsubscribeWorkspaceTabs?: () => void;
+
     disconnectedCallback() {
+        this.unsubscribeWorkspaceTabs?.();
+        this.unsubscribeWorkspaceTabs = undefined;
         this.ribbon.removePropertyChanged(this.onRibbonChanged);
         this.ribbon.tabs.removeCollectionChanged(this.onTabsChanged);
         this.ribbon.tabs.forEach((tab) => tab.removePropertyChanged(this.onTabChanged));
@@ -232,11 +239,8 @@ export class MainToolbar extends HTMLElement {
                 sources: this.ribbon.quickCommands,
                 template: (command: CommandKeys) => QuickButton(command as any),
             }),
-            collection({
-                className: style.docTabs,
-                sources: this.app.views,
-                template: (view: IView) => this.docTab(view),
-            }),
+            this.docTabs,
+            this.workspaceTabStrip,
             svg({
                 className: style.appButton,
                 icon: "icon-plus",
@@ -247,12 +251,53 @@ export class MainToolbar extends HTMLElement {
         );
     }
 
+    /** Built on first use (from `appBar`, inside the constructor — after `app` is set). */
+    private _docTabs?: HTMLElement;
+    private get docTabs(): HTMLElement {
+        this._docTabs ??= collection({
+            className: style.docTabs,
+            sources: this.app.views,
+            template: (view: IView) => this.docTab(view),
+        });
+        return this._docTabs;
+    }
+
+    /** Drawing sheets (and any other workspace over the 3D view), each a tab after the documents. */
+    private readonly workspaceTabStrip = div({ className: style.docTabs });
+
+    private readonly renderWorkspaceTabs = () => {
+        const active = workspaceTabs.active;
+        // a workspace in front means no document tab is the one being looked at
+        this.docTabs.toggleAttribute("data-workspace-front", active !== undefined);
+        this.workspaceTabStrip.replaceChildren(
+            ...workspaceTabs.list.map((tab) =>
+                div(
+                    {
+                        className: tab.id === active ? `${style.docTab} ${style.active}` : style.docTab,
+                        onclick: () => workspaceTabs.activate(tab.id),
+                    },
+                    ...(tab.icon ? [svg({ className: style.docIcon, icon: tab.icon })] : []),
+                    span({ className: style.docName, textContent: tab.title() }),
+                    svg({
+                        className: style.docClose,
+                        icon: "icon-times",
+                        onclick: (e) => {
+                            e.stopPropagation();
+                            tab.close();
+                        },
+                    }),
+                ),
+            ),
+        );
+    };
+
     private docTab(view: IView) {
         return div(
             {
                 className: new Binding(this.app, "activeView", new ActiveViewConverter(view)),
                 onclick: () => {
                     this.app.activeView = view;
+                    workspaceTabs.activate(undefined); // back to the model
                 },
             },
             span({ className: style.docName, textContent: new Binding(view.document, "name") }),

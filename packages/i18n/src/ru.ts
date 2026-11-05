@@ -378,6 +378,7 @@ export default {
         "drawing.export.pdf": "PDF",
         "drawing.export.dxf": "DXF",
         "drawing.close": "Закрыть",
+        "drawing.toModel": "К модели",
         "drawing.sheet": "Лист",
         "drawing.format": "Формат",
         "drawing.orientation": "Ориентация",

@@ -416,6 +416,7 @@ export const I18N_KEYS = [
     "drawing.export.pdf",
     "drawing.export.dxf",
     "drawing.close",
+    "drawing.toModel",
     "drawing.sheet",
     "drawing.format",
     "drawing.orientation",

@@ -435,6 +435,7 @@ export default {
         "drawing.export.pdf": "PDF",
         "drawing.export.dxf": "DXF",
         "drawing.close": "Close",
+        "drawing.toModel": "To model",
         "drawing.sheet": "Sheet",
         "drawing.format": "Format",
         "drawing.orientation": "Orientation",
