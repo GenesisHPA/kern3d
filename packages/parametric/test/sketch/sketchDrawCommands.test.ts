@@ -413,14 +413,15 @@ describe("typed dimensions", () => {
         editor.solver.dispose();
     });
 
-    test("a circle is dimensioned by the radius that was typed", () => {
+    test("a circle is dimensioned by the diameter that was typed", () => {
         const editor = fakeEditor();
+        // a typed 6 is the diameter: the rim point lands 3 from the centre
         runCommand(
             new SketchCircleCommand(),
             editor,
             [
                 [3, 4],
-                [9, 4],
+                [6, 4],
             ],
             [undefined, typed(6)],
         );
@@ -429,7 +430,8 @@ describe("typed dimensions", () => {
             id: expect.any(Number),
             kind: ConstraintKind.Radius,
             refs: [{ entityId: 1, pointIndex: 0 }],
-            datum: 6,
+            datum: 3,
+            display: "diameter",
         });
         editor.solver.dispose();
     });

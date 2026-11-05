@@ -1,7 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { command, Dimensions, type IStep, type XYZ } from "@chili3d/core";
+import { command, Dimensions, formatMeasurement, type IStep, type XYZ } from "@chili3d/core";
+import { ConstraintKind, type SketchConstraintData } from "../sketchModel";
 import { SketchMultistepCommand } from "./sketchMultistepCommand";
 import { type SketchPointSnapData, SketchPointStep } from "./sketchPointStep";
 
@@ -15,8 +16,17 @@ export class SketchCircleCommand extends SketchMultistepCommand {
     getSteps(): IStep[] {
         return [
             new SketchPointStep("prompt.pickCircleCenter"),
-            new SketchPointStep("prompt.pickRadius", this.getRadiusData),
+            new SketchPointStep("prompt.pickDiameter", this.getRadiusData),
         ];
+    }
+
+    /** A typed number was the diameter, so the dimension it leaves reads Ø too. */
+    protected override typedDimensions(entityId: number): Omit<SketchConstraintData, "id">[] {
+        return super
+            .typedDimensions(entityId)
+            .map((dimension) =>
+                dimension.kind === ConstraintKind.Radius ? { ...dimension, display: "diameter" } : dimension,
+            );
     }
 
     protected executeMainTask(): void {
@@ -27,6 +37,15 @@ export class SketchCircleCommand extends SketchMultistepCommand {
     private readonly getRadiusData = (): SketchPointSnapData => ({
         refPoint: () => this.stepDatas[0].point!,
         dimension: Dimensions.D1,
+        // the circle is sized by its diameter: a typed number is the diameter, the tip reads Ø
+        inputScale: 0.5,
+        prompt: (snaped) =>
+            snaped.point === undefined
+                ? ""
+                : formatMeasurement(
+                      "diameter",
+                      this.editor.node.plane.projectDistance(this.stepDatas[0].point!, snaped.point) * 2,
+                  ),
         preview: this.circlePreview,
         tentative: (probe) => ({ type: "circle", params: circleParams(this.uvOf(0), probe) }),
     });

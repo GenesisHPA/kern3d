@@ -18,6 +18,11 @@ export interface PointSnapData extends SnapData {
     dimension?: Dimension;
     refPoint?: () => XYZ;
     plane?: (point?: XYZ) => Plane;
+    /**
+     * A single typed number times this is the distance from `refPoint` — 0.5 when the step
+     * asks for a diameter while it picks a rim point. Coordinates are not scaled.
+     */
+    inputScale?: number;
 }
 
 export interface SnapPointOnCurveData extends PointSnapData {
@@ -62,7 +67,7 @@ export class PointSnapEventHandler extends SnapEventHandler<PointSnapData> {
 
     private calculatePointFromDistance(refPoint: XYZ, distance: number): XYZ {
         const vector = this._snaped!.point!.sub(refPoint).normalize()!;
-        return refPoint.add(vector.multiply(distance));
+        return refPoint.add(vector.multiply(distance * (this.data.inputScale ?? 1)));
     }
 
     private calculatePointFromCoordinates(refPoint: XYZ, dims: number[]): XYZ {
