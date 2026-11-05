@@ -84,8 +84,10 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   TAG="${{ inputs.tag || github.ref_name }}"
-                  NOTES="desktop/release-notes/${TAG}.md"
-                  [ -f "$NOTES" ] || NOTES="desktop/release-notes/default.md"
+                  # notes: this version's section of CHANGELOG.md, then how to install
+                  NOTES="$RUNNER_TEMP/notes.md"
+                  node scripts/release-notes.mjs "${TAG#v}" > "$NOTES"
+                  cat "$NOTES"
                   ls -la out
                   if gh release view "$TAG" >/dev/null 2>&1; then
                       gh release upload "$TAG" out/* --clobber

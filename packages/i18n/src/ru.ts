@@ -527,6 +527,7 @@ export default {
         "file.format": "Формат",
         "helix.pitch": "Шаг",
         "helix.turns": "Витки",
+        "home.changes": "Что нового",
         "home.recent": "Недавние проекты",
         "home.recent.empty": "Пока нет недавних документов. Создайте или откройте документ, чтобы начать.",
         "home.credits":

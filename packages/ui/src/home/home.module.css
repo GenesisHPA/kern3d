@@ -412,7 +412,7 @@
 
         & .videoColumn {
             display: flex;
-            flex: 0 0 280px;
+            flex: 0 0 340px;
             min-height: 0;
             flex-direction: column;
             overflow: hidden;
@@ -456,6 +456,74 @@
 
             & .videoSection {
                 flex-shrink: 0;
+            }
+
+            & .changes {
+                gap: 22px;
+            }
+
+            & .release {
+                flex-shrink: 0;
+
+                & .releaseHeader {
+                    display: flex;
+                    align-items: baseline;
+                    gap: 10px;
+                    margin-bottom: 6px;
+                }
+
+                & .releaseVersion {
+                    font-size: 15px;
+                    font-weight: 600;
+                }
+
+                & .releaseDate {
+                    font-size: 12px;
+                    color: var(--foreground-muted-color);
+                }
+
+                & .releaseItems {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                    margin-top: 6px;
+                }
+
+                & .releaseGroup {
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    color: var(--foreground-muted-color);
+                }
+
+                & .releaseItem {
+                    position: relative;
+                    padding-left: 14px;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    color: var(--foreground-muted-color);
+
+                    &::before {
+                        content: "";
+                        position: absolute;
+                        left: 2px;
+                        top: 0.55em;
+                        width: 5px;
+                        height: 5px;
+                        border-radius: 50%;
+                        background: var(--foreground-muted-color);
+                        opacity: 0.6;
+                    }
+                }
+
+                &.current .releaseVersion {
+                    color: var(--primary-color);
+                }
+
+                &.current .releaseItem {
+                    color: inherit;
+                }
             }
 
             & .videoSection + .videoSection {

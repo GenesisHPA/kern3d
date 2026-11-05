@@ -39,6 +39,13 @@ export const TITLE_BLOCK_SIZE: Record<TitleBlockKind, [number, number]> = {
     none: [0, 0],
 };
 
+/** Parts of the drawing area the frame takes: ГОСТ graph 26 in the top-left corner. */
+export function reservedRects(sheet: SheetData, kind: TitleBlockKind): Rect[] {
+    if (kind !== "gost") return [];
+    const frame = frameRect(sheet, kind);
+    return [{ minX: frame.minX, minY: frame.maxY - 14, maxX: frame.minX + 70, maxY: frame.maxY }];
+}
+
 /** Where views can go: the inner frame above the title block's height. */
 export function drawingArea(sheet: SheetData, kind: TitleBlockKind): Rect {
     const frame = frameRect(sheet, kind);

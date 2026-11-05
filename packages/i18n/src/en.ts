@@ -614,6 +614,7 @@ export default {
         "file.format": "Format",
         "helix.pitch": "Pitch",
         "helix.turns": "Turns",
+        "home.changes": "What's new",
         "home.recent": "Recent Projects",
         "home.recent.empty": "No recent documents yet. Create or open a document to get started.",
         "home.credits":

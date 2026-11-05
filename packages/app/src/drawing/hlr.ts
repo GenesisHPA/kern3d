@@ -756,12 +756,26 @@ export function computeViewGeometry(input: HlrInput, basis: ViewBasis, options: 
 
     const finish = (lines: RawLine[]) =>
         lines.map((l) => toPolyline(simplify(l.points, context.tolerance2D * 0.01), l.circle));
-    const circles = dedupeCircles(
+    const visible = finish([...visibleEdges, ...visibleOutlines]);
+    let circles = dedupeCircles(
         edgeLines.flatMap((l) => (l.circle === undefined ? [] : [l.circle])),
         context.tolerance2D,
     );
+    if (!options.hidden || options.section !== undefined) {
+        // without hidden lines, a circle that does not show gets no centre mark either
+        const t = context.tolerance2D;
+        circles = circles.filter((c) =>
+            visible.some(
+                (l) =>
+                    l.arc !== undefined &&
+                    Math.abs(l.arc.cx - c.cx) <= t &&
+                    Math.abs(l.arc.cy - c.cy) <= t &&
+                    Math.abs(l.arc.r - c.r) <= t,
+            ),
+        );
+    }
     return {
-        visible: finish([...visibleEdges, ...visibleOutlines]),
+        visible,
         hidden: finish(hidden),
         tangent: finish(visibleTangents),
         circles,

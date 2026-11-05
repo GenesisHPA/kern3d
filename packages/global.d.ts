@@ -36,5 +36,7 @@ declare namespace jest {
 }
 
 declare var __APP_VERSION__: string;
+/** CHANGELOG.md at build time: the home page's "what's new". */
+declare var __CHANGELOG__: string;
 declare var __DOCUMENT_VERSION__: string;
 declare var __IS_PRODUCTION__: boolean;

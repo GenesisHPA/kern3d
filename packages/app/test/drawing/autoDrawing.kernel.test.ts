@@ -77,7 +77,7 @@ function insideFrame(data: DrawingData, cache: ViewGeometryCache) {
 describe("automatic drawing by the rules", () => {
     test("a plain block: three views, its three overall sizes once each, no cut", () => {
         const { data, cache } = drawingOf(shapeFactory.box(Plane.XY, 100, 60, 40).value, "block");
-        expect(data.views.map((v) => v.orientation)).toEqual(["front", "top", "left"]);
+        expect(data.views.map((v) => v.orientation)).toEqual(["front", "top", "left", "iso"]);
         expect(data.views.every((v) => v.section === undefined)).toBe(true);
         expect(labels(data)).toEqual(["100", "40", "60"]);
         insideFrame(data, cache);
@@ -158,5 +158,20 @@ describe("automatic drawing by the rules", () => {
         const { data, cache } = drawingOf(bracket, "bracket");
         expect(labels(data)).toEqual(["10", "10", "40", "50", "80"]);
         insideFrame(data, cache);
+    });
+
+    test("a blind hole in the right face: a view from the right is added, it sees the hole", () => {
+        const block = shapeFactory.box(Plane.XY, 60, 40, 30).value;
+        const hole = cylinder(52, 20, 15, 5, 20, XYZ.unitX);
+        const { data, cache } = drawingOf(cut(block, hole), "rightHole");
+        expect(data.views.map((v) => v.orientation)).toContain("right");
+        const right = data.views.find((v) => v.orientation === "right")!;
+        expect(cache.geometryOf(right)!.circles.length).toBe(1);
+        insideFrame(data, cache);
+    });
+
+    test("nothing on the far sides: no extra views", () => {
+        const { data } = drawingOf(shapeFactory.box(Plane.XY, 60, 40, 30).value, "plainBlock");
+        expect(data.views.filter((v) => v.orientation !== "iso").length).toBe(3);
     });
 });

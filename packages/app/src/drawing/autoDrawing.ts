@@ -12,12 +12,18 @@ import {
     type ProjectionSide,
     type Vec3,
 } from "./drawingData";
-import { layoutStandardViews, type ViewGeometryCache, viewBasisOf } from "./drawingViews";
+import {
+    layoutStandardViews,
+    newView,
+    projectedView,
+    type ViewGeometryCache,
+    viewBasisOf,
+} from "./drawingViews";
 import type { HlrInput, Polyline2, ViewGeometry } from "./hlr";
 import { placementOf, toSheet, type ViewPlacement } from "./placement";
 import { cutTraceHost, traceOn } from "./sectionMarks";
-import { drawingArea } from "./sheet";
-import { cross, dot, normalize, STANDARD_SCALES } from "./viewBasis";
+import { drawingArea, reservedRects } from "./sheet";
+import { cross, dot, formatScale, normalize, STANDARD_SCALES } from "./viewBasis";
 
 /**
  * A drawing laid out by the rules rather than by hand (ГОСТ 2.305, 2.307):
@@ -563,8 +569,10 @@ export function planDimensions(
         return false;
     };
     const radial = (c: Cylinder, kind: "diameter" | "radius", prefix?: string) => {
-        for (const view of views) {
-            if (!circleIn(view, c)) continue;
+        // the view where the circle shows, before one that sees it hidden
+        const facing = views.filter((v) => circleIn(v, c));
+        const shows = (v: DrawingViewData) => arcShows(geometries.get(v.id)!, project2(v, c.point), c.radius);
+        for (const view of [...facing.filter(shows), ...facing.filter((v) => !shows(v))]) {
             const g = geometries.get(view.id)!;
             const center = project2(view, c.point);
             const taken = radialAngles.get(view.id) ?? [];
@@ -730,6 +738,18 @@ export function boltCircle(
     return undefined;
 }
 
+/** A visible arc of the view on this circle. */
+function arcShows(g: ViewGeometry, center: Point2, radius: number): boolean {
+    const t = Math.hypot(g.bounds.maxX - g.bounds.minX, g.bounds.maxY - g.bounds.minY) * 1e-3 + 1e-6;
+    return g.visible.some(
+        (l) =>
+            l.arc !== undefined &&
+            Math.abs(l.arc.cx - center[0]) <= t &&
+            Math.abs(l.arc.cy - center[1]) <= t &&
+            Math.abs(l.arc.r - radius) <= t,
+    );
+}
+
 /** The member of a set of equal holes whose callout points out of the view most freely. */
 function pickCallout(
     set: Cylinder[],
@@ -774,7 +794,10 @@ function chooseView(
 ): DrawingViewData | undefined {
     const candidates = views.filter((v) => roleIn(v, axis) !== undefined);
     if (center !== undefined) {
-        const seen = candidates.find((v) => circleIn(v, center));
+        const facing = candidates.filter((v) => circleIn(v, center));
+        const seen =
+            facing.find((v) => arcShows(geometries.get(v.id)!, project2(v, center.point), center.radius)) ??
+            facing[0];
         if (seen !== undefined) return seen;
     }
     const visible = (v: DrawingViewData, c: Coordinate) => {
@@ -898,44 +921,42 @@ export function arrangeViews(
 ) {
     const root = data.views.find((v) => v.parentId === undefined && orthographic(v));
     if (root === undefined) return;
-    const children = data.views.filter((v) => v.parentId === root.id && v.side !== undefined);
     const area = drawingArea(data.sheet, data.titleBlock.kind);
-    const zero: Margins = { up: 0, down: 0, left: 0, right: 0 };
-    const m = (v: DrawingViewData) => margins.get(v.id) ?? zero;
-    const size = (v: DrawingViewData): [number, number] => {
-        const b = geometries.get(v.id)?.bounds;
-        if (b === undefined || !Number.isFinite(b.minX)) return [40, 30];
-        return [b.maxX - b.minX, b.maxY - b.minY];
-    };
+    const m = (v: DrawingViewData) => margins.get(v.id) ?? ZERO_MARGINS;
+    const childrenOf = (v: DrawingViewData) =>
+        data.views.filter((c) => c.parentId === v.id && c.side !== undefined && orthographic(c));
     const layout = (scale: number) => {
-        const positions = new Map<string, Point2>([[root.id, [0, 0]]]);
-        const [rw, rh] = size(root).map((x) => (x * scale) / 2);
-        const box = {
-            minX: -rw - m(root).left,
-            maxX: rw + m(root).right,
-            minY: -rh - m(root).down,
-            maxY: rh + m(root).up,
+        const positions = new Map<string, Point2>();
+        const box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        // each view relative to its parent, its own neighbours relative to it, down the tree
+        const place = (v: DrawingViewData, x: number, y: number, depth: number) => {
+            positions.set(v.id, [x, y]);
+            const [w, h] = halfSizeOf(geometries.get(v.id), scale);
+            box.minX = Math.min(box.minX, x - w - m(v).left);
+            box.maxX = Math.max(box.maxX, x + w + m(v).right);
+            box.minY = Math.min(box.minY, y - h - m(v).down);
+            box.maxY = Math.max(box.maxY, y + h + m(v).up);
+            if (depth > 8) return;
+            for (const c of childrenOf(v)) {
+                const [cw, ch] = halfSizeOf(geometries.get(c.id), scale);
+                let cx = x;
+                let cy = y;
+                if (c.side === "right")
+                    cx = x + w + Math.max(VIEW_GAP, m(v).right + m(c).left + MARGIN_GAP) + cw;
+                if (c.side === "left")
+                    cx = x - w - Math.max(VIEW_GAP, m(v).left + m(c).right + MARGIN_GAP) - cw;
+                if (c.side === "up") cy = y + h + Math.max(VIEW_GAP, m(v).up + m(c).down + MARGIN_GAP) + ch;
+                if (c.side === "down") cy = y - h - Math.max(VIEW_GAP, m(v).down + m(c).up + MARGIN_GAP) - ch;
+                place(c, cx, cy, depth + 1);
+            }
         };
-        for (const c of children) {
-            const [cw, ch] = size(c).map((x) => (x * scale) / 2);
-            let x = 0;
-            let y = 0;
-            if (c.side === "right") x = rw + Math.max(VIEW_GAP, m(root).right + m(c).left + MARGIN_GAP) + cw;
-            if (c.side === "left") x = -rw - Math.max(VIEW_GAP, m(root).left + m(c).right + MARGIN_GAP) - cw;
-            if (c.side === "up") y = rh + Math.max(VIEW_GAP, m(root).up + m(c).down + MARGIN_GAP) + ch;
-            if (c.side === "down") y = -rh - Math.max(VIEW_GAP, m(root).down + m(c).up + MARGIN_GAP) - ch;
-            positions.set(c.id, [x, y]);
-            box.minX = Math.min(box.minX, x - cw - m(c).left);
-            box.maxX = Math.max(box.maxX, x + cw + m(c).right);
-            box.minY = Math.min(box.minY, y - ch - m(c).down);
-            box.maxY = Math.max(box.maxY, y + ch + m(c).up);
-        }
+        place(root, 0, 0, 0);
         return { positions, box };
     };
     const roomW = area.maxX - area.minX - 10;
     const roomH = area.maxY - area.minY - 10;
-    let chosen = layout(STANDARD_SCALES[STANDARD_SCALES.length - 1]);
     let scale = STANDARD_SCALES[STANDARD_SCALES.length - 1];
+    let chosen = layout(scale);
     for (const s of STANDARD_SCALES) {
         const l = layout(s);
         if (l.box.maxX - l.box.minX <= roomW && l.box.maxY - l.box.minY <= roomH) {
@@ -946,12 +967,131 @@ export function arrangeViews(
     }
     const dx = (area.minX + area.maxX) / 2 - (chosen.box.minX + chosen.box.maxX) / 2;
     const dy = (area.minY + area.maxY) / 2 - (chosen.box.minY + chosen.box.maxY) / 2;
-    for (const v of [root, ...children]) {
-        const [x, y] = chosen.positions.get(v.id)!;
+    for (const v of data.views) {
+        const p = chosen.positions.get(v.id);
+        if (p === undefined) continue;
         v.scale = scale;
-        v.x = x + dx;
-        v.y = y + dy;
+        v.x = p[0] + dx;
+        v.y = p[1] + dy;
     }
+}
+
+const ZERO_MARGINS: Margins = { up: 0, down: 0, left: 0, right: 0 };
+
+function halfSizeOf(g: ViewGeometry | undefined, scale: number): [number, number] {
+    const b = g?.bounds;
+    if (b === undefined || !Number.isFinite(b.minX)) return [20, 15];
+    return [((b.maxX - b.minX) * scale) / 2, ((b.maxY - b.minY) * scale) / 2];
+}
+
+function visibleLength(g: ViewGeometry | undefined): number {
+    let total = 0;
+    for (const line of g?.visible ?? []) {
+        const p = line.points;
+        for (let k = 2; k + 1 < p.length; k += 2) total += Math.hypot(p[k] - p[k - 2], p[k + 1] - p[k - 1]);
+    }
+    return total;
+}
+
+/**
+ * ГОСТ 2.305 asks for as many views as the part needs: the opposite basic views (from the
+ * right, from below, from behind) are added where they show more than the view they mirror
+ * does — something on that side the standard views only see hidden.
+ */
+export function addRevealingViews(data: DrawingData, cache: ViewGeometryCache) {
+    const root = data.views.find((v) => v.parentId === undefined && orthographic(v));
+    if (root === undefined) return;
+    const geometryOf = (v: DrawingViewData) => cache.geometryOf(v);
+    const opposite: Record<ProjectionSide, ProjectionSide> = {
+        up: "down",
+        down: "up",
+        left: "right",
+        right: "left",
+    };
+    const candidates: { parent: DrawingViewData; side: ProjectionSide; mirrors: DrawingViewData }[] = [];
+    for (const child of data.views.filter((v) => v.parentId === root.id && v.side !== undefined)) {
+        const side = opposite[child.side!];
+        if (!data.views.some((v) => v.parentId === root.id && v.side === side))
+            candidates.push({ parent: root, side, mirrors: child });
+        // the view from behind sits beyond the side view, on the same side
+        if (child.side === "left" || child.side === "right")
+            candidates.push({ parent: child, side: child.side, mirrors: root });
+    }
+    const added: DrawingViewData[] = [];
+    for (const c of candidates) {
+        const view = projectedView(data, c.parent, c.side, geometryOf);
+        // compare with what the mirrored view sees uncut
+        const plain = { ...c.mirrors, id: `${c.mirrors.id}~plain`, section: undefined };
+        const seen = visibleLength(geometryOf(view));
+        const mirrored = visibleLength(geometryOf(plain));
+        if (seen > mirrored * 1.02 + 1e-6) {
+            view.showHidden = false;
+            added.push(view);
+        }
+    }
+    data.views.push(...added);
+}
+
+/**
+ * The isometric view, in the first corner of the drawing area its outline fits into clear of
+ * the other views and their dimensions; taken off the sheet when no corner has the room.
+ */
+export function placeIsometric(
+    data: DrawingData,
+    margins: ReadonlyMap<string, Margins>,
+    cache: ViewGeometryCache,
+) {
+    const iso = data.views.find((v) => v.orientation === "iso" && v.parentId === undefined);
+    if (iso === undefined) return;
+    const root = data.views.find((v) => v.parentId === undefined && orthographic(v));
+    const main = root?.scale ?? iso.scale;
+    const taken = data.views
+        .filter((v) => v !== iso)
+        .map((v) => {
+            const [vw, vh] = halfSizeOf(cache.geometryOf(v), v.scale);
+            const m = margins.get(v.id) ?? ZERO_MARGINS;
+            return {
+                minX: v.x - vw - m.left,
+                maxX: v.x + vw + m.right,
+                minY: v.y - vh - m.down,
+                maxY: v.y + vh + m.up,
+            };
+        });
+    const area = drawingArea(data.sheet, data.titleBlock.kind);
+    taken.push(...reservedRects(data.sheet, data.titleBlock.kind));
+    const pad = 8;
+    // the main views' scale, or up to two standard steps smaller (ГОСТ 2.316: written over it)
+    const scales = STANDARD_SCALES.filter((s) => s <= main + 1e-9).slice(0, 3);
+    for (const scale of scales) {
+        const [w, h] = halfSizeOf(cache.geometryOf(iso), scale);
+        // room for the scale written over the view
+        const top = scale === main ? 0 : 9;
+        const corners: Point2[] = [
+            [area.maxX - pad - w, area.maxY - pad - h - top],
+            [area.minX + pad + w, area.maxY - pad - h - top],
+            [area.maxX - pad - w, area.minY + pad + h],
+            [area.minX + pad + w, area.minY + pad + h],
+        ];
+        const fits = ([x, y]: Point2) =>
+            x - w >= area.minX &&
+            x + w <= area.maxX &&
+            y - h >= area.minY &&
+            y + h + top <= area.maxY &&
+            taken.every(
+                (r) =>
+                    x + w + pad <= r.minX ||
+                    x - w - pad >= r.maxX ||
+                    y + h + top + pad <= r.minY ||
+                    y - h - pad >= r.maxY,
+            );
+        const spot = corners.find(fits);
+        if (spot === undefined) continue;
+        iso.scale = scale;
+        [iso.x, iso.y] = spot;
+        iso.label = scale === main ? undefined : `(${formatScale(scale)})`;
+        return;
+    }
+    data.views = data.views.filter((v) => v !== iso);
 }
 
 /** Turns the plan into dimensions on paper, now that the views have their places and scale. */
@@ -1015,14 +1155,17 @@ export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGe
     const own = { ...data, views: data.views.filter((v) => v.sourceId === sourceId) };
     const geometries = cache.all(own);
     const planned = planDimensions(own, input, geometries, cylinders);
-    arrangeViews(data, marginsOf(data, planned), geometries);
+    const margins = marginsOf(data, planned);
+    arrangeViews(data, margins, geometries);
+    placeIsometric(data, margins, cache);
     // the layout moved and rescaled the views: the dimensions are placed after it
     data.dimensions.push(...placeDimensions(data, planned, cache.all(data)));
 }
 
 /**
- * The whole drawing of a source by the rules: the three standard views, cuts where holes
- * run across a view, centre lines, and the dimensions — replacing every view on the sheet.
+ * The whole drawing of a source by the rules: the three standard views and those of the
+ * other basic views that show something more, cuts where holes run across a view, centre
+ * lines, dimensions, and an isometric view where the sheet has room — replacing every view.
  */
 export function autoDrawing(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
     data.views = [];
@@ -1030,6 +1173,9 @@ export function autoDrawing(data: DrawingData, sourceId: string, cache: ViewGeom
     layoutStandardViews(data, sourceId, (v) => cache.geometryOf(v));
     const input = cache.inputFor(sourceId);
     if (input === undefined) return;
+    addRevealingViews(data, cache);
+    const root = data.views[0];
+    data.views.push(newView(sourceId, "iso", root.scale, root.x, root.y));
     autoSections(data, cylindersOf(input), modelTolerance(input));
     settleSectionLabels(data, cache.all(data));
     autoDimension(data, sourceId, cache);

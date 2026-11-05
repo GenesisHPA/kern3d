@@ -13,6 +13,7 @@ import {
     type RecentDocumentDTO,
 } from "@chili3d/core";
 import { button, collection, div, img, span, svg } from "@chili3d/element";
+import { type ChangelogRelease, parseChangelog } from "./changelog";
 import style from "./home.module.css";
 import { LanguageSelector } from "./languageSelector";
 import { ThemeSelector } from "./themeSelector";
@@ -157,8 +158,43 @@ export class Home extends HTMLElement {
                         div({ className: style.sectionTitle, textContent: new Localize("home.recent") }),
                         this.documentCollection(documents),
                     ),
+                    this.changesColumn(),
                 ),
                 div({ className: style.credits, textContent: new Localize("home.credits") }),
+            ),
+        );
+    }
+
+    /** "What's new": every version from CHANGELOG.md, the newest first. */
+    private changesColumn() {
+        const releases = parseChangelog(typeof __CHANGELOG__ === "string" ? __CHANGELOG__ : "");
+        return div(
+            { className: style.videoColumn },
+            div({ className: style.sectionTitle, textContent: new Localize("home.changes") }),
+            div(
+                { className: `${style.videoScroll} ${style.changes}` },
+                ...releases.map((r) => this.release(r)),
+            ),
+        );
+    }
+
+    private release(release: ChangelogRelease) {
+        const current = release.version === __APP_VERSION__;
+        return div(
+            { className: current ? `${style.release} ${style.current}` : style.release },
+            div(
+                { className: style.releaseHeader },
+                span({ className: style.releaseVersion, textContent: release.version }),
+                span({ className: style.releaseDate, textContent: release.date }),
+            ),
+            ...release.sections.map((section) =>
+                div(
+                    { className: style.releaseItems },
+                    ...(section.title
+                        ? [div({ className: style.releaseGroup, textContent: section.title })]
+                        : []),
+                    ...section.items.map((item) => div({ className: style.releaseItem, textContent: item })),
+                ),
             ),
         );
     }

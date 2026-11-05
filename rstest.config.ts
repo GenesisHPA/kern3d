@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DefinePlugin } from "@rspack/core";
 import { defineConfig } from "@rstest/core";
@@ -23,6 +24,7 @@ export default defineConfig({
             plugins: [
                 new DefinePlugin({
                     __APP_VERSION__: JSON.stringify(packages.version),
+                    __CHANGELOG__: JSON.stringify(readFileSync(resolve(configDir, "CHANGELOG.md"), "utf8")),
                     __DOCUMENT_VERSION__: JSON.stringify(packages.documentVersion),
                     __IS_PRODUCTION__: JSON.stringify(process.env.NODE_ENV === "production"),
                 }),

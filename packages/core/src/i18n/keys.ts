@@ -594,6 +594,7 @@ export const I18N_KEYS = [
     "file.format",
     "helix.pitch",
     "helix.turns",
+    "home.changes",
     "home.recent",
     "home.recent.empty",
     "home.credits",
