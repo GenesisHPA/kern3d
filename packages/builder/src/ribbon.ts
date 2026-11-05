@@ -209,6 +209,7 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                     "feature.draft",
                     "feature.split",
                     ["feature.offsetFace", "feature.removeFeature"],
+                    "modify.makeEditable",
                     "feature.fuse",
                     "feature.cut",
                     ["feature.common"],

@@ -79,7 +79,17 @@ export type FeatureData =
     | OffsetFaceFeatureData
     | HelixFeatureData
     | ThreadFeatureData
-    | TransformFeatureData;
+    | TransformFeatureData
+    | ImportedFeatureData;
+
+/**
+ * Geometry brought in from a file (STEP, IGES, BREP) as a body's first step: the shape as
+ * BREP text, in world coordinates. Later features build on it like on any other.
+ */
+export interface ImportedFeatureData extends FeatureBase {
+    readonly type: "imported";
+    readonly brep: string;
+}
 
 /**
  * A rigid placement applied to the whole chain input — how a parametric body "moves".

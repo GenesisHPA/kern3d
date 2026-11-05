@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 export * from "./assembly";
+export { editableBodyOf, isImportedBody, makeEditable } from "./commands/makeEditableCommand";
 export * from "./datum";
 export * from "./features";
 export * from "./parametricBodyNode";

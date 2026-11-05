@@ -160,10 +160,12 @@ export async function confirmPlacement(
     source: PlacementSource,
     prompt: I18nKeys,
     onPreview: (preview: PlacementPreviewHandler | undefined) => void,
+    makeHandler: (document: IDocument, controller: AsyncController) => PlacementPreviewHandler = (d, c) =>
+        new PlacementPreviewHandler(d, c, source),
 ): Promise<SnapResult | undefined> {
     const controller = new AsyncController();
     stepController.onCancelled(() => controller.cancel());
-    const preview = new PlacementPreviewHandler(document, controller, source);
+    const preview = makeHandler(document, controller);
     onPreview(preview);
     try {
         await document.picker.pickAsync(preview, prompt, controller, "none", "select.default");

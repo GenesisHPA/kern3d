@@ -4,6 +4,7 @@
 import "../assembly/componentCommands";
 import "../assembly/jointCommands";
 import "./alignCommand";
+import "./makeEditableCommand";
 import "./axisCommand";
 import "./booleanCommand";
 import "./detachCommand";

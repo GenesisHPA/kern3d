@@ -21,6 +21,7 @@ import {
     type VisualNode,
     XYZ,
 } from "@chili3d/core";
+import { type DraggablePlacement, MoveGizmoHandler } from "./moveGizmo";
 import {
     applyPlacement,
     confirmPlacement,
@@ -65,7 +66,7 @@ export function moveCopyMatrix(values: MoveCopyValues, pivot: XYZ): Matrix4 {
  * pivot on the selection's bounding-box centre, or on a picked point.
  */
 @command({ key: "modify.moveCopy", icon: "icon-move" })
-export class MoveCopyCommand extends MultistepCommand implements PlacementSource {
+export class MoveCopyCommand extends MultistepCommand implements DraggablePlacement {
     @property("option.command.moveX", { unit: LENGTH_UNITS })
     get dx(): ParameterValue {
         return this.getPrivateValue("dx", 0);
@@ -186,6 +187,22 @@ export class MoveCopyCommand extends MultistepCommand implements PlacementSource
         return resolved;
     }
 
+    /** The translation typed or dragged so far (zero while a value does not resolve). */
+    offset(): XYZ {
+        const v = this.values();
+        return v === undefined ? XYZ.zero : new XYZ({ x: v.dx, y: v.dy, z: v.dz });
+    }
+
+    /** The gizmo's drag: the three offsets at once, redrawn once. */
+    setOffset(offset: XYZ): void {
+        const round = (x: number) => Math.round(x * 1000) / 1000;
+        // each value tells the panel; the preview is rebuilt once, after all three
+        this.setProperty("dx", round(offset.x));
+        this.setProperty("dy", round(offset.y));
+        this.setProperty("dz", round(offset.z));
+        this._preview?.refresh();
+    }
+
     transform(): Matrix4 | undefined {
         const values = this.values();
         return values === undefined ? undefined : moveCopyMatrix(values, this.pivot());
@@ -213,8 +230,13 @@ class MoveCopyConfirmStep implements IStep {
     constructor(private readonly command: MoveCopyCommand) {}
 
     execute(document: IDocument, controller: AsyncController): Promise<SnapResult | undefined> {
-        return confirmPlacement(document, controller, this.command, "prompt.moveCopy.confirm", (preview) =>
-            this.command.setPreview(preview),
+        return confirmPlacement(
+            document,
+            controller,
+            this.command,
+            "prompt.moveCopy.confirm",
+            (preview) => this.command.setPreview(preview),
+            (d, c) => new MoveGizmoHandler(d, c, this.command),
         );
     }
 }

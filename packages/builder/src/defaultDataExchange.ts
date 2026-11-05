@@ -13,6 +13,7 @@ import {
     ShapeNode,
     type VisualNode,
 } from "@chili3d/core";
+import { makeEditable } from "@chili3d/parametric";
 import { buildThreeMf, type ThreeMfObject } from "./threeMf";
 
 export class DefaultDataExchange implements IDataExchange {
@@ -60,6 +61,9 @@ export class DefaultDataExchange implements IDataExchange {
         const node = nodeResult.value;
         node.name = name;
         document.modelManager.addNode(node);
+        // imported solids become parametric bodies starting with the imported shape, so holes,
+        // cuts and fillets apply to them; an STL mesh stays a mesh
+        if (!name.endsWith(".stl")) makeEditable([node]);
         document.visual.update();
     }
 

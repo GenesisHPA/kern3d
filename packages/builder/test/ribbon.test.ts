@@ -236,6 +236,7 @@ describe("ParametricRibbonProfiles", () => {
             "feature.split",
             "feature.offsetFace",
             "feature.removeFeature",
+            "modify.makeEditable",
             "feature.fuse",
             "feature.cut",
             "feature.common",
