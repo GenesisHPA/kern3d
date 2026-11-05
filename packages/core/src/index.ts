@@ -30,4 +30,5 @@ export * from "./snapType";
 export * from "./step";
 export * from "./text";
 export * from "./ui";
+export * from "./usageStats";
 export * from "./visual";

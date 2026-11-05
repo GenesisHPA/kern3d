@@ -14,6 +14,11 @@ const ORIGIN = `${SCHEME}://app`;
 const APP_DIR = path.join(__dirname, "app");
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
+// An AppImage cannot ship the setuid sandbox helper, and Ubuntu 24.04+ blocks the unprivileged
+// user-namespace sandbox for unconfined apps — without this the AppImage does not start there.
+// The window only ever shows the bundled app (outside links open in the browser).
+if (process.platform === "linux" && process.env.APPIMAGE) app.commandLine.appendSwitch("no-sandbox");
+
 protocol.registerSchemesAsPrivileged([
     {
         scheme: SCHEME,

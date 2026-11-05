@@ -3,3 +3,4 @@
 
 export * from "./commandService";
 export * from "./hotkeyService";
+export * from "./usageService";

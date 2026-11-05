@@ -1,7 +1,7 @@
 {
     "name": "kern3d-desktop",
     "productName": "Kern3D",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "description": "Kern3D — параметрическая 3D САПР",
     "author": "Genesis Tactical",
     "license": "AGPL-3.0-only",
@@ -12,7 +12,8 @@
         "prepare-app": "node scripts/prepare.mjs",
         "start": "npm run prepare-app && electron .",
         "dist": "npm run prepare-app && electron-builder --win --publish never",
-        "release": "npm run prepare-app && electron-builder --win --publish always"
+        "release": "npm run prepare-app && electron-builder --win --publish always",
+        "dist:linux": "npm run prepare-app && electron-builder --linux --publish never"
     },
     "dependencies": {
         "electron-updater": "6.8.11"
@@ -71,6 +72,21 @@
         "electronLanguages": [
             "ru",
             "en-US"
-        ]
+        ],
+        "linux": {
+            "target": [
+                {
+                    "target": "AppImage",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "build/icons",
+            "category": "Graphics",
+            "artifactName": "Kern3D-x86_64.${ext}",
+            "synopsis": "Параметрическая 3D САПР",
+            "maintainer": "Genesis Tactical"
+        }
     }
 }
