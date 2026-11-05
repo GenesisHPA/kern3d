@@ -17,7 +17,7 @@ import {
 } from "@chili3d/core";
 import type { ImportedFeatureData } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
-import { meshToSolid } from "./meshToSolid";
+import { meshToSolid, RECOVER_ON_IMPORT_FACES } from "./meshToSolid";
 
 /** The shapes a body can grow from: solids and the shells and faces an IGES file brings. */
 const EDITABLE_TYPES = new Set<ShapeType>([
@@ -136,7 +136,12 @@ export function solidifyMeshes(nodes: readonly INode[]): void {
         if (node instanceof EditableShapeNode && node.shape.isOk) {
             try {
                 const solid = meshToSolid(node.shape.value);
-                if (solid.isOk) node.shape = solid;
+                if (solid.isOk) {
+                    node.shape = solid;
+                    // too many faces to recover cylinders on the way in: say how to
+                    if (solid.value.findSubShapes(ShapeTypes.face).length > RECOVER_ON_IMPORT_FACES)
+                        PubSub.default.pub("showToast", "toast.import.facetedLarge");
+                }
             } catch {
                 // left as triangles
             }

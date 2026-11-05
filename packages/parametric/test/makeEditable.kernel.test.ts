@@ -151,3 +151,98 @@ describe("an STL made a part", () => {
         expect(solid.volume()).toBeCloseTo(8000, 0);
     });
 });
+
+describe("cylinders recovered from an STL", () => {
+    test("a hole, a boss and a rounded edge come back as exact cylinders", async () => {
+        const { OccShape } = await import("../../wasm/src/shape");
+        const { meshToSolid } = await import("../src/commands/meshToSolid");
+        const { recoverCylinders, findCylinders } = await import("../src/commands/recoverCylinders");
+        const plate = shapeFactory.box(Plane.XY, 60, 40, 10).value;
+        const hole = shapeFactory.cylinder(XYZ.unitZ, new XYZ({ x: 20, y: 20, z: -1 }), 5, 12).value;
+        const boss = shapeFactory.cylinder(XYZ.unitZ, new XYZ({ x: 45, y: 20, z: 10 }), 6, 8).value;
+        let part = shapeFactory.booleanCut([plate], [hole]).value;
+        part = shapeFactory.booleanFuse([part], [boss], true).value;
+        // round the plate's edge along y at x = 0, z = 10
+        const edges = part.findSubShapes(ShapeTypes.edge) as any[];
+        const k = edges.findIndex((e) => {
+            const [a, b] = e.ends();
+            return (
+                Math.abs(a.x) < 1e-6 &&
+                Math.abs(b.x) < 1e-6 &&
+                Math.abs(a.z - 10) < 1e-6 &&
+                Math.abs(b.z - 10) < 1e-6
+            );
+        });
+        part = shapeFactory.fillet(part, [k], 5).value;
+        const exact = part.volume();
+        const stl = shapeConverter.convertToSTL([part], { binary: false } as any);
+        const node = (globalThis as any).wasm.Converter.convertFromStl(stl.value);
+        const faceted = meshToSolid(OccShape.wrap(node.shape), "never").value;
+        const found = findCylinders(faceted)
+            .map((c) => `${c.convex ? "+" : "-"}${c.radius.toFixed(2)}/${Math.round(c.sweep)}`)
+            .sort();
+        expect(found).toEqual(["+5.00/90", "+6.00/360", "-5.00/360"]);
+        const { shape, count } = recoverCylinders(faceted);
+        expect(count).toBe(3);
+        const cylinders = (shape.findSubShapes(ShapeTypes.face) as any[]).filter((f) => {
+            const s = f.surface();
+            const planar = s.isPlanar();
+            s.dispose();
+            return !planar;
+        });
+        expect(cylinders.length).toBeGreaterThanOrEqual(3);
+        expect(shape.volume()).toBeCloseTo(exact, 0);
+    });
+});
+
+describe("an STL part, imported, then edited", () => {
+    test("a recovered hole's rim is a circle that takes a chamfer like a modelled one", async () => {
+        const { OccShape } = await import("../../wasm/src/shape");
+        const { solidifyMeshes } = await import("../src/commands/makeEditableCommand");
+        const { captureEdgeRef } = await import("../src/features/edgeRef");
+        const plate = shapeFactory.booleanCut(
+            [shapeFactory.box(Plane.XY, 50, 30, 10).value],
+            [shapeFactory.cylinder(XYZ.unitZ, new XYZ({ x: 25, y: 15, z: -1 }), 4, 12).value],
+        ).value;
+        const stl = shapeConverter.convertToSTL([plate], { binary: true } as any);
+        const triangles = OccShape.wrap((globalThis as any).wasm.Converter.convertFromStl(stl.value).shape);
+        const { doc } = documentWith(
+            (d) => new EditableShapeNode({ document: d, name: "stl", shape: triangles }),
+        );
+        // the importer's two steps
+        solidifyMeshes([doc.modelManager.rootNode]);
+        makeEditable([doc.modelManager.rootNode]);
+        const body = doc.modelManager.findNodes(
+            (n) => n instanceof ParametricBodyNode,
+        )[0] as ParametricBodyNode;
+        expect(body.shape.isOk).toBe(true);
+        const edges = body.shape.value.findSubShapes(ShapeTypes.edge) as any[];
+        const rim = edges.findIndex((e) => {
+            try {
+                const b = e.curve.basisCurve;
+                return (
+                    b.curveType === "circle" &&
+                    Math.abs(b.radius - 4) < 0.01 &&
+                    Math.abs(b.center.z - 10) < 1e-3
+                );
+            } catch {
+                return false;
+            }
+        });
+        expect(rim).toBeGreaterThanOrEqual(0);
+        const volume = body.shape.value.volume();
+        const id = body.edgeIdAt(rim);
+        body.setFeaturesEmitShapeChanged([
+            ...body.features,
+            {
+                id: "ch",
+                type: "chamfer",
+                distance: 1,
+                edges: [captureEdgeRef(edges[rim], id, body.edgeIdIsShared(id))],
+            } as any,
+        ]);
+        expect(body.shape.isOk).toBe(true);
+        expect(body.shape.value.checkShape()).toBe(true);
+        expect(body.shape.value.volume()).toBeLessThan(volume - 1);
+    });
+});

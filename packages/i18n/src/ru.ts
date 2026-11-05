@@ -218,6 +218,11 @@ export default {
         "command.modify.mirror": "Отразить",
         "command.modify.moveCopy": "Переместить/Копировать",
         "command.modify.makeEditable": "Сделать редактируемым",
+        "command.modify.recoverCylinders": "Распознать цилиндры",
+        "toast.recoverCylinders{0}": "Тел с восстановленными цилиндрами: {0}",
+        "toast.recoverCylinders.none": "Выберите импортированное тело без последующих операций",
+        "toast.import.facetedLarge":
+            "Большая сетка STL: цилиндры не распознаны автоматически — команда «Распознать цилиндры»",
         "toast.makeEditable{0}": "Редактируемых тел: {0}",
         "option.command.moveX": "Смещение X",
         "option.command.moveY": "Смещение Y",

@@ -298,6 +298,11 @@ export default {
         "command.modify.mirror": "Mirror",
         "command.modify.moveCopy": "Move/Copy",
         "command.modify.makeEditable": "Make Editable",
+        "command.modify.recoverCylinders": "Recover Cylinders",
+        "toast.recoverCylinders{0}": "Bodies with recovered cylinders: {0}",
+        "toast.recoverCylinders.none": "Pick an imported body with no features after the import",
+        "toast.import.facetedLarge":
+            "Large STL mesh: cylinders not recovered automatically — use “Recover Cylinders”",
         "toast.makeEditable{0}": "Bodies made editable: {0}",
         "command.modify.move": "Move",
         "command.modify.paintBucket": "Paint Bucket",
