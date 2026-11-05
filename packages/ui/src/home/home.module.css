@@ -275,6 +275,14 @@
         color: var(--foreground-muted-color);
     }
 
+    & .credits {
+        flex: none;
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--foreground-muted-color);
+        opacity: 0.8;
+    }
+
     & .contentRow {
         display: flex;
         flex: 1;

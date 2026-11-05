@@ -82,7 +82,7 @@ export class Home extends HTMLElement {
             div(
                 { className: style.logoText },
                 span({ className: style.wordmark, textContent: "Kern3D" }),
-                span({ className: style.version, textContent: `v${__APP_VERSION__} · на основе Chili3D` }),
+                span({ className: style.version, textContent: `v${__APP_VERSION__}` }),
             ),
         );
     }
@@ -158,6 +158,7 @@ export class Home extends HTMLElement {
                         this.documentCollection(documents),
                     ),
                 ),
+                div({ className: style.credits, textContent: new Localize("home.credits") }),
             ),
         );
     }

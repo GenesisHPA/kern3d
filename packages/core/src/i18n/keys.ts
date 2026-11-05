@@ -585,6 +585,7 @@ export const I18N_KEYS = [
     "helix.turns",
     "home.recent",
     "home.recent.empty",
+    "home.credits",
     "home.welcome",
     "home.welcome.subtitle",
     "items.header",

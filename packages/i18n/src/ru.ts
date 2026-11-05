@@ -518,6 +518,8 @@ export default {
         "helix.turns": "Витки",
         "home.recent": "Недавние проекты",
         "home.recent.empty": "Пока нет недавних документов. Создайте или откройте документ, чтобы начать.",
+        "home.credits":
+            "Kern3D от Genesis Tactical · на основе Chili3D, автор xiangechen (仙阁) · лицензия AGPL-3.0",
         "home.welcome": "Добро пожаловать в Kern3D",
         "home.welcome.subtitle": "Проектируйте и моделируйте в 3D прямо в браузере.",
         "items.header": "Компоненты",
