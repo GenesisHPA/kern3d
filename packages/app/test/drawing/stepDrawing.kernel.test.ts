@@ -44,16 +44,21 @@ describe.skipIf(!STEP)("drawing of a STEP part", () => {
         const data = defaultDrawingData();
         const started = Date.now();
         autoDrawing(data, "part", cache);
-        const sheet = composeDrawing(data, cache.all(data));
         mkdirSync(DUMP, { recursive: true });
-        writeFileSync(
-            path.join(DUMP, `${path.basename(STEP!).replace(/\.[^.]+$/, "")}.svg`),
-            sheetToSvg(sheet),
-        );
+        const name = path.basename(STEP!).replace(/\.[^.]+$/, "");
+        for (let page = 0; page < (data.pages ?? 1); page++) {
+            const sheet = composeDrawing(data, cache.all(data), page);
+            writeFileSync(path.join(DUMP, `${name}-${page + 1}.svg`), sheetToSvg(sheet));
+        }
         console.log(
             JSON.stringify({
                 ms: Date.now() - started,
-                views: data.views.map((v) => [v.orientation, v.scale, v.section?.name]),
+                views: data.views.map((v) => [
+                    v.orientation,
+                    v.scale,
+                    v.page ?? 0,
+                    v.section?.name ?? v.designation,
+                ]),
                 dims: data.dimensions.length,
             }),
         );

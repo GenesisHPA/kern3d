@@ -240,26 +240,47 @@ describe("automatic drawing by the rules", () => {
         ];
         const { data, cache } = drawingOf(cut(part, ...tools), "busy");
         const root = data.views[0];
-        // the views alone fit at 1:1 on A3; dimensions must not drive the scale below 1:2
+        // too busy for one sheet: every view on a sheet of its own, out of projection — lettered
+        expect(data.layout).toBe("spread");
+        const ortho = data.views.filter((v) => v.orientation !== "iso");
+        expect(new Set(ortho.map((v) => v.page ?? 0)).size).toBe(ortho.length);
+        for (const v of ortho.slice(1)) expect(v.designation ?? v.section?.name).toBeDefined();
         expect(root.scale).toBeGreaterThanOrEqual(0.5);
-        insideFrame(data, cache);
-        // no dimension runs over another view's outline
-        const sheet = composeDrawing(data, cache.all(data));
-        const bounds = ownerBounds(sheet.primitives);
+        // every sheet inside its frame, no dimension over another view of its sheet
         const rect = (v: (typeof data.views)[number]) => {
             const b = cache.geometryOf(v)!.bounds;
             const w = ((b.maxX - b.minX) * v.scale) / 2;
             const h = ((b.maxY - b.minY) * v.scale) / 2;
             return { minX: v.x - w, maxX: v.x + w, minY: v.y - h, maxY: v.y + h };
         };
-        for (const d of data.dimensions) {
-            const r = bounds.get(`dim:${d.id}`)!;
-            for (const v of data.views) {
-                if (v.id === d.viewId) continue;
-                const o = rect(v);
-                const overlap =
-                    r.minX < o.maxX - 1 && r.maxX > o.minX + 1 && r.minY < o.maxY - 1 && r.maxY > o.minY + 1;
-                expect([d.id, v.orientation, overlap]).toEqual([d.id, v.orientation, false]);
+        const frame = frameRect(data.sheet, data.titleBlock.kind);
+        for (let page = 0; page < (data.pages ?? 1); page++) {
+            const bounds = ownerBounds(composeDrawing(data, cache.all(data), page).primitives);
+            for (const [owner, r] of bounds) {
+                expect([page, owner, r.minX >= frame.minX - 1e-6 && r.maxX <= frame.maxX + 1e-6]).toEqual([
+                    page,
+                    owner,
+                    true,
+                ]);
+                expect([page, owner, r.minY >= frame.minY - 1e-6 && r.maxY <= frame.maxY + 1e-6]).toEqual([
+                    page,
+                    owner,
+                    true,
+                ]);
+            }
+            for (const d of data.dimensions) {
+                const r = bounds.get(`dim:${d.id}`);
+                if (r === undefined) continue;
+                for (const v of data.views) {
+                    if (v.id === d.viewId || (v.page ?? 0) !== page) continue;
+                    const o = rect(v);
+                    const overlap =
+                        r.minX < o.maxX - 1 &&
+                        r.maxX > o.minX + 1 &&
+                        r.minY < o.maxY - 1 &&
+                        r.maxY > o.minY + 1;
+                    expect([d.id, v.orientation, overlap]).toEqual([d.id, v.orientation, false]);
+                }
             }
         }
     });

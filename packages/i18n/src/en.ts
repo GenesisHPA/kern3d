@@ -504,7 +504,7 @@ export default {
         "drawing.field.organization": "Organization",
         "drawing.field.letter": "Letter",
         "drawing.hint":
-            "Wheel: zoom. Drag empty paper or right/middle button: pan. Drag a view, note or dimension to move it. Esc cancels, Del deletes, Ctrl+Z undoes.",
+            "Wheel: scroll the sheets (Shift: sideways), Ctrl+wheel: zoom. Drag empty paper or right/middle button: pan. Drag a view, note or dimension to move it. Esc cancels, Del deletes, Ctrl+Z undoes.",
         "drawing.prompt.select": "Select a view, dimension or note",
         "drawing.prompt.placeView": "Click on the sheet to place the base view",
         "drawing.prompt.placeProjected": "Click beside the view: right/left/above/below",

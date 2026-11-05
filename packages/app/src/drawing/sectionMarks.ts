@@ -97,6 +97,63 @@ export function traceOn(
     return { a: dot(ws, basis.u), b: dot(ws, basis.v), offset: section.section?.offset ?? 0 };
 }
 
+/**
+ * The arrow of each lettered view (ГОСТ 2.305 "вид Б"): on the main view if it sees the
+ * direction side-on, else on another view that does — outside its outline on the side the
+ * view is looked from, pointing at the part, the letter beside it.
+ */
+export function viewArrows(
+    data: DrawingData,
+    placements: ReadonlyMap<string, ViewPlacement>,
+): DrawingPrimitive[] {
+    const result: DrawingPrimitive[] = [];
+    for (const view of data.views) {
+        if (view.designation === undefined || view.section !== undefined) continue;
+        const w = viewBasisOf(view).w;
+        const candidates = data.views.filter(
+            (v) =>
+                v.id !== view.id &&
+                v.orientation !== "iso" &&
+                v.designation === undefined &&
+                Math.abs(dot(viewBasisOf(v).w, w)) < 1e-6,
+        );
+        const host = candidates.find((v) => (v.page ?? 0) === 0 && v.parentId === undefined) ?? candidates[0];
+        const placement = host === undefined ? undefined : placements.get(host.id);
+        const g = placement?.geometry;
+        if (placement === undefined || g === undefined || !Number.isFinite(g.bounds.minX)) continue;
+        const basis = viewBasisOf(placement.view);
+        const a = dot(w, basis.u);
+        const b = dot(w, basis.v);
+        const [cx, cy] = toSheet(
+            placement,
+            (g.bounds.minX + g.bounds.maxX) / 2,
+            (g.bounds.minY + g.bounds.maxY) / 2,
+        );
+        const [x1, y1] = toSheet(placement, g.bounds.minX, g.bounds.minY);
+        const [x2, y2] = toSheet(placement, g.bounds.maxX, g.bounds.maxY);
+        // the outline's edge on the viewer's side, the arrow 4 mm off it and 10 mm long
+        const reach = Math.abs(a) > Math.abs(b) ? (x2 - x1) / 2 : (y2 - y1) / 2;
+        const tip: Point2 = [cx + a * (reach + 4), cy + b * (reach + 4)];
+        const tail: Point2 = [tip[0] + a * 10, tip[1] + b * 10];
+        const owner = `view:${host!.id}`;
+        result.push(line("dimension", [...tail, ...tip], LINE_WIDTH.thin, owner));
+        const nx = -b * 0.8;
+        const ny = a * 0.8;
+        const bx = tip[0] + a * 3.5;
+        const by = tip[1] + b * 3.5;
+        result.push({
+            kind: "fill",
+            layer: "dimension",
+            points: [...tip, bx + nx, by + ny, bx - nx, by - ny],
+            owner,
+        });
+        result.push(
+            text("text", tail[0] - b * 4, tail[1] + a * 4 - 2.5, view.designation, 5, "middle", 0, owner),
+        );
+    }
+    return result;
+}
+
 /** The section's letters: "А–А" over the view. */
 export function sectionTitle(name: string): string {
     return `${name}–${name}`;

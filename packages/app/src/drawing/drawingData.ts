@@ -105,6 +105,11 @@ export interface DrawingViewData {
     section?: SectionData;
     /** The sheet the view is on, 0-based; undefined is the first. */
     page?: number;
+    /**
+     * ГОСТ 2.305: a view out of projection with the main one is lettered ("Б") and an arrow
+     * with the same letter shows on another view where it is looked from.
+     */
+    designation?: string;
 }
 
 export type Point2 = [number, number];
@@ -171,6 +176,8 @@ export interface DrawingData {
     suppressed?: string[];
     /** How many sheets the drawing has; undefined is one. */
     pages?: number;
+    /** "spread": the automatic drawing of a busy part — one view per sheet, fully dimensioned. */
+    layout?: "spread";
 }
 
 /** The sheet a view or note is on. */
@@ -237,6 +244,7 @@ function parseView(raw: unknown): DrawingViewData | undefined {
         label: typeof r["label"] === "string" ? r["label"] : undefined,
         section: parseSection(r["section"]),
         page: parsePage(r["page"]),
+        designation: typeof r["designation"] === "string" && r["designation"] ? r["designation"] : undefined,
     };
 }
 
@@ -343,6 +351,7 @@ export function parseDrawingData(json: string | undefined): DrawingData {
         dimensions: parseList(raw["dimensions"], parseDimension),
         notes: parseList(raw["notes"], parseNote),
         pages: parsePage(raw["pages"]),
+        layout: raw["layout"] === "spread" ? "spread" : undefined,
         suppressed: Array.isArray(raw["suppressed"])
             ? (raw["suppressed"] as unknown[]).filter((x): x is string => typeof x === "string")
             : undefined,

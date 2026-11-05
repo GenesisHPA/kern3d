@@ -28,7 +28,7 @@ import {
     ownerBounds,
     text,
 } from "./primitives";
-import { cuttingPlaneMarks, hatch, sectionTitle } from "./sectionMarks";
+import { cuttingPlaneMarks, hatch, sectionTitle, viewArrows } from "./sectionMarks";
 import { composeFrame, sheetSize } from "./sheet";
 import { formatScale } from "./viewBasis";
 
@@ -262,7 +262,7 @@ function viewLabels(
         const label =
             view.label ??
             (view.section === undefined || view.section.unlabeled
-                ? undefined
+                ? view.designation
                 : sectionTitle(view.section.name));
         const g = placements.get(view.id)?.geometry;
         if (!label || g === undefined || !Number.isFinite(g.bounds.minX)) continue;
@@ -273,7 +273,7 @@ function viewLabels(
         for (const d of data.dimensions) {
             if (d.viewId !== view.id) continue;
             const r = bounds.get(`dim:${d.id}`);
-            if (r !== undefined && r.maxX > left - 5 && r.minX < right + 5 && r.minY >= top - 1)
+            if (r !== undefined && r.maxX > left - 5 && r.minX < right + 5 && r.maxY > top)
                 y = Math.max(y, r.maxY + 4);
         }
         result.push(text("text", view.x, y, label, 5, "middle", 0, `view:${view.id}`));
@@ -488,6 +488,7 @@ export function composeDrawing(
         );
     }
     primitives.push(...cuttingPlaneMarks(data, placements));
+    primitives.push(...viewArrows(data, placements));
     primitives.push(...viewLabels(data, placements, primitives));
     for (const note of data.notes) if (pageOf(note) === page) primitives.push(...composeNote(note));
     return { width, height, primitives };

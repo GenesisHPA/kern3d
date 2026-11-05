@@ -149,6 +149,8 @@ export class DrawingEditor {
     private geometries = new Map<string, ViewGeometry>();
     private composed: ComposedSheet = { width: 0, height: 0, primitives: [] };
     private bounds = new Map<string, Rect>();
+    /** Every sheet composed, stacked down the canvas one under another. */
+    private sheets: { composed: ComposedSheet; bounds: Map<string, Rect> }[] = [];
     private selection: string | undefined;
     private tool: Tool = { kind: "select" };
     private drag: Drag | undefined;
@@ -329,17 +331,35 @@ export class DrawingEditor {
         this.page = Math.min(this.page, pageCount(this.data) - 1);
         alignProjectedViews(this.data);
         this.geometries = this.cache.all(this.data);
-        this.composed = composeDrawing(this.data, this.geometries, this.page);
+        this.sheets = Array.from({ length: pageCount(this.data) }, (_, page) => {
+            const composed = composeDrawing(this.data, this.geometries, page);
+            return { composed, bounds: ownerBounds(composed.primitives) };
+        });
+        this.usePage(this.page);
         this.updatePages();
-        this.bounds = ownerBounds(this.composed.primitives);
-        const { width, height } = this.composed;
-        this.paper.setAttribute("width", String(width));
-        this.paper.setAttribute("height", String(height));
-        const flip = `matrix(1 0 0 -1 0 ${height})`;
-        for (const g of [this.sheetGroup, this.hitGroup, this.overlayGroup])
-            g.setAttribute("transform", flip);
-        this.sheetGroup.innerHTML = primitivesMarkup(this.composed.primitives, "owner");
+        this.paper.setAttribute("width", "0");
+        this.paper.setAttribute("height", "0");
+        // each sheet in its own group: its paper, its drawing, flipped to y up, placed down the stack
+        this.sheetGroup.replaceChildren();
+        this.sheets.forEach(({ composed }, page) => {
+            const g = svgElement("g", { transform: this.pageTransform(page) });
+            g.append(
+                svgElement("rect", {
+                    x: 0,
+                    y: 0,
+                    width: composed.width,
+                    height: composed.height,
+                    fill: "#fff",
+                }),
+            );
+            const drawing = svgElement("g");
+            drawing.innerHTML = primitivesMarkup(composed.primitives, "owner");
+            g.append(drawing);
+            this.sheetGroup.append(g);
+        });
         this.sheetGroup.setAttribute("color", "#000");
+        this.sheetGroup.removeAttribute("transform");
+        this.hitGroup.removeAttribute("transform");
         this.drawHitAreas();
         this.drawSelection();
         this.updateSources();
@@ -348,25 +368,49 @@ export class DrawingEditor {
         this.updateStatus();
     }
 
+    /** Gap between sheets on the canvas, mm. */
+    private static readonly PAGE_GAP = 20;
+
+    /** Where a sheet sits on the canvas: stacked downward, its own y up. */
+    private pageTransform(page: number): string {
+        const height = this.sheets[0]?.composed.height ?? 0;
+        return `matrix(1 0 0 -1 0 ${page * (height + DrawingEditor.PAGE_GAP) + height})`;
+    }
+
+    /** Makes `page` the one tools and selection work on. */
+    private usePage(page: number) {
+        this.page = Math.max(0, Math.min(page, this.sheets.length - 1));
+        const sheet = this.sheets[this.page];
+        if (sheet === undefined) return;
+        this.composed = sheet.composed;
+        this.bounds = sheet.bounds;
+        this.overlayGroup.setAttribute("transform", this.pageTransform(this.page));
+        this.pageSelect.value = String(this.page);
+    }
+
     private drawHitAreas() {
         this.hitGroup.replaceChildren();
-        const owners = [...this.bounds.keys()].sort(
-            (a, b) => Number(!a.startsWith("view:")) - Number(!b.startsWith("view:")),
-        );
-        for (const owner of owners) {
-            const r = this.bounds.get(owner)!;
-            const pad = owner.startsWith("view:") ? 2 : 1;
-            this.hitGroup.append(
-                svgElement("rect", {
-                    x: r.minX - pad,
-                    y: r.minY - pad,
-                    width: r.maxX - r.minX + 2 * pad,
-                    height: r.maxY - r.minY + 2 * pad,
-                    fill: "transparent",
-                    "data-hit": owner,
-                }),
+        this.sheets.forEach(({ bounds }, page) => {
+            const g = svgElement("g", { transform: this.pageTransform(page) });
+            const owners = [...bounds.keys()].sort(
+                (a, b) => Number(!a.startsWith("view:")) - Number(!b.startsWith("view:")),
             );
-        }
+            for (const owner of owners) {
+                const r = bounds.get(owner)!;
+                const pad = owner.startsWith("view:") ? 2 : 1;
+                g.append(
+                    svgElement("rect", {
+                        x: r.minX - pad,
+                        y: r.minY - pad,
+                        width: r.maxX - r.minX + 2 * pad,
+                        height: r.maxY - r.minY + 2 * pad,
+                        fill: "transparent",
+                        "data-hit": owner,
+                    }),
+                );
+            }
+            this.hitGroup.append(g);
+        });
     }
 
     private drawSelection() {
@@ -374,6 +418,10 @@ export class DrawingEditor {
             g.setAttribute("color", g.dataset["owner"] === this.selection ? "#1677ff" : "#000");
         }
         this.overlayGroup.replaceChildren();
+        // the selection's own sheet is the one worked on
+        const on =
+            this.selection === undefined ? -1 : this.sheets.findIndex((s) => s.bounds.has(this.selection!));
+        if (on >= 0 && on !== this.page) this.usePage(on);
         const r = this.selection === undefined ? undefined : this.bounds.get(this.selection);
         if (r !== undefined) {
             this.overlayGroup.append(
@@ -412,7 +460,9 @@ export class DrawingEditor {
     }
 
     fit() {
-        const { width, height } = this.composed;
+        const width = this.composed.width;
+        const count = Math.max(1, this.sheets.length);
+        const height = count * this.composed.height + (count - 1) * DrawingEditor.PAGE_GAP;
         const rect = this.svg.getBoundingClientRect();
         const aspect = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : width / height;
         const margin = 0.05;
@@ -619,11 +669,19 @@ export class DrawingEditor {
         this.pageSelect.value = String(this.page);
     }
 
+    /** Scrolls the canvas to a sheet and makes it the one worked on. */
     private showPage(page: number) {
-        this.page = Math.max(0, Math.min(page, pageCount(this.data) - 1));
         this.selection = undefined;
         this.refresh();
-        this.fit();
+        this.usePage(page);
+        const { width, height } = this.composed;
+        const box = this.viewBox;
+        const scale = Math.min(box.w / (width * 1.1), box.h / (height * 1.1));
+        const w = box.w / scale;
+        const h = box.h / scale;
+        const top = this.page * (height + DrawingEditor.PAGE_GAP);
+        this.setViewBox({ x: width / 2 - w / 2, y: top + height / 2 - h / 2, w, h });
+        this.drawSelection();
     }
 
     /** A new empty sheet after the last one, shown at once. */
@@ -739,7 +797,10 @@ export class DrawingEditor {
         const ctm = this.svg.getScreenCTM();
         if (ctm === null) return [0, 0];
         const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
-        return [p.x, this.composed.height - p.y];
+        const height = this.composed.height;
+        // the sheet under the pointer (kept while dragging), in its own coordinates
+        if (this.drag === undefined) this.usePage(Math.floor(p.y / (height + DrawingEditor.PAGE_GAP)));
+        return [p.x, this.page * (height + DrawingEditor.PAGE_GAP) + height - p.y];
     }
 
     /** Sheet millimetres per screen pixel. */
@@ -861,8 +922,23 @@ export class DrawingEditor {
         const ctm = this.svg.getScreenCTM();
         if (ctm === null) return;
         const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
-        const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
         const box = this.viewBox;
+        if (!e.ctrlKey && !e.metaKey) {
+            // the wheel scrolls through the sheets (Shift: sideways); Ctrl + wheel zooms
+            const k = this.pixel();
+            const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+            this.setViewBox(
+                e.shiftKey
+                    ? { ...box, x: box.x + dy * k }
+                    : { ...box, x: box.x + e.deltaX * k, y: box.y + dy * k },
+            );
+            // the sheet in the middle of the window is the one worked on
+            const middle = this.viewBox.y + this.viewBox.h / 2;
+            const page = Math.floor(middle / (this.composed.height + DrawingEditor.PAGE_GAP));
+            if (page !== this.page && this.selection === undefined) this.usePage(page);
+            return;
+        }
+        const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
         this.setViewBox({
             x: p.x - (p.x - box.x) * factor,
             y: p.y - (p.y - box.y) * factor,

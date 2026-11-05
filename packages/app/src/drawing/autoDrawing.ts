@@ -12,6 +12,7 @@ import {
     newDrawingItemId,
     type Point2,
     type ProjectionSide,
+    pageCount,
     pageOf,
     type Vec3,
 } from "./drawingData";
@@ -69,6 +70,8 @@ type Side = "up" | "down" | "left" | "right";
 
 interface PlannedLinear {
     type: "linear";
+    /** Set when rows were packed (chains): the row on its side, 0 innermost. */
+    tier?: number;
     viewId: string;
     kind: LinearDimensionKind;
     a: Point2;
@@ -272,8 +275,20 @@ function coordinatesAlong(
         }
         return c;
     };
+    // what is too small to dimension on its own: short edges (knurling, chamfer ends) and
+    // coordinates closer than a fraction of a millimetre to another
+    const extents = extentsOf(input);
+    const size = Math.hypot(...extents.map(([lo, hi]) => (Number.isFinite(hi - lo) ? hi - lo : 0)));
+    const minEdge = Math.max(1, size * 0.02);
+    const minGap = Math.max(0.5, size * 0.01);
     for (const edge of input.edges) {
         if (edge.tangent || edge.circle !== undefined || edge.points.length < 2) continue;
+        let length = 0;
+        for (let k = 1; k < edge.points.length; k++) {
+            const [a, b] = [edge.points[k - 1], edge.points[k]];
+            length += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+        }
+        if (length < minEdge) continue;
         const v = edge.points[0][axis];
         if (edge.points.every((p) => Math.abs(p[axis] - v) <= tolerance)) at(v).face = true;
     }
@@ -286,12 +301,45 @@ function coordinatesAlong(
                 if (!rims.includes(c)) rims.push(c);
             }
         } else if (c.axisIndex !== undefined) {
-            if (placed.has(c)) continue;
+            if (placed.has(c) || c.radius < 0.4) continue;
             if (!c.full && !roundEnd(c, axis, input, result, tolerance)) continue;
             at(c.point[axis]).centers.push(c);
         }
     }
-    return result.sort((a, b) => a.value - b.value);
+    result.sort((a, b) => a.value - b.value);
+    // near-coincident coordinates are one: a face wins over a rim, a rim over a centre
+    const merged: Coordinate[] = [];
+    for (const c of result) {
+        const last = merged[merged.length - 1];
+        if (last === undefined || c.value - last.value >= minGap) {
+            merged.push({ ...c, rims: [...c.rims], centers: [...c.centers] });
+            continue;
+        }
+        if (c.face && !last.face) last.value = c.value;
+        last.face ||= c.face;
+        last.rims.push(...c.rims);
+        last.centers.push(...c.centers);
+    }
+    // a run of closely spaced coordinates is a pattern (knurling, teeth, ribs): its ends only
+    const dense = minGap * 3;
+    const kept: Coordinate[] = [];
+    for (let i = 0; i < merged.length; ) {
+        let j = i;
+        while (j + 1 < merged.length && merged[j + 1].value - merged[j].value < dense) j++;
+        if (j - i + 1 >= 4) kept.push(merged[i], merged[j]);
+        else kept.push(...merged.slice(i, j + 1));
+        i = j + 1;
+    }
+    merged.splice(0, merged.length, ...kept);
+    // the part's ends stay where they are
+    if (merged.length > 0 && result.length > 0) {
+        merged[0].value = Math.min(merged[0].value, result[0].value);
+        merged[merged.length - 1].value = Math.max(
+            merged[merged.length - 1].value,
+            result[result.length - 1].value,
+        );
+    }
+    return merged;
 }
 
 /**
@@ -521,7 +569,7 @@ export function planDimensions(
     input: HlrInput,
     geometries: ReadonlyMap<string, ViewGeometry>,
     cylinders = cylindersOf(input),
-    mode: "full" | "basic" = "full",
+    mode: "full" | "basic" | "spread" = "full",
 ): Planned[] {
     const tolerance = modelTolerance(input);
     const basic = mode === "basic";
@@ -611,6 +659,14 @@ export function planDimensions(
         for (const view of [...facing.filter(shows), ...facing.filter((v) => !shows(v))]) {
             const g = geometries.get(view.id)!;
             const center = project2(view, c.point);
+            if (c.radius < 0.4) return true;
+            const around = planned.filter(
+                (p) =>
+                    p.type === "radial" &&
+                    p.viewId === view.id &&
+                    Math.hypot(p.center[0] - center[0], p.center[1] - center[1]) <= c.radius + tolerance2(g),
+            ).length;
+            if (around >= 4) return true;
             const taken = radialAngles.get(view.id) ?? [];
             let angle: number;
             if (kind === "radius" && c.arcMid !== undefined) {
@@ -644,6 +700,8 @@ export function planDimensions(
         // — holes there crowd each other's callouts, they are clicked in one by one
         if (basic && !outer(c)) continue;
         if (!c.full) {
+            // radii of a busy part cross its views with long leaders: clicked in by hand
+            if (mode === "spread") continue;
             const key = c.radius.toFixed(4);
             if (radii.has(key)) continue;
             radii.add(key);
@@ -932,10 +990,190 @@ function tiers(planned: Planned[]): Map<PlannedLinear, number> {
     }
     const result = new Map<PlannedLinear, number>();
     for (const list of groups.values()) {
+        if (list.every((p) => p.tier !== undefined)) {
+            for (const p of list) result.set(p, p.tier!);
+            continue;
+        }
         list.sort((a, b) => lengthOf(a) - lengthOf(b));
         list.forEach((p, i) => result.set(p, i));
     }
     return result;
+}
+
+const MAX_ROWS = 5;
+const OPPOSITE: Record<Side, Side> = { up: "down", down: "up", left: "right", right: "left" };
+
+/**
+ * Baseline dimensions turned into chains (ГОСТ 2.307 цепной способ) packed into rows: the
+ * links of one axis of a view run end to end in as few rows as their numbers allow, the
+ * overall size outermost; the link that would close the chain against it is left out. Rows
+ * past the fifth go to the view's other side. `scale` estimates the paper lengths.
+ */
+function chainPack(
+    planned: Planned[],
+    scale: number,
+    geometries: ReadonlyMap<string, ViewGeometry>,
+): Planned[] {
+    const out: Planned[] = planned.filter((p) => p.type === "radial");
+    const groups = new Map<string, PlannedLinear[]>();
+    for (const p of planned) {
+        if (p.type !== "linear") continue;
+        const key = `${p.viewId}|${p.kind}`;
+        groups.set(key, [...(groups.get(key) ?? []), p]);
+    }
+    for (const group of groups.values()) {
+        const k = group[0].kind === "horizontal" ? 0 : 1;
+        const g = geometries.get(group[0].viewId);
+        const t =
+            g === undefined
+                ? 1e-4
+                : Math.hypot(g.bounds.maxX - g.bounds.minX, g.bounds.maxY - g.bounds.minY) * 1e-3;
+        const base = Math.min(...group.map((p) => Math.min(p.a[k], p.b[k])));
+        const isBaseline = (p: PlannedLinear) =>
+            !p.prefix && Math.abs(p.a[k] - base) <= t && p.b[k] > p.a[k] + t;
+        const baseline = group.filter(isBaseline).sort((a, b) => a.b[k] - b.b[k]);
+        const free = group.filter((p) => !isBaseline(p));
+        const links: PlannedLinear[] = [];
+        let overall: PlannedLinear | undefined;
+        if (baseline.length > 0) {
+            overall = baseline[baseline.length - 1];
+            for (let i = 0; i + 1 < baseline.length; i++) {
+                links.push({
+                    ...baseline[i],
+                    a: i === 0 ? baseline[0].a : baseline[i - 1].b,
+                    b: baseline[i].b,
+                });
+            }
+        }
+        // rows: each item takes its span and its number's width; greedy, left to right
+        const footprint = (p: PlannedLinear): [number, number] => {
+            const lo = Math.min(p.a[k], p.b[k]) * scale;
+            const hi = Math.max(p.a[k], p.b[k]) * scale;
+            const value = Math.abs(p.b[k] - p.a[k]);
+            const width = `${p.prefix ?? ""}${Math.round(value * 100) / 100}`.length * 3.5 * 0.72 + 2;
+            const mid = (lo + hi) / 2;
+            const tight = hi - lo < 8 ? 7 : 0;
+            return [Math.min(lo - tight, mid - width / 2), Math.max(hi + tight, mid + width / 2)];
+        };
+        const items = [...links, ...free].sort((a, b) => footprint(a)[0] - footprint(b)[0]);
+        const rows: number[] = [];
+        const rowOf = new Map<PlannedLinear, number>();
+        for (const p of items) {
+            const [lo, hi] = footprint(p);
+            let r = rows.findIndex((end) => end + 1 <= lo);
+            if (r < 0) {
+                rows.push(-Infinity);
+                r = rows.length - 1;
+            }
+            rows[r] = hi;
+            rowOf.set(p, r);
+        }
+        // the overall size in a row of its own, outside the others
+        const last = 2 * MAX_ROWS - 1;
+        if (overall !== undefined) rowOf.set(overall, Math.min(rows.length, last));
+        const primary = group[0].side;
+        for (const [p, r] of rowOf) {
+            // past two sides of rows the sheet would shrink for them: left to "Размеры элемента"
+            if (r >= last && p !== overall) continue;
+            const moved = r >= MAX_ROWS;
+            const side = moved ? OPPOSITE[primary] : primary;
+            let { a, b } = p;
+            if (moved && g !== undefined) {
+                // extension lines from the contour's other side
+                const high = side === "up" || side === "right";
+                const again = (q: Point2) => {
+                    const old = pointAt(g, k, q[k], !high, t);
+                    if (old === undefined || Math.abs(old[1 - k] - q[1 - k]) > t) return q;
+                    return pointAt(g, k, q[k], high, t) ?? q;
+                };
+                a = again(a);
+                b = again(b);
+            }
+            out.push({ ...p, a, b, side, tier: moved ? r - MAX_ROWS : r });
+        }
+    }
+    return out;
+}
+
+/** The largest standard scale at which each view, with its margins, fits its sheet. */
+function sheetScale(
+    data: DrawingData,
+    views: DrawingViewData[],
+    margins: ReadonlyMap<string, Margins>,
+    geometries: ReadonlyMap<string, ViewGeometry>,
+): number {
+    for (const s of STANDARD_SCALES) {
+        const fits = views.every((v) => {
+            const area = drawingArea(data.sheet, data.titleBlock.kind, v.page ?? 0);
+            const [w, h] = halfSizeOf(geometries.get(v.id), s);
+            const m = margins.get(v.id) ?? ZERO_MARGINS;
+            return (
+                2 * w + m.left + m.right <= area.maxX - area.minX - 10 &&
+                2 * h + m.up + m.down <= area.maxY - area.minY - 10
+            );
+        });
+        if (fits) return s;
+    }
+    return STANDARD_SCALES[STANDARD_SCALES.length - 1];
+}
+
+/**
+ * The automatic drawing of a busy part: every view (cuts included) on a sheet of its own —
+ * the main view, with the isometric one, on the first — out of projection, so lettered with an
+ * arrow on the main view (ГОСТ 2.305), and each fully dimensioned in chains.
+ */
+function spreadSheets(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
+    const views = data.views.filter((v) => v.sourceId === sourceId && orthographic(v));
+    const used = new Set(data.views.map((v) => v.section?.name).filter((x) => x !== undefined));
+    const letters = SECTION_LETTERS.filter((x) => !used.has(x));
+    views.forEach((v, i) => {
+        v.page = i === 0 ? undefined : i;
+        v.parentId = undefined;
+        v.side = undefined;
+        v.designation = i > 0 && v.section === undefined ? letters.shift() : undefined;
+    });
+    for (const v of data.views) if (v.sourceId === sourceId && v.orientation === "iso") v.page = undefined;
+    data.pages = Math.max(pageCount(data), views.length);
+    data.layout = "spread";
+    // out of projection now: a cut is lettered even along a plane of symmetry
+    settleSectionLabels(data, cache.all(data));
+    spreadDimensions(data, sourceId, cache);
+}
+
+function spreadDimensions(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
+    const input = cache.inputFor(sourceId);
+    const mine = new Set(data.views.filter((v) => v.sourceId === sourceId).map((v) => v.id));
+    data.dimensions = data.dimensions.filter((d) => !d.auto || !mine.has(d.viewId));
+    if (input === undefined) return;
+    const views = data.views.filter((v) => mine.has(v.id) && orthographic(v));
+    const own = { ...data, views };
+    const geometries = cache.all(own);
+    const raw = planDimensions(own, input, geometries, cylindersOf(input), "spread");
+    // the paper lengths the rows are packed by: the scale the views alone would take, with room
+    const guess = sheetScale(
+        data,
+        views,
+        new Map(views.map((v) => [v.id, { up: 45, down: 45, left: 45, right: 45 }])),
+        geometries,
+    );
+    const planned = chainPack(raw, guess, geometries);
+    const margins = marginsOf(own, planned);
+    const scale = sheetScale(data, views, margins, geometries);
+    for (const v of views) {
+        const area = drawingArea(data.sheet, data.titleBlock.kind, v.page ?? 0);
+        const m = margins.get(v.id) ?? ZERO_MARGINS;
+        v.scale = scale;
+        v.x = (area.minX + area.maxX) / 2 + (m.left - m.right) / 2;
+        v.y = (area.minY + area.maxY) / 2 + (m.down - m.up) / 2;
+    }
+    placeIsometric(data, margins, cache);
+    const skip = new Set(data.suppressed ?? []);
+    for (const d of data.dimensions) {
+        const key = dimensionKey(data, d);
+        if (key !== undefined) skip.add(key);
+    }
+    const placed = placeDimensions(data, planned, cache.all(data));
+    data.dimensions.push(...placed.filter((d) => !skip.has(dimensionKey(data, d) ?? "")));
 }
 
 /** Paper room each view needs round it for its dimensions, and for a section's title on top. */
@@ -1096,7 +1334,7 @@ export function placeIsometric(
     const root = data.views.find((v) => v.parentId === undefined && orthographic(v));
     const main = root?.scale ?? iso.scale;
     const taken = data.views
-        .filter((v) => v !== iso)
+        .filter((v) => v !== iso && (v.page ?? 0) === (iso.page ?? 0))
         .map((v) => {
             const [vw, vh] = halfSizeOf(cache.geometryOf(v), v.scale);
             const m = margins.get(v.id) ?? ZERO_MARGINS;
@@ -1478,7 +1716,8 @@ function onFirstSheet(data: DrawingData, work: (first: DrawingData) => void) {
 }
 
 export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
-    onFirstSheet(data, (first) => autoDimensionSheet(first, sourceId, cache));
+    if (data.layout === "spread") spreadDimensions(data, sourceId, cache);
+    else onFirstSheet(data, (first) => autoDimensionSheet(first, sourceId, cache));
 }
 
 function autoDimensionSheet(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
@@ -1489,8 +1728,8 @@ function autoDimensionSheet(data: DrawingData, sourceId: string, cache: ViewGeom
     const own = { ...data, views: data.views.filter((v) => v.sourceId === sourceId) };
     const geometries = cache.all(own);
     let planned = planDimensions(own, input, geometries, cylinders);
-    // more than a few rows on a side: the part is too busy to dimension by rules alone — the
-    // sheet gets its overall sizes, the rest is clicked in feature by feature
+    // more than a few rows on a side: too busy for one sheet — until the drawing spreads
+    // over sheets (autoDrawing), this sheet gets only the overall sizes
     if (tooBusy(planned)) planned = planDimensions(own, input, geometries, cylinders, "basic");
     const margins = marginsOf(data, planned);
     arrangeViews(data, margins, geometries);
@@ -1512,7 +1751,29 @@ function autoDimensionSheet(data: DrawingData, sourceId: string, cache: ViewGeom
  * lines, dimensions, and an isometric view where the sheet has room — replacing every view.
  */
 export function autoDrawing(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
+    if (data.layout === "spread") {
+        // a spread drawing is rebuilt whole: the source's views come off every sheet first
+        const mine = new Set(data.views.filter((v) => v.sourceId === sourceId).map((v) => v.id));
+        const orientationOf = new Map(data.views.map((v) => [v.id, v.orientation]));
+        const manual = data.dimensions.filter((d) => !d.auto && mine.has(d.viewId));
+        data.views = data.views.filter((v) => !mine.has(v.id));
+        data.dimensions = data.dimensions.filter((d) => !mine.has(d.viewId));
+        data.layout = undefined;
+        // hand-made dimensions wait on stand-in views of their direction on the first sheet;
+        // the rebuild moves them onto the new view looking the same way
+        for (const d of manual) {
+            const o = orientationOf.get(d.viewId);
+            const stand = newView(sourceId, o === "custom" || o === undefined ? "front" : o, 1, 0, 0);
+            data.views.push(stand);
+            data.dimensions.push({ ...d, viewId: stand.id });
+        }
+    }
     onFirstSheet(data, (first) => autoDrawingSheet(first, sourceId, cache));
+    const input = cache.inputFor(sourceId);
+    if (input === undefined) return;
+    const own = { ...data, views: data.views.filter((v) => v.sourceId === sourceId && pageOf(v) === 0) };
+    const planned = planDimensions(own, input, cache.all(own), cylindersOf(input));
+    if (tooBusy(planned)) spreadSheets(data, sourceId, cache);
 }
 
 function autoDrawingSheet(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
