@@ -1,9 +1,10 @@
 // Release notes for GitHub: the version's section of CHANGELOG.md, then the install text
 // (desktop/release-notes/default.md). Usage: node scripts/release-notes.mjs 0.9.4
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.argv[2];
 if (!version) {
     console.error("usage: node scripts/release-notes.mjs <version>");

@@ -1,7 +1,7 @@
 {
     "name": "kern3d-desktop",
     "productName": "Kern3D",
-    "version": "0.9.3",
+    "version": "0.9.4",
     "description": "Kern3D — параметрическая 3D САПР",
     "author": "Genesis Tactical",
     "license": "AGPL-3.0-only",
