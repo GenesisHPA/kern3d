@@ -1011,7 +1011,7 @@ const OPPOSITE: Record<Side, Side> = { up: "down", down: "up", left: "right", ri
  */
 function chainPack(
     planned: Planned[],
-    scale: number,
+    scaleOf: (viewId: string) => number,
     geometries: ReadonlyMap<string, ViewGeometry>,
 ): Planned[] {
     const out: Planned[] = planned.filter((p) => p.type === "radial");
@@ -1046,6 +1046,7 @@ function chainPack(
             }
         }
         // rows: each item takes its span and its number's width; greedy, left to right
+        const scale = scaleOf(group[0].viewId);
         const footprint = (p: PlannedLinear): [number, number] => {
             const lo = Math.min(p.a[k], p.b[k]) * scale;
             const hi = Math.max(p.a[k], p.b[k]) * scale;
@@ -1149,20 +1150,18 @@ function spreadDimensions(data: DrawingData, sourceId: string, cache: ViewGeomet
     const own = { ...data, views };
     const geometries = cache.all(own);
     const raw = planDimensions(own, input, geometries, cylindersOf(input), "spread");
-    // the paper lengths the rows are packed by: the scale the views alone would take, with room
-    const guess = sheetScale(
-        data,
-        views,
-        new Map(views.map((v) => [v.id, { up: 45, down: 45, left: 45, right: 45 }])),
-        geometries,
+    // each sheet its own largest standard scale (ГОСТ 2.316 writes it by the view's letters);
+    // the rows are packed at the scale the view alone would take with room round it
+    const room = { up: 45, down: 45, left: 45, right: 45 };
+    const guess = new Map(
+        views.map((v) => [v.id, sheetScale(data, [v], new Map([[v.id, room]]), geometries)]),
     );
-    const planned = chainPack(raw, guess, geometries);
+    const planned = chainPack(raw, (id) => guess.get(id) ?? 1, geometries);
     const margins = marginsOf(own, planned);
-    const scale = sheetScale(data, views, margins, geometries);
     for (const v of views) {
         const area = drawingArea(data.sheet, data.titleBlock.kind, v.page ?? 0);
         const m = margins.get(v.id) ?? ZERO_MARGINS;
-        v.scale = scale;
+        v.scale = sheetScale(data, [v], margins, geometries);
         v.x = (area.minX + area.maxX) / 2 + (m.left - m.right) / 2;
         v.y = (area.minY + area.maxY) / 2 + (m.down - m.up) / 2;
     }

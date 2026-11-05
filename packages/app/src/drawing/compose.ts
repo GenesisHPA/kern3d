@@ -258,12 +258,21 @@ function viewLabels(
 ): DrawingPrimitive[] {
     const result: DrawingPrimitive[] = [];
     const bounds = ownerBounds(primitives);
+    const main = data.views.find(
+        (v) => (v.page ?? 0) === 0 && v.parentId === undefined && v.orientation !== "iso",
+    );
+    const mainScale = main?.scale;
     for (const view of data.views) {
-        const label =
-            view.label ??
-            (view.section === undefined || view.section.unlabeled
+        const lettered =
+            view.section === undefined || view.section.unlabeled
                 ? view.designation
-                : sectionTitle(view.section.name));
+                : sectionTitle(view.section.name);
+        // a lettered view at a scale other than the main one's carries it (ГОСТ 2.316)
+        const scaled =
+            lettered !== undefined && mainScale !== undefined && Math.abs(view.scale - mainScale) > 1e-9
+                ? `${lettered} (${formatScale(view.scale)})`
+                : lettered;
+        const label = view.label ?? scaled;
         const g = placements.get(view.id)?.geometry;
         if (!label || g === undefined || !Number.isFinite(g.bounds.minX)) continue;
         const placement = placements.get(view.id)!;

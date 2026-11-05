@@ -460,6 +460,19 @@ export class DrawingEditor {
     }
 
     fit() {
+        // several sheets: the shown one fills the window, the others are scrolled to
+        if (this.sheets.length > 1) {
+            const { width, height } = this.composed;
+            const rect = this.svg.getBoundingClientRect();
+            const aspect = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : width / height;
+            let w = width * 1.06;
+            let h = height * 1.06;
+            if (w / h < aspect) w = h * aspect;
+            else h = w / aspect;
+            const top = this.page * (height + DrawingEditor.PAGE_GAP);
+            this.setViewBox({ x: width / 2 - w / 2, y: top + height / 2 - h / 2, w, h });
+            return;
+        }
         const width = this.composed.width;
         const count = Math.max(1, this.sheets.length);
         const height = count * this.composed.height + (count - 1) * DrawingEditor.PAGE_GAP;
