@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { EditableShapeNode, Matrix4, Plane, XYZ } from "@chili3d/core";
+import { EditableShapeNode, Matrix4, Plane, ShapeTypes, XYZ, type XYZLike } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, OccShapeConverter, ShapeFactory } from "@chili3d/wasm";
 import { makeEditable } from "../src/commands/makeEditableCommand";
@@ -33,7 +33,7 @@ function documentWith(node: (doc: TestDocument) => EditableShapeNode) {
     return { doc, imported };
 }
 
-const round = (b: { min: XYZ; max: XYZ }) =>
+const round = (b: { min: XYZLike; max: XYZLike }) =>
     [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map((x) => Math.round(x * 1000) / 1000);
 
 describe("imported bodies made editable", () => {
@@ -86,5 +86,50 @@ describe("imported bodies made editable", () => {
         expect(body.shape.isOk).toBe(true);
         expect(body.shape.value.volume()).toBeLessThan(volume - 1);
         expect(body.features.map((f) => f.type)).toEqual(["imported", "primitive"]);
+    });
+});
+
+const STEP = process.env["KERN3D_STEP"];
+
+describe.skipIf(!STEP)("a real STEP part made editable", () => {
+    test("a chamfer on every straight edge of each part, one at a time", async () => {
+        const { OccShape } = await import("../../wasm/src/shape");
+        const { captureEdgeRef } = await import("../src/features/edgeRef");
+        const root = (globalThis as any).wasm.Converter.convertFromStep(new Uint8Array(readFileSync(STEP!)));
+        const nodes: any[] = [];
+        const walk = (n: any) => {
+            if (n.shape && !n.shape.isNull()) nodes.push({ name: n.name, shape: OccShape.wrap(n.shape) });
+            for (const c of n.getChildren()) walk(c);
+        };
+        walk(root);
+        const report: string[] = [];
+        for (const { name, shape } of nodes) {
+            const { doc } = documentWith((d) => new EditableShapeNode({ document: d, name, shape }));
+            makeEditable([doc.modelManager.rootNode]);
+            const body = doc.modelManager.findNodes(
+                (n) => n instanceof ParametricBodyNode,
+            )[0] as ParametricBodyNode;
+            const edges = body.shape.value.findSubShapes(ShapeTypes.edge) as any[];
+            const k = edges.findIndex((e) => {
+                try {
+                    return e.curve.basisCurve.curveType === "line";
+                } catch {
+                    return false;
+                }
+            });
+            if (k < 0) continue;
+            const id = body.edgeIdAt(k);
+            body.setFeaturesEmitShapeChanged([
+                ...body.features,
+                {
+                    id: "ch",
+                    type: "chamfer",
+                    distance: Number(process.env["CH"] ?? 0.2),
+                    edges: [captureEdgeRef(edges[k], id, body.edgeIdIsShared(id))],
+                } as any,
+            ]);
+            report.push(`${name}: ${body.shape.isOk ? "ok" : body.shape.error}`);
+        }
+        require("node:fs").writeFileSync(process.env["PROBE_OUT"] ?? "probe.out", report.join("\n"));
     });
 });
