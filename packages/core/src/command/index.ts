@@ -4,6 +4,7 @@
 export * from "./command";
 export * from "./commandData";
 export * from "./commandKeys";
+export * from "./commandPanel";
 export * from "./commandStore";
 export * from "./decorator";
 export * from "./multistepCommand";

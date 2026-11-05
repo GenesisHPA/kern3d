@@ -11,6 +11,7 @@ import {
     Dimensions,
     type EdgeMeshData,
     type I18nKeys,
+    type ICommandPanelProvider,
     type ICurve,
     Id,
     type IEdge,
@@ -38,6 +39,7 @@ import { pointCrossMesh } from "../sketch/curveMesh";
 import type { PlaneFaceRef } from "../sketch/planeRef";
 import { HoleCenterPickHandler, type SketchPointGlyphHit } from "./holeCenterPickHandler";
 import { deduceHoleFace, type PickedHoleFace } from "./holeFace";
+import { createHolePanel } from "./holePanel";
 
 /**
  * Hole: pick hole centers straight off the sketches' point glyphs (click toggles, Enter or the
@@ -75,6 +77,7 @@ export function isOpeningCenterOf(face: IFace, point: XYZ): boolean {
     return false;
 }
 
+const HOLE_PREVIEW_COLOR = 0xe53935;
 const TIP_ANGLE: I18nKeys = "feature.hole.tip.angle";
 const TIP_FLAT: I18nKeys = "feature.hole.tip.flat";
 const STYLE_SIMPLE: I18nKeys = "feature.hole.style.simple";
@@ -82,7 +85,12 @@ const STYLE_COUNTERBORE: I18nKeys = "feature.hole.style.counterbore";
 const STYLE_COUNTERSINK: I18nKeys = "feature.hole.style.countersink";
 
 @command({ key: "feature.hole", icon: "icon-hole" })
-export class HoleFeatureCommand extends MultistepCommand {
+export class HoleFeatureCommand extends MultistepCommand implements ICommandPanelProvider {
+    /** The panel: type / end / extent toggles and a dimensioned section of the hole. */
+    createCommandPanel(): HTMLElement {
+        return createHolePanel(this);
+    }
+
     @property("common.type", {
         combobox: Combobox.from([STYLE_SIMPLE, STYLE_COUNTERBORE, STYLE_COUNTERSINK]),
     })
@@ -378,7 +386,15 @@ export class HoleFeatureCommand extends MultistepCommand {
             centers,
         );
         if (!tools.isOk) return [];
-        return tools.value.map((tool) => this.meshShape(tool));
+        // the holes as see-through red solids with their outline, like the cut they will make
+        const meshes: ShapeMeshData[] = [];
+        for (const tool of tools.value) {
+            const mesh = tool.mesh;
+            if (mesh.faces) meshes.push({ ...mesh.faces, color: HOLE_PREVIEW_COLOR, opacity: 0.35 });
+            if (mesh.edges) meshes.push({ ...mesh.edges, color: HOLE_PREVIEW_COLOR });
+            tool.dispose();
+        }
+        return meshes;
     }
 
     /**

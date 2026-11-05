@@ -15,6 +15,7 @@ import {
     type IDisposable,
     type IDocument,
     isCancelableCommand,
+    isCommandPanelProvider,
     isPropertyChanged,
     isTargetProvider,
     Localize,
@@ -161,7 +162,11 @@ export class CommandContext extends HTMLElement implements IDisposable {
         );
         if (this.docked) enableDockedDrag(this, header);
         this.container.append(header, this.groupsContainer);
-        this.initContext();
+        if (isCommandPanelProvider(this.command)) {
+            this.groupsContainer.append(this.command.createCommandPanel());
+        } else {
+            this.initContext();
+        }
         if (isCancelableCommand(this.command)) {
             this.closeIcon = div(
                 { className: style.cancelButton },

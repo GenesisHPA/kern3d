@@ -234,7 +234,14 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
 
         this._tempShapes = this.data
             .preview?.(point)
-            ?.map((shape) => this.document.visual.context.displayMesh([shape], this.facePreviewOpion));
+            ?.map((shape) =>
+                this.document.visual.context.displayMesh(
+                    [shape],
+                    shape.opacity === undefined
+                        ? this.facePreviewOpion
+                        : { ...this.facePreviewOpion, meshOpacity: shape.opacity },
+                ),
+            );
     }
 
     /**
