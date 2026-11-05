@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { concentricGroups, pitchCircles, symmetryAxes, toleranceOf } from "./centerMarks";
 import {
     type DrawingData,
     type DrawingDimensionData,
@@ -11,7 +12,8 @@ import {
     type Point2,
     type RadialDimensionData,
 } from "./drawingData";
-import type { Polyline2, ViewGeometry } from "./hlr";
+import type { Circle2, Polyline2, ViewGeometry } from "./hlr";
+import { placementOf, toSheet, type ViewPlacement } from "./placement";
 import {
     type ComposedSheet,
     DASH_CENTER,
@@ -21,45 +23,20 @@ import {
     estimateTextWidth,
     LINE_WIDTH,
     line,
+    ownerBounds,
     text,
 } from "./primitives";
+import { cuttingPlaneMarks, hatch, sectionTitle } from "./sectionMarks";
 import { composeFrame, sheetSize } from "./sheet";
 import { formatScale } from "./viewBasis";
+
+export { fromSheet, placementOf, toSheet, type ViewPlacement } from "./placement";
 
 export const DIMENSION_TEXT_HEIGHT = 3.5;
 const ARROW_LENGTH = 3;
 const ARROW_HALF_WIDTH = 0.55;
 const EXTENSION_OVERSHOOT = 2;
 const EXTENSION_GAP = 1;
-
-/** Maps a view's model 2D frame onto the sheet: centred at the view's position, scaled. */
-export interface ViewPlacement {
-    view: DrawingViewData;
-    geometry: ViewGeometry | undefined;
-    cx: number;
-    cy: number;
-}
-
-export function placementOf(view: DrawingViewData, geometry: ViewGeometry | undefined): ViewPlacement {
-    const b = geometry?.bounds;
-    const valid = b !== undefined && Number.isFinite(b.minX);
-    return {
-        view,
-        geometry,
-        cx: valid ? (b.minX + b.maxX) / 2 : 0,
-        cy: valid ? (b.minY + b.maxY) / 2 : 0,
-    };
-}
-
-export function toSheet(placement: ViewPlacement, x: number, y: number): Point2 {
-    const s = placement.view.scale;
-    return [placement.view.x + s * (x - placement.cx), placement.view.y + s * (y - placement.cy)];
-}
-
-export function fromSheet(placement: ViewPlacement, x: number, y: number): Point2 {
-    const s = placement.view.scale;
-    return [placement.cx + (x - placement.view.x) / s, placement.cy + (y - placement.view.y) / s];
-}
 
 /** Model length as a dimension states it: up to two decimals, a comma for ГОСТ. */
 export function formatLength(value: number, decimalComma: boolean): string {
@@ -104,33 +81,137 @@ function lineworkOf(
     });
 }
 
-/** Centre marks on circles facing the viewer and centre lines along side-on axes. */
+/** Where centre lines stick out past what they mark: ГОСТ 2.303 asks for 2–5 mm. */
+const CENTER_OVERSHOOT = 3;
+
+function centerLine(points: number[], owner: string, solid = false): DrawingPrimitive {
+    return { ...line("center", points, LINE_WIDTH.thin, owner), dash: solid ? undefined : DASH_CENTER };
+}
+
+/**
+ * Centre marks on circles facing the viewer (one cross per centre, sized by the largest
+ * circle there), centre-line circles through holes spaced round a centre, centre lines
+ * along side-on axes, and the axes of symmetry of a symmetric view.
+ */
 function centerLines(placement: ViewPlacement): DrawingPrimitive[] {
     const g = placement.geometry!;
     const owner = `view:${placement.view.id}`;
     const s = placement.view.scale;
+    const tolerance = toleranceOf(g);
     const result: DrawingPrimitive[] = [];
-    for (const c of g.circles) {
+    const orthographic = placement.view.orientation !== "iso" && placement.view.orientation !== "custom";
+    const mirror = orthographic ? symmetryAxes(g) : {};
+    // an axis of symmetry is drawn where it organises something: a circle on it, or a pair
+    // of circles mirrored across it — a plain block gets none
+    const pairs = (on: (c: Circle2) => number, off: (c: Circle2) => number, at: number) =>
+        g.circles.some(
+            (c) =>
+                Math.abs(on(c) - at) <= tolerance ||
+                g.circles.some(
+                    (o) =>
+                        o !== c &&
+                        Math.abs(on(o) - (2 * at - on(c))) <= tolerance &&
+                        Math.abs(off(o) - off(c)) <= tolerance &&
+                        Math.abs(o.r - c.r) <= tolerance,
+                ),
+        );
+    const symmetry = {
+        vertical:
+            mirror.vertical !== undefined &&
+            pairs(
+                (c) => c.cx,
+                (c) => c.cy,
+                mirror.vertical,
+            )
+                ? mirror.vertical
+                : undefined,
+        horizontal:
+            mirror.horizontal !== undefined &&
+            pairs(
+                (c) => c.cy,
+                (c) => c.cx,
+                mirror.horizontal,
+            )
+                ? mirror.horizontal
+                : undefined,
+    };
+    const onVertical = (x: number) =>
+        symmetry.vertical !== undefined && Math.abs(x - symmetry.vertical) <= tolerance;
+    const onHorizontal = (y: number) =>
+        symmetry.horizontal !== undefined && Math.abs(y - symmetry.horizontal) <= tolerance;
+
+    const pitches = pitchCircles(g.circles, tolerance);
+    const onPitch = new Set(pitches.flatMap((p) => p.members));
+    const free = g.circles.filter((_, i) => !onPitch.has(i));
+    for (const group of concentricGroups(free, tolerance)) {
+        const c = group[0];
         const r = c.r * s;
         if (r < 1) continue;
         const [x, y] = toSheet(placement, c.cx, c.cy);
-        const e = r + 3;
+        const e = r + CENTER_OVERSHOOT;
         // ГОСТ 2.303: below 12 mm the centre lines of a circle are drawn solid
-        const dash = 2 * r >= 12 ? DASH_CENTER : undefined;
-        result.push({ ...line("center", [x - e, y, x + e, y], LINE_WIDTH.thin, owner), dash });
-        result.push({ ...line("center", [x, y - e, x, y + e], LINE_WIDTH.thin, owner), dash });
+        const solid = 2 * r < 12;
+        // an arm lying on an axis of symmetry is drawn by that axis
+        if (!onHorizontal(c.cy)) result.push(centerLine([x - e, y, x + e, y], owner, solid));
+        if (!onVertical(c.cx)) result.push(centerLine([x, y - e, x, y + e], owner, solid));
+    }
+    for (const p of pitches) {
+        const [cx, cy] = toSheet(placement, p.cx, p.cy);
+        const R = p.r * s;
+        result.push({
+            kind: "arc",
+            layer: "center",
+            cx,
+            cy,
+            r: R,
+            start: 0,
+            sweep: 2 * Math.PI,
+            width: LINE_WIDTH.thin,
+            dash: DASH_CENTER,
+            owner,
+        });
+        for (const k of p.members) {
+            const c = g.circles[k];
+            const [x, y] = toSheet(placement, c.cx, c.cy);
+            const length = Math.hypot(x - cx, y - cy) || 1;
+            const ux = (x - cx) / length;
+            const uy = (y - cy) / length;
+            const e = c.r * s + CENTER_OVERSHOOT;
+            result.push(
+                centerLine([x - ux * e, y - uy * e, x + ux * e, y + uy * e], owner, 2 * c.r * s < 12),
+            );
+        }
     }
     for (const a of g.axes) {
         const [x1, y1] = toSheet(placement, a.x1, a.y1);
         const [x2, y2] = toSheet(placement, a.x2, a.y2);
         const length = Math.hypot(x2 - x1, y2 - y1);
         if (length === 0) continue;
-        const dx = ((x2 - x1) / length) * 3;
-        const dy = ((y2 - y1) / length) * 3;
-        result.push({
-            ...line("center", [x1 - dx, y1 - dy, x2 + dx, y2 + dy], LINE_WIDTH.thin, owner),
-            dash: DASH_CENTER,
-        });
+        const dx = ((x2 - x1) / length) * CENTER_OVERSHOOT;
+        const dy = ((y2 - y1) / length) * CENTER_OVERSHOOT;
+        result.push(centerLine([x1 - dx, y1 - dy, x2 + dx, y2 + dy], owner));
+    }
+    const b = g.bounds;
+    const along = (x1: number, y1: number, x2: number, y2: number) =>
+        g.axes.some(
+            (a) =>
+                Math.abs((a.x1 - x1) * (y2 - y1) - (a.y1 - y1) * (x2 - x1)) <=
+                    tolerance * Math.hypot(x2 - x1, y2 - y1) &&
+                Math.abs((a.x2 - x1) * (y2 - y1) - (a.y2 - y1) * (x2 - x1)) <=
+                    tolerance * Math.hypot(x2 - x1, y2 - y1),
+        );
+    if (symmetry.vertical !== undefined && !along(symmetry.vertical, b.minY, symmetry.vertical, b.maxY)) {
+        const [x, y1] = toSheet(placement, symmetry.vertical, b.minY);
+        const [, y2] = toSheet(placement, symmetry.vertical, b.maxY);
+        result.push(centerLine([x, y1 - CENTER_OVERSHOOT, x, y2 + CENTER_OVERSHOOT], owner));
+    }
+    if (
+        symmetry.horizontal !== undefined &&
+        !along(b.minX, symmetry.horizontal, b.maxX, symmetry.horizontal)
+    ) {
+        const [x1, y] = toSheet(placement, b.minX, symmetry.horizontal);
+        const [x2] = toSheet(placement, b.maxX, symmetry.horizontal);
+        result.push(centerLine([x1 - CENTER_OVERSHOOT, y, x2 + CENTER_OVERSHOOT, y], owner));
     }
     return result;
 }
@@ -159,10 +240,41 @@ function composeView(placement: ViewPlacement): DrawingPrimitive[] {
         result.push(...lineworkOf(placement, g.hidden, "hidden", LINE_WIDTH.thin, DASH_HIDDEN));
     if (view.showTangent)
         result.push(...lineworkOf(placement, g.tangent, "tangent", LINE_WIDTH.thin, undefined));
+    result.push(...hatch(placement));
     if (view.showCenterMarks) result.push(...centerLines(placement));
-    if (view.label) {
-        const [, top] = toSheet(placement, 0, g.bounds.maxY);
-        result.push(text("text", view.x, top + 6, view.label, 5, "middle", 0, owner));
+    return result;
+}
+
+/**
+ * The views' titles ("А–А" over a section): centred over the view, above whatever of its
+ * dimensions run over its top, so the title never sits on a dimension line.
+ */
+function viewLabels(
+    data: DrawingData,
+    placements: ReadonlyMap<string, ViewPlacement>,
+    primitives: readonly DrawingPrimitive[],
+): DrawingPrimitive[] {
+    const result: DrawingPrimitive[] = [];
+    const bounds = ownerBounds(primitives);
+    for (const view of data.views) {
+        const label =
+            view.label ??
+            (view.section === undefined || view.section.unlabeled
+                ? undefined
+                : sectionTitle(view.section.name));
+        const g = placements.get(view.id)?.geometry;
+        if (!label || g === undefined || !Number.isFinite(g.bounds.minX)) continue;
+        const placement = placements.get(view.id)!;
+        const [left, top] = toSheet(placement, g.bounds.minX, g.bounds.maxY);
+        const [right] = toSheet(placement, g.bounds.maxX, g.bounds.maxY);
+        let y = top + 6;
+        for (const d of data.dimensions) {
+            if (d.viewId !== view.id) continue;
+            const r = bounds.get(`dim:${d.id}`);
+            if (r !== undefined && r.maxX > left - 5 && r.minX < right + 5 && r.minY >= top - 1)
+                y = Math.max(y, r.maxY + 4);
+        }
+        result.push(text("text", view.x, y, label, 5, "middle", 0, `view:${view.id}`));
     }
     return result;
 }
@@ -262,7 +374,7 @@ function composeLinear(placement: ViewPlacement, d: LinearDimensionData, comma: 
     const g = linearGeometry(placement, d);
     const p1 = toSheet(placement, d.a[0], d.a[1]);
     const p2 = toSheet(placement, d.b[0], d.b[1]);
-    const label = d.textOverride ?? formatLength(g.value, comma);
+    const label = d.textOverride ?? `${d.prefix ?? ""}${formatLength(g.value, comma)}`;
     const result: DrawingPrimitive[] = [];
     for (const e of [extension(p1, g.q1, owner), extension(p2, g.q2, owner)]) if (e) result.push(e);
     const span = Math.hypot(g.q2[0] - g.q1[0], g.q2[1] - g.q1[1]);
@@ -298,7 +410,9 @@ function composeRadial(placement: ViewPlacement, d: RadialDimensionData, comma: 
     const ux = Math.cos(rad);
     const uy = Math.sin(rad);
     const value = d.kind === "diameter" ? 2 * d.radius : d.radius;
-    const label = d.textOverride ?? `${d.kind === "diameter" ? "Ø" : "R"}${formatLength(value, comma)}`;
+    const label =
+        d.textOverride ??
+        `${d.prefix ?? ""}${d.kind === "diameter" ? "Ø" : "R"}${formatLength(value, comma)}`;
     const width = estimateTextWidth(label, DIMENSION_TEXT_HEIGHT);
     const ax = cx + ux * r;
     const ay = cy + uy * r;
@@ -362,6 +476,8 @@ export function composeDrawing(
                 : composeLinear(placement, d, comma)),
         );
     }
+    primitives.push(...cuttingPlaneMarks(data, placements));
+    primitives.push(...viewLabels(data, placements, primitives));
     for (const note of data.notes) primitives.push(...composeNote(note));
     return { width, height, primitives };
 }

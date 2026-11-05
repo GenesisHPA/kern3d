@@ -12,6 +12,7 @@ import {
     type WorkspaceTab,
     workspaceTabs,
 } from "@chili3d/core";
+import { autoDimension, autoDrawing, sectionThrough, settleSectionLabels } from "./autoDrawing";
 import {
     composeDrawing,
     fromSheet,
@@ -468,6 +469,8 @@ export class DrawingEditor {
             this.sourceSelect,
             this.button("drawing.baseView", () => this.setTool({ kind: "baseView" }), "baseView"),
             this.button("drawing.standardViews", () => this.addStandardViews()),
+            this.button("drawing.auto", () => this.autoDrawing()),
+            this.button("drawing.autoDims", () => this.autoDimensions()),
             this.button("drawing.projectedView", () => this.startProjected(), "projected"),
             this.separator(),
             this.button("drawing.dim.horizontal", () => this.startLinear("horizontal"), "horizontal"),
@@ -525,6 +528,50 @@ export class DrawingEditor {
             return;
         }
         layoutStandardViews(this.data, source, this.geometryOf);
+        this.commit();
+        this.refresh();
+    }
+
+    /** Rebuilds the sheet by the rules: views, cuts, centre lines and dimensions. */
+    private autoDrawing() {
+        const source = this.currentSource();
+        if (source === undefined) {
+            PubSub.default.pub("showToast", "toast.drawing.selectBody");
+            return;
+        }
+        this.selection = undefined;
+        autoDrawing(this.data, source, this.cache);
+        this.commit();
+        this.refresh();
+    }
+
+    /** Replaces the automatic dimensions (hand-placed ones stay) and spaces the views for them. */
+    private autoDimensions() {
+        const source = this.currentSource();
+        if (source === undefined) {
+            PubSub.default.pub("showToast", "toast.drawing.selectBody");
+            return;
+        }
+        if (this.selection?.startsWith("dim:")) this.selection = undefined;
+        settleSectionLabels(this.data, this.cache.all(this.data));
+        autoDimension(this.data, source, this.cache);
+        this.commit();
+        this.refresh();
+    }
+
+    /** Turns a view into a full cut through the most holes across it, or back into a view. */
+    setSection(viewId: string, on: boolean) {
+        const view = this.data.views.find((v) => v.id === viewId);
+        if (view === undefined) return;
+        if (!on) {
+            view.section = undefined;
+        } else {
+            const input = this.cache.inputFor(view.sourceId);
+            view.section = sectionThrough(this.data, view, input);
+            view.showHidden = false;
+        }
+        this.refresh(true);
+        settleSectionLabels(this.data, this.geometries);
         this.commit();
         this.refresh();
     }
@@ -965,6 +1012,7 @@ export class DrawingEditor {
             },
             addProjected: (parentId: string, side: ProjectionSide) => this.addProjected(parentId, side),
             addIsometric: (parentId: string) => this.addIsometric(parentId),
+            setSection: (viewId: string, on: boolean) => this.setSection(viewId, on),
             remove: () => this.deleteSelection(),
         };
     }

@@ -16,9 +16,10 @@ import {
     ShapeNode,
     Transaction,
 } from "@chili3d/core";
+import { autoDrawing } from "./autoDrawing";
 import { DrawingEditor } from "./drawingEditor";
 import { DrawingNode } from "./drawingNode";
-import { layoutStandardViews, resolveSource, ViewGeometryCache } from "./drawingViews";
+import { resolveSource, ViewGeometryCache } from "./drawingViews";
 
 function isBody(node: INode): node is ShapeNode {
     return node instanceof ShapeNode && !isReferenceGeometryNode(node) && node.shape.isOk;
@@ -37,7 +38,8 @@ async function pickBody(document: IDocument): Promise<ShapeNode | undefined> {
 
 /**
  * A new drawing of `body`: an A3 sheet with the ГОСТ title block and the three standard views
- * in first-angle projection, at the largest standard scale that fits.
+ * in first-angle projection, cut where holes run across them, with centre lines and
+ * dimensions, at the largest standard scale that fits.
  */
 export function createDrawingOf(document: IDocument, body: ShapeNode): DrawingNode {
     const name = NodeUtils.generateName(document, I18n.translate("drawing.defaultName"));
@@ -49,7 +51,7 @@ export function createDrawingOf(document: IDocument, body: ShapeNode): DrawingNo
         year: "2-digit",
     });
     const cache = new ViewGeometryCache((id) => resolveSource(document, id));
-    layoutStandardViews(data, body.id, (view) => cache.geometryOf(view));
+    autoDrawing(data, body.id, cache);
     node.setData(data);
     return node;
 }

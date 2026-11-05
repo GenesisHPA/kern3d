@@ -62,6 +62,22 @@ export interface TitleBlockData {
     fields: Partial<Record<TitleField, string>>;
 }
 
+/**
+ * A full cut (ГОСТ 2.305 разрез): the material between the viewer and the plane through the
+ * view's direction at `offset` (along the view's `w`, in world millimetres) is taken away, the
+ * cut faces are hatched, and the other views show where the plane runs.
+ */
+export interface SectionData {
+    offset: number;
+    /** The letter of the cut: "А" labels the view "А–А" and the plane's trace elsewhere. */
+    name: string;
+    /**
+     * ГОСТ 2.305: a cut along the part's plane of symmetry, in its projected place, is not
+     * labelled — neither the title nor the plane's trace is drawn.
+     */
+    unlabeled?: boolean;
+}
+
 export interface DrawingViewData {
     id: string;
     /** Id of the model node the view projects. */
@@ -84,6 +100,7 @@ export interface DrawingViewData {
     showTangent: boolean;
     showCenterMarks: boolean;
     label?: string;
+    section?: SectionData;
 }
 
 export type Point2 = [number, number];
@@ -102,6 +119,10 @@ export interface LinearDimensionData {
     offset: number;
     /** Replaces the computed value when set (e.g. a tolerance appended by hand). */
     textOverride?: string;
+    /** Written before the value: "Ø" for a diameter measured side-on, "4 отв. " for a set. */
+    prefix?: string;
+    /** Placed by automatic dimensioning: the next automatic run replaces it. */
+    auto?: boolean;
 }
 
 export interface RadialDimensionData {
@@ -115,6 +136,8 @@ export interface RadialDimensionData {
     /** Direction of the leader, degrees from the sheet's +x. */
     angle: number;
     textOverride?: string;
+    prefix?: string;
+    auto?: boolean;
 }
 
 export type DrawingDimensionData = LinearDimensionData | RadialDimensionData;
@@ -194,6 +217,17 @@ function parseView(raw: unknown): DrawingViewData | undefined {
         showTangent: r["showTangent"] === true,
         showCenterMarks: r["showCenterMarks"] !== false,
         label: typeof r["label"] === "string" ? r["label"] : undefined,
+        section: parseSection(r["section"]),
+    };
+}
+
+function parseSection(raw: unknown): SectionData | undefined {
+    const r = asRecord(raw);
+    if (typeof r["offset"] !== "number" || !Number.isFinite(r["offset"])) return undefined;
+    return {
+        offset: r["offset"],
+        name: typeof r["name"] === "string" ? r["name"] : "А",
+        unlabeled: r["unlabeled"] === true ? true : undefined,
     };
 }
 
@@ -201,6 +235,8 @@ function parseDimension(raw: unknown): DrawingDimensionData | undefined {
     const r = asRecord(raw);
     if (typeof r["id"] !== "string" || typeof r["viewId"] !== "string") return undefined;
     const textOverride = typeof r["textOverride"] === "string" ? r["textOverride"] : undefined;
+    const auto = r["auto"] === true ? true : undefined;
+    const prefix = typeof r["prefix"] === "string" && r["prefix"] !== "" ? r["prefix"] : undefined;
     if (r["kind"] === "diameter" || r["kind"] === "radius") {
         return {
             id: r["id"],
@@ -210,6 +246,8 @@ function parseDimension(raw: unknown): DrawingDimensionData | undefined {
             radius: Math.abs(finite(r["radius"], 1)),
             angle: finite(r["angle"], 45),
             textOverride,
+            prefix,
+            auto,
         };
     }
     return {
@@ -220,6 +258,8 @@ function parseDimension(raw: unknown): DrawingDimensionData | undefined {
         b: point2(r["b"]),
         offset: finite(r["offset"], 10),
         textOverride,
+        prefix,
+        auto,
     };
 }
 

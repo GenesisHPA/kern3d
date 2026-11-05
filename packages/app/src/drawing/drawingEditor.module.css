@@ -2,7 +2,7 @@
 .dialog {
     position: fixed;
     inset: 30px 0 0 0;
-    z-index: 900;
+    z-index: 1500;
     width: 100vw;
     height: calc(100vh - 30px);
     max-width: 100vw;

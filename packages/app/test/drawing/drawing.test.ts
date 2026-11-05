@@ -51,6 +51,7 @@ function rectangleGeometry(): ViewGeometry {
         circles: [{ cx: 50, cy: 20, r: 10 }],
         axes: [],
         vertices: [0, 0, 100, 0, 100, 40, 0, 40, 50, 20],
+        cut: [],
         bounds: { minX: 0, minY: 0, maxX: 100, maxY: 40 },
     };
 }

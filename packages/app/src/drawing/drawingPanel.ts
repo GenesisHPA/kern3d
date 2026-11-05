@@ -31,6 +31,7 @@ export interface DrawingPanelHost {
     change(recompute?: boolean): void;
     addProjected(parentId: string, side: ProjectionSide): void;
     addIsometric(parentId: string): void;
+    setSection(viewId: string, on: boolean): void;
     remove(): void;
 }
 
@@ -301,6 +302,12 @@ export class DrawingPanel {
                 this.host.change();
             }),
         );
+        if (view.orientation !== "iso" && view.orientation !== "custom") {
+            this.row(
+                "drawing.view.section",
+                this.checkbox(view.section !== undefined, (v) => this.host.setSection(view.id, v)),
+            );
+        }
         this.row(
             "drawing.view.label",
             this.textInput(view.label ?? "", (v) => {

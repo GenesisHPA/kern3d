@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, type IShape, type Matrix4, ShapeNode } from "@chili3d/core";
+import { type IDocument, type IShape, type Matrix4, Plane, ShapeNode, XYZ } from "@chili3d/core";
 import {
     type DrawingData,
     type DrawingViewData,
@@ -50,9 +50,49 @@ export function viewBasisOf(view: DrawingViewData): ViewBasis {
  */
 export class ViewGeometryCache {
     private readonly inputs = new WeakMap<IShape, { transform: Matrix4; input: HlrInput }>();
+    private readonly cuts = new WeakMap<IShape, Map<string, HlrInput>>();
     private readonly geometries = new Map<string, { shape: IShape; key: string; geometry: ViewGeometry }>();
 
     constructor(private readonly resolve: (sourceId: string) => ViewSource | undefined) {}
+
+    /** The uncut model of a source, in world coordinates: what automatic dimensioning reads. */
+    inputFor(sourceId: string): HlrInput | undefined {
+        const source = this.resolve(sourceId);
+        return source === undefined ? undefined : this.inputOf(source);
+    }
+
+    /**
+     * The model with everything between the viewer and the section plane cut away: a box on
+     * the viewer's side of the plane, far larger than the model, subtracted from it.
+     */
+    private sectionInputOf(source: ViewSource, view: DrawingViewData, offset: number): HlrInput {
+        const key = JSON.stringify([view.u, view.v, offset, source.transform.toArray()]);
+        let byKey = this.cuts.get(source.shape);
+        if (byKey === undefined) {
+            byKey = new Map();
+            this.cuts.set(source.shape, byKey);
+        }
+        const cached = byKey.get(key);
+        if (cached !== undefined) return cached;
+        const basis = viewBasisOf(view);
+        const world = source.shape.transformed(source.transform);
+        const box = world.boundingBox();
+        const size = Math.max(
+            1,
+            Math.hypot(box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z),
+        );
+        const L = size * 4 + Math.abs(offset) * 2;
+        const xyz = (a: readonly number[]) => new XYZ({ x: a[0], y: a[1], z: a[2] });
+        const [u, v, w] = [basis.u, basis.v, basis.w];
+        const origin = xyz([0, 1, 2].map((i) => w[i] * offset - L * u[i] - L * v[i]));
+        const plane = new Plane({ origin, normal: xyz(w), xvec: xyz(u) });
+        let input: HlrInput;
+        const cutter = shapeFactory.box(plane, 2 * L, 2 * L, L);
+        const cut = cutter.isOk ? shapeFactory.booleanCut([world], [cutter.value]) : undefined;
+        input = cut?.isOk ? extractHlrInput(cut.value) : this.inputOf(source);
+        byKey.set(key, input);
+        return input;
+    }
 
     private inputOf(source: ViewSource): HlrInput {
         const cached = this.inputs.get(source.shape);
@@ -65,19 +105,25 @@ export class ViewGeometryCache {
     geometryOf(view: DrawingViewData): ViewGeometry | undefined {
         const source = this.resolve(view.sourceId);
         if (source === undefined) return undefined;
+        const section = view.section?.offset;
         const key = JSON.stringify([
             view.u,
             view.v,
             view.showHidden,
             view.showTangent,
+            section,
             source.transform.toArray(),
         ]);
         const cached = this.geometries.get(view.id);
         if (cached !== undefined && cached.shape === source.shape && cached.key === key)
             return cached.geometry;
-        const geometry = computeViewGeometry(this.inputOf(source), viewBasisOf(view), {
-            hidden: view.showHidden,
+        const input =
+            section === undefined ? this.inputOf(source) : this.sectionInputOf(source, view, section);
+        const geometry = computeViewGeometry(input, viewBasisOf(view), {
+            // a section shows what the cut opened, not what lies hidden behind it
+            hidden: view.showHidden && section === undefined,
             tangent: view.showTangent,
+            section,
         });
         this.geometries.set(view.id, { shape: source.shape, key, geometry });
         return geometry;

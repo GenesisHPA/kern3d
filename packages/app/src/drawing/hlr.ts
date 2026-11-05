@@ -94,12 +94,16 @@ export interface ViewGeometry {
     axes: Axis2[];
     /** Flat x, y pairs: edge end points and circle centres, the snap targets of a dimension. */
     vertices: number[];
+    /** A section's cut faces as triangles, six numbers (three x, y pairs) each: what is hatched. */
+    cut: number[];
     bounds: Bounds2;
 }
 
 export interface HlrOptions {
     hidden: boolean;
     tangent: boolean;
+    /** For a section: the cutting plane's depth along `w`; the faces lying on it are the cut. */
+    section?: number;
 }
 
 type P3 = [number, number, number];
@@ -206,7 +210,7 @@ class OccluderGrid {
 }
 
 /** Uniform grid of 2D segments, answering "is a line within `tolerance` of this point?". */
-class SegmentIndex {
+export class SegmentIndex {
     private readonly cells = new Map<number, number[]>();
     private readonly segments: number[] = [];
 
@@ -600,8 +604,8 @@ function dedupeCircles(circles: Circle2[], tolerance: number): Circle2[] {
 }
 
 /** Coaxial circles seen edge-on: one centre line per axis, spanning their projected centres. */
-function sideAxes(edges: HlrEdge[], basis: ViewBasis, tolerance: number): Axis2[] {
-    const groups: { dx: number; dy: number; points: [number, number][] }[] = [];
+function sideAxes(edges: HlrEdge[], basis: ViewBasis, tolerance: number): (Axis2 & { radii: number[] })[] {
+    const groups: { dx: number; dy: number; points: [number, number][]; radii: number[] }[] = [];
     for (const edge of edges) {
         const c = edge.circle;
         if (c === undefined) continue;
@@ -617,10 +621,13 @@ function sideAxes(edges: HlrEdge[], basis: ViewBasis, tolerance: number): Axis2[
             const [px, py] = g.points[0];
             return Math.abs((center[0] - px) * g.dy - (center[1] - py) * g.dx) <= tolerance;
         });
-        if (group === undefined) groups.push({ dx, dy, points: [[center[0], center[1]]] });
-        else group.points.push([center[0], center[1]]);
+        if (group === undefined) groups.push({ dx, dy, points: [[center[0], center[1]]], radii: [c.radius] });
+        else {
+            group.points.push([center[0], center[1]]);
+            group.radii.push(c.radius);
+        }
     }
-    const axes: Axis2[] = [];
+    const axes: (Axis2 & { radii: number[] })[] = [];
     for (const g of groups) {
         const ts = g.points.map(([x, y]) => x * g.dx + y * g.dy);
         const lo = Math.min(...ts);
@@ -631,9 +638,32 @@ function sideAxes(edges: HlrEdge[], basis: ViewBasis, tolerance: number): Axis2[
         const at = (t: number): [number, number] => [t * g.dx - n * g.dy, t * g.dy + n * g.dx];
         const [x1, y1] = at(lo);
         const [x2, y2] = at(hi);
-        axes.push({ x1, y1, x2, y2 });
+        axes.push({ x1, y1, x2, y2, radii: g.radii });
     }
     return axes;
+}
+
+/**
+ * Whether a side-on cylinder shows: visible outline lines along the axis at one of its radii
+ * on both sides somewhere along it. Without hidden lines, the axis of a hole that does not
+ * show is not drawn either.
+ */
+function axisShows(axis: Axis2 & { radii: number[] }, index: SegmentIndex): boolean {
+    const dx = axis.x2 - axis.x1;
+    const dy = axis.y2 - axis.y1;
+    const length = Math.hypot(dx, dy);
+    if (length === 0) return false;
+    const nx = -dy / length;
+    const ny = dx / length;
+    for (let i = 1; i < 16; i++) {
+        const x = axis.x1 + (dx * i) / 16;
+        const y = axis.y1 + (dy * i) / 16;
+        for (const r of axis.radii) {
+            if (index.near(x + nx * r, y + ny * r, dx, dy) && index.near(x - nx * r, y - ny * r, dx, dy))
+                return true;
+        }
+    }
+    return false;
 }
 
 function collectVertices(lines: RawLine[], circles: Circle2[], tolerance: number): number[] {
@@ -672,7 +702,7 @@ export function computeViewGeometry(input: HlrInput, basis: ViewBasis, options: 
         for (const p of line.points) grow(bounds, p[0], p[1]);
     }
     if (!Number.isFinite(bounds.minX)) {
-        return { visible: [], hidden: [], tangent: [], circles: [], axes: [], vertices: [], bounds };
+        return { visible: [], hidden: [], tangent: [], circles: [], axes: [], vertices: [], cut: [], bounds };
     }
     const meshBounds = { ...mesh.bounds };
     grow(meshBounds, bounds.minX, bounds.minY);
@@ -735,8 +765,34 @@ export function computeViewGeometry(input: HlrInput, basis: ViewBasis, options: 
         hidden: finish(hidden),
         tangent: finish(visibleTangents),
         circles,
-        axes: sideAxes(input.edges, basis, context.tolerance2D),
+        axes: sideAxes(input.edges, basis, context.tolerance2D)
+            .filter((a) => (options.hidden && options.section === undefined) || axisShows(a, visibleIndex))
+            .map(({ x1, y1, x2, y2 }) => ({ x1, y1, x2, y2 })),
         vertices: collectVertices([...edges.visible, ...edges.hidden], circles, context.tolerance2D),
+        cut:
+            options.section === undefined
+                ? []
+                : cutTriangles(input, mesh, options.section, context.depthTolerance),
         bounds,
     };
+}
+
+/** The triangles of the faces lying on the cutting plane and facing the viewer: the section. */
+function cutTriangles(input: HlrInput, mesh: ProjectedMesh, depth: number, tolerance: number): number[] {
+    const result: number[] = [];
+    for (const face of input.faces) {
+        let onPlane = true;
+        for (let k = face.start; k < face.start + face.count && onPlane; k++) {
+            const i = input.index[k] * 3;
+            if (Math.abs(mesh.p[i + 2] - depth) > tolerance || mesh.n[i + 2] < 0.999) onPlane = false;
+        }
+        if (!onPlane) continue;
+        for (let k = face.start; k + 2 < face.start + face.count; k += 3) {
+            for (let j = 0; j < 3; j++) {
+                const i = input.index[k + j] * 3;
+                result.push(mesh.p[i], mesh.p[i + 1]);
+            }
+        }
+    }
+    return result;
 }
