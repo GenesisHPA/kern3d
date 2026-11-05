@@ -245,7 +245,7 @@ describe("hole feature", () => {
         test("the drill angle must lie between 0 and 180", () => {
             const flat = evaluate(holeFeature({ drillAngle: 180 }));
             expect((flat as { error: string }).error).toBe(
-                "Hole drill angle must be between 0 and 180 degrees",
+                "Hole drill angle must be between 0 and 180 degrees (choose a flat end for a flat bottom)",
             );
         });
 

@@ -116,3 +116,20 @@ describe("picking the center of an existing hole", () => {
         expect(isOpeningCenterOf(top, new XYZ({ x: 9, y: 8, z: 20 }))).toBe(false);
     });
 });
+
+describe("a flat-bottomed hole", () => {
+    test("removes exactly the cylinder, whatever the drill angle field holds", () => {
+        const body = plate();
+        const before = body.shape.unchecked()!.volume();
+        addHole(body, "h1", { diameter: 6, depth: 8, tip: "flat", drillAngle: 0 });
+        expect(errors(body)).toEqual([undefined, undefined]);
+        const removed = before - body.shape.unchecked()!.volume();
+        expect(Math.round(removed * 1e4) / 1e4).toBe(Math.round(Math.PI * 3 * 3 * 8 * 1e4) / 1e4);
+    });
+
+    test("an angled end still refuses a 0° point", () => {
+        const body = plate();
+        addHole(body, "h1", { diameter: 6, depth: 8, drillAngle: 0 });
+        expect(errors(body)[1]).toContain("flat");
+    });
+});

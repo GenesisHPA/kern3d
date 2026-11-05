@@ -812,6 +812,11 @@ export interface HoleFeatureData extends FeatureBase {
     readonly depth?: ParameterValue;
     /** Drill tip included angle in degrees (default 118, the general-purpose point). */
     readonly drillAngle?: ParameterValue;
+    /**
+     * How a blind hole ends: `angle` (absent) — the drill point at `drillAngle`; `flat` — a
+     * flat bottom (an end mill, a counterbore made by hand), and `drillAngle` is not used.
+     */
+    readonly tip?: "angle" | "flat";
     /** Socket-head recess; required when `style` is `counterbore`. */
     readonly counterbore?: { readonly diameter: ParameterValue; readonly depth: ParameterValue };
     /** Flat-head recess; required when `style` is `countersink` (angle defaults to 90°). */

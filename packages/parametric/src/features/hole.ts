@@ -138,10 +138,20 @@ const holeHandler: FeatureHandler<HoleFeatureData> = {
         // An empty depth drills through all — the feature carries no `depth` then at all.
         { key: "depth", display: "feature.hole.depth", value: feature.depth ?? "", unit: LENGTH_UNITS },
         {
+            key: "tip",
+            display: "feature.hole.tip",
+            value: feature.tip ?? "angle",
+            choices: [
+                { value: "angle", display: "feature.hole.tip.angle" },
+                { value: "flat", display: "feature.hole.tip.flat" },
+            ],
+        },
+        {
             key: "drillAngle",
             display: "feature.hole.drillAngle",
             value: feature.drillAngle ?? DEFAULT_DRILL_ANGLE,
             unit: ANGLE_UNITS,
+            visibleWhen: [{ key: "tip", value: "angle" }],
         },
         {
             key: "counterbore.diameter",
@@ -180,6 +190,12 @@ const holeHandler: FeatureHandler<HoleFeatureData> = {
                 : feature;
         }
         if (key === "preset") return typeof value === "string" ? applyPreset(feature, value) : feature;
+        if (key === "tip") {
+            if (value === "flat") return { ...feature, tip: "flat" };
+            if (value !== "angle") return feature;
+            const { tip: _, ...rest } = feature;
+            return rest;
+        }
         if (typeof value === "boolean") return feature;
         if (key === "diameter") return { ...feature, diameter: value };
         if (key === "drillAngle") return { ...feature, drillAngle: value };
@@ -300,13 +316,18 @@ function resolveHoleParams(feature: HoleFeatureData, scope: Scope): Result<HoleP
     const diameter = resolveUnitSpec(feature.diameter, scope, LENGTH_UNITS);
     if (!diameter.isOk) return Result.err(diameter.error);
     if (!(diameter.value > 0)) return Result.err("Hole diameter must be positive");
-    const angle = resolveUnitSpec(feature.drillAngle ?? DEFAULT_DRILL_ANGLE, scope, ANGLE_UNITS);
-    if (!angle.isOk) return Result.err(angle.error);
-    if (!(angle.value > 0 && angle.value < 180)) {
-        return Result.err("Hole drill angle must be between 0 and 180 degrees");
-    }
     const radius = diameter.value / 2;
-    const tipHeight = radius / Math.tan(MathUtils.degToRad(angle.value / 2));
+    let tipHeight = 0; // a flat bottom has no point
+    if (feature.tip !== "flat") {
+        const angle = resolveUnitSpec(feature.drillAngle ?? DEFAULT_DRILL_ANGLE, scope, ANGLE_UNITS);
+        if (!angle.isOk) return Result.err(angle.error);
+        if (!(angle.value > 0 && angle.value < 180)) {
+            return Result.err(
+                "Hole drill angle must be between 0 and 180 degrees (choose a flat end for a flat bottom)",
+            );
+        }
+        tipHeight = radius / Math.tan(MathUtils.degToRad(angle.value / 2));
+    }
 
     let depth: number | undefined;
     // A blank depth is through-all; it is stripped at write time, but a hand-edited file may carry one.

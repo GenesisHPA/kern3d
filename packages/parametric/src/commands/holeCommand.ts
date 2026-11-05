@@ -75,6 +75,8 @@ export function isOpeningCenterOf(face: IFace, point: XYZ): boolean {
     return false;
 }
 
+const TIP_ANGLE: I18nKeys = "feature.hole.tip.angle";
+const TIP_FLAT: I18nKeys = "feature.hole.tip.flat";
 const STYLE_SIMPLE: I18nKeys = "feature.hole.style.simple";
 const STYLE_COUNTERBORE: I18nKeys = "feature.hole.style.counterbore";
 const STYLE_COUNTERSINK: I18nKeys = "feature.hole.style.countersink";
@@ -108,7 +110,27 @@ export class HoleFeatureCommand extends MultistepCommand {
         this.setProperty("depth", value);
     }
 
-    @property("feature.hole.drillAngle", { unit: ANGLE_UNITS })
+    /** How a blind hole ends: the drill point at an angle, or a flat bottom. */
+    @property("feature.hole.tip", { combobox: Combobox.from([TIP_ANGLE, TIP_FLAT]) })
+    get tip(): I18nKeys {
+        return this.getPrivateValue("tip", TIP_ANGLE);
+    }
+    set tip(value: I18nKeys) {
+        this.setProperty("tip", value);
+        this.showDrillAngle = value !== TIP_FLAT;
+    }
+
+    get showDrillAngle(): boolean {
+        return this.getPrivateValue("showDrillAngle", this.tip !== TIP_FLAT);
+    }
+    set showDrillAngle(value: boolean) {
+        this.setProperty("showDrillAngle", value);
+    }
+
+    @property("feature.hole.drillAngle", {
+        unit: ANGLE_UNITS,
+        dependencies: [{ property: "showDrillAngle", value: true }],
+    })
     get drillAngle(): ParameterValue {
         return this.getPrivateValue("drillAngle", 118);
     }
@@ -472,9 +494,11 @@ export class HoleFeatureCommand extends MultistepCommand {
             const depth = this.resolveParameter(this.depth, LENGTH_UNITS);
             if (!depth.isOk || depth.value <= 0) return invalid("Invalid hole depth");
         }
-        const drillAngle = this.resolveParameter(this.drillAngle, ANGLE_UNITS);
-        if (!drillAngle.isOk || drillAngle.value <= 0 || drillAngle.value >= 180) {
-            return invalid("Invalid drill angle");
+        if (this.tip !== TIP_FLAT) {
+            const drillAngle = this.resolveParameter(this.drillAngle, ANGLE_UNITS);
+            if (!drillAngle.isOk || drillAngle.value <= 0 || drillAngle.value >= 180) {
+                return invalid("Invalid drill angle — choose a flat end for a flat bottom");
+            }
         }
         if (this.style === STYLE_COUNTERBORE) {
             const diameter2 = this.resolveParameter(this.counterboreDiameter, LENGTH_UNITS);
@@ -520,6 +544,7 @@ export class HoleFeatureCommand extends MultistepCommand {
             diameter: this.diameter,
             ...(this.depth === "" ? {} : { depth: this.depth }),
             drillAngle: this.drillAngle,
+            ...(this.tip === TIP_FLAT ? { tip: "flat" as const } : {}),
             ...(style === "counterbore"
                 ? { counterbore: { diameter: this.counterboreDiameter, depth: this.counterboreDepth } }
                 : {}),
