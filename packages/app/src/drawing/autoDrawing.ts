@@ -6,6 +6,7 @@ import {
     type DrawingData,
     type DrawingDimensionData,
     type DrawingViewData,
+    isRadialDimension,
     type LinearDimensionKind,
     newDrawingItemId,
     type Point2,
@@ -829,6 +830,7 @@ function lengthOf(p: PlannedLinear): number {
 export function settleSectionLabels(data: DrawingData, geometries: ReadonlyMap<string, ViewGeometry>) {
     for (const view of data.views) {
         if (view.section === undefined) continue;
+        if (view.section.fixedLabel) continue;
         view.section.unlabeled = undefined;
         const host = cutTraceHost(data, view);
         const g = host === undefined ? undefined : geometries.get(host.id);
@@ -1147,6 +1149,20 @@ export function placeDimensions(
  * Replaces the automatic dimensions of the drawing with a fresh set (dimensions placed by
  * hand stay), spacing the views to make room for them.
  */
+/**
+ * What a dimension measures, independent of the drawing's view ids: the view's direction and
+ * whether it is cut, the kind, and the measured points. An automatic dimension the user
+ * deleted, or one they changed (it stops being automatic), is matched by it.
+ */
+export function dimensionKey(data: DrawingData, d: DrawingDimensionData): string | undefined {
+    const view = data.views.find((v) => v.id === d.viewId);
+    if (view === undefined) return undefined;
+    const r = (x: number) => (Math.round(x * 1000) / 1000).toString();
+    const where = `${view.orientation}${view.section === undefined ? "" : "/cut"}`;
+    if (isRadialDimension(d)) return `${where}|${d.kind}|${r(d.center[0])},${r(d.center[1])}|${r(d.radius)}`;
+    return `${where}|${d.kind}|${r(d.a[0])},${r(d.a[1])}|${r(d.b[0])},${r(d.b[1])}`;
+}
+
 export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
     const input = cache.inputFor(sourceId);
     data.dimensions = data.dimensions.filter((d) => !d.auto);
@@ -1158,8 +1174,15 @@ export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGe
     const margins = marginsOf(data, planned);
     arrangeViews(data, margins, geometries);
     placeIsometric(data, margins, cache);
-    // the layout moved and rescaled the views: the dimensions are placed after it
-    data.dimensions.push(...placeDimensions(data, planned, cache.all(data)));
+    // the layout moved and rescaled the views: the dimensions are placed after it; one the
+    // user deleted stays deleted, one they changed is kept as theirs instead
+    const skip = new Set(data.suppressed ?? []);
+    for (const d of data.dimensions) {
+        const key = dimensionKey(data, d);
+        if (key !== undefined) skip.add(key);
+    }
+    const placed = placeDimensions(data, planned, cache.all(data));
+    data.dimensions.push(...placed.filter((d) => !skip.has(dimensionKey(data, d) ?? "")));
 }
 
 /**
@@ -1168,6 +1191,11 @@ export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGe
  * lines, dimensions, and an isometric view where the sheet has room — replacing every view.
  */
 export function autoDrawing(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
+    // dimensions made or changed by hand move over to the new view looking the same way
+    const orientationOf = new Map(data.views.map((v) => [v.id, v.orientation]));
+    const manual = data.dimensions
+        .filter((d) => !d.auto)
+        .map((d) => ({ d, orientation: orientationOf.get(d.viewId) }));
     data.views = [];
     data.dimensions = [];
     layoutStandardViews(data, sourceId, (v) => cache.geometryOf(v));
@@ -1176,6 +1204,10 @@ export function autoDrawing(data: DrawingData, sourceId: string, cache: ViewGeom
     addRevealingViews(data, cache);
     const root = data.views[0];
     data.views.push(newView(sourceId, "iso", root.scale, root.x, root.y));
+    for (const { d, orientation } of manual) {
+        const view = data.views.find((v) => v.orientation === orientation);
+        if (view !== undefined) data.dimensions.push({ ...d, viewId: view.id });
+    }
     autoSections(data, cylindersOf(input), modelTolerance(input));
     settleSectionLabels(data, cache.all(data));
     autoDimension(data, sourceId, cache);

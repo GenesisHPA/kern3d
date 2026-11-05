@@ -18,6 +18,7 @@ import {
     type ViewOrientation,
 } from "./drawingData";
 import style from "./drawingEditor.module.css";
+import { viewBasisOf } from "./drawingViews";
 import type { ViewGeometry } from "./hlr";
 import { formatScale, orientationBasis, parseScale, STANDARD_SCALES } from "./viewBasis";
 
@@ -32,6 +33,8 @@ export interface DrawingPanelHost {
     addProjected(parentId: string, side: ProjectionSide): void;
     addIsometric(parentId: string): void;
     setSection(viewId: string, on: boolean): void;
+    /** Brings back the automatic dimensions the user deleted. */
+    restoreAuto(): void;
     remove(): void;
 }
 
@@ -205,6 +208,9 @@ export class DrawingPanel {
                 ),
             );
         }
+        if ((data.suppressed?.length ?? 0) > 0) {
+            this.buttons(["drawing.restoreAuto", () => this.host.restoreAuto()]);
+        }
         const hint = el("p", t("drawing.hint"));
         hint.style.opacity = "0.7";
         this.element.append(hint);
@@ -307,6 +313,43 @@ export class DrawingPanel {
                 "drawing.view.section",
                 this.checkbox(view.section !== undefined, (v) => this.host.setSection(view.id, v)),
             );
+            const section = view.section;
+            if (section !== undefined) {
+                // the plane as a model coordinate ("Y = 20"), not as a depth along the view
+                const w = viewBasisOf(view).w;
+                const axis = [0, 1, 2].find((i) => Math.abs(w[i]) > 0.999);
+                const sign = axis === undefined ? 1 : Math.sign(w[axis]);
+                const letter = axis === undefined ? "" : ` (${"XYZ"[axis]})`;
+                const row = el("div");
+                row.className = style.row;
+                row.append(
+                    el("span", `${t("drawing.section.offset")}${letter}`),
+                    this.textInput(String(Math.round(section.offset * sign * 1000) / 1000), (v) => {
+                        const value = Number(v.replace(",", ".").replace(/^\s*[xyzXYZ]\s*=\s*/, ""));
+                        if (!Number.isFinite(value)) return;
+                        section.offset = value * sign;
+                        this.host.change(true);
+                    }),
+                );
+                this.element.append(row);
+                this.row(
+                    "drawing.section.name",
+                    this.textInput(section.name, (v) => {
+                        const name = v.trim();
+                        if (name === "") return;
+                        section.name = name;
+                        this.host.change();
+                    }),
+                );
+                this.row(
+                    "drawing.section.labeled",
+                    this.checkbox(!section.unlabeled, (v) => {
+                        section.unlabeled = v ? undefined : true;
+                        section.fixedLabel = true;
+                        this.host.change();
+                    }),
+                );
+            }
         }
         this.row(
             "drawing.view.label",
@@ -340,10 +383,25 @@ export class DrawingPanel {
         this.heading(`drawing.dim.${dim.kind}`);
         const comma = this.host.data().titleBlock.kind === "gost";
         this.row("drawing.dim.value", el("span", formatLength(dimensionValue(dim), comma)));
+        if (dim.auto) this.row("drawing.dim.origin", el("span", t("drawing.dim.origin.auto")));
+        // an edit makes the dimension the user's: automatic runs keep it as it is
+        this.row(
+            "drawing.dim.prefix",
+            this.textInput(
+                dim.prefix ?? "",
+                (v) => {
+                    dim.prefix = v || undefined;
+                    dim.auto = undefined;
+                    this.host.change();
+                },
+                "Ø, 4 отв. Ø",
+            ),
+        );
         this.row(
             "drawing.dim.override",
             this.textInput(dim.textOverride ?? "", (v) => {
                 dim.textOverride = v || undefined;
+                dim.auto = undefined;
                 this.host.change();
             }),
         );

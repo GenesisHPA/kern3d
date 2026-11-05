@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type IShape, Matrix4, Plane, XYZ } from "@chili3d/core";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
-import { autoDrawing, cylindersOf } from "../../src/drawing/autoDrawing";
+import { autoDimension, autoDrawing, cylindersOf, dimensionKey } from "../../src/drawing/autoDrawing";
 import { composeDrawing, dimensionValue } from "../../src/drawing/compose";
 import { type DrawingData, defaultDrawingData, isRadialDimension } from "../../src/drawing/drawingData";
 import { ViewGeometryCache } from "../../src/drawing/drawingViews";
@@ -173,5 +173,35 @@ describe("automatic drawing by the rules", () => {
     test("nothing on the far sides: no extra views", () => {
         const { data } = drawingOf(shapeFactory.box(Plane.XY, 60, 40, 30).value, "plainBlock");
         expect(data.views.filter((v) => v.orientation !== "iso").length).toBe(3);
+    });
+
+    test("hand edits survive automatic runs: a deleted one stays deleted, a changed one stays the user's", () => {
+        const plate = shapeFactory.box(Plane.XY, 120, 80, 20).value;
+        const { data, cache } = drawingOf(cut(plate, cylinder(20, 20, -5, 5, 30)), "edits");
+        const count = data.dimensions.length;
+        // delete one automatic dimension the way the editor does
+        const gone = data.dimensions.find(
+            (d) => !isRadialDimension(d) && Math.abs(dimensionValue(d) - 120) < 1e-6,
+        )!;
+        data.suppressed = [dimensionKey(data, gone)!];
+        data.dimensions = data.dimensions.filter((d) => d !== gone);
+        // change another: moved and retexted, it is the user's now
+        const mine = data.dimensions.find((d) => isRadialDimension(d))!;
+        mine.auto = undefined;
+        mine.textOverride = "Ø10H7";
+        autoDimension(data, "part", cache);
+        expect(data.dimensions.length).toBe(count - 1);
+        expect(
+            data.dimensions.some((d) => !isRadialDimension(d) && Math.abs(dimensionValue(d) - 120) < 1e-6),
+        ).toBe(false);
+        expect(data.dimensions.filter((d) => isRadialDimension(d)).map((d) => d.textOverride)).toEqual([
+            "Ø10H7",
+        ]);
+        // a full rebuild keeps the user's dimension too, on the new view looking the same way
+        autoDrawing(data, "part", cache);
+        const kept = data.dimensions.filter((d) => d.textOverride === "Ø10H7");
+        expect(kept.length).toBe(1);
+        expect(data.views.some((v) => v.id === kept[0].viewId)).toBe(true);
+        expect(data.dimensions.filter((d) => isRadialDimension(d)).length).toBe(1);
     });
 });

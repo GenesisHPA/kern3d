@@ -270,7 +270,7 @@ export const DrawingRibbonProfiles: RibbonProfileExtra[] = [
         groups: [
             {
                 groupName: "ribbon.group.drawing",
-                items: ["drawing.create", "drawing.open"],
+                items: ["drawing.create", "drawing.createEmpty", "drawing.open"],
             },
         ],
     },

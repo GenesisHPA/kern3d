@@ -76,6 +76,8 @@ export interface SectionData {
      * labelled — neither the title nor the plane's trace is drawn.
      */
     unlabeled?: boolean;
+    /** The user set `unlabeled` by hand: automatic runs leave it as it is. */
+    fixedLabel?: boolean;
 }
 
 export interface DrawingViewData {
@@ -162,6 +164,8 @@ export interface DrawingData {
     views: DrawingViewData[];
     dimensions: DrawingDimensionData[];
     notes: DrawingNoteData[];
+    /** Automatic dimensions the user deleted (their keys): automatic runs do not bring them back. */
+    suppressed?: string[];
 }
 
 export function defaultDrawingData(): DrawingData {
@@ -228,6 +232,7 @@ function parseSection(raw: unknown): SectionData | undefined {
         offset: r["offset"],
         name: typeof r["name"] === "string" ? r["name"] : "А",
         unlabeled: r["unlabeled"] === true ? true : undefined,
+        fixedLabel: r["fixedLabel"] === true ? true : undefined,
     };
 }
 
@@ -317,6 +322,9 @@ export function parseDrawingData(json: string | undefined): DrawingData {
         views: parseList(raw["views"], parseView),
         dimensions: parseList(raw["dimensions"], parseDimension),
         notes: parseList(raw["notes"], parseNote),
+        suppressed: Array.isArray(raw["suppressed"])
+            ? (raw["suppressed"] as unknown[]).filter((x): x is string => typeof x === "string")
+            : undefined,
     };
 }
 

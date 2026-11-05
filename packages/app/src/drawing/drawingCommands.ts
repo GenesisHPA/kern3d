@@ -41,7 +41,7 @@ async function pickBody(document: IDocument): Promise<ShapeNode | undefined> {
  * in first-angle projection, cut where holes run across them, with centre lines and
  * dimensions, at the largest standard scale that fits.
  */
-export function createDrawingOf(document: IDocument, body: ShapeNode): DrawingNode {
+export function createDrawingOf(document: IDocument, body: ShapeNode, auto = true): DrawingNode {
     const name = NodeUtils.generateName(document, I18n.translate("drawing.defaultName"));
     const node = new DrawingNode({ document, name });
     const data = node.data;
@@ -50,8 +50,10 @@ export function createDrawingOf(document: IDocument, body: ShapeNode): DrawingNo
         month: "2-digit",
         year: "2-digit",
     });
-    const cache = new ViewGeometryCache((id) => resolveSource(document, id));
-    autoDrawing(data, body.id, cache);
+    if (auto) {
+        const cache = new ViewGeometryCache((id) => resolveSource(document, id));
+        autoDrawing(data, body.id, cache);
+    }
     node.setData(data);
     return node;
 }
@@ -71,6 +73,30 @@ export class CreateDrawing implements ICommand {
             return;
         }
         const node = createDrawingOf(document, body);
+        Transaction.execute(document, "drawing.create", () => document.modelManager.addNode(node));
+        DrawingEditor.open(node);
+    }
+}
+
+/**
+ * A drawing to make by hand: the sheet and its title block for the picked body, no views —
+ * they, the cuts and the dimensions are placed in the drawing editor (its source list holds
+ * the body, "Авточертёж" still fills the sheet when wanted).
+ */
+@command({
+    key: "drawing.createEmpty",
+    icon: "icon-file-plus",
+})
+export class CreateEmptyDrawing implements ICommand {
+    async execute(app: IApplication): Promise<void> {
+        const document = app.activeView?.document;
+        if (document === undefined) return;
+        const body = await pickBody(document);
+        if (body === undefined) {
+            PubSub.default.pub("showToast", "toast.drawing.selectBody");
+            return;
+        }
+        const node = createDrawingOf(document, body, false);
         Transaction.execute(document, "drawing.create", () => document.modelManager.addNode(node));
         DrawingEditor.open(node);
     }

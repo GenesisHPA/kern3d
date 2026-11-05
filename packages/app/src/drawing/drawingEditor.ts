@@ -12,7 +12,7 @@ import {
     type WorkspaceTab,
     workspaceTabs,
 } from "@chili3d/core";
-import { autoDimension, autoDrawing, sectionThrough, settleSectionLabels } from "./autoDrawing";
+import { autoDimension, autoDrawing, dimensionKey, sectionThrough, settleSectionLabels } from "./autoDrawing";
 import {
     composeDrawing,
     fromSheet,
@@ -602,7 +602,13 @@ export class DrawingEditor {
         if (owner === undefined) return;
         const [kind, id] = owner.split(":");
         if (kind === "view") removeView(this.data, id);
-        if (kind === "dim") this.data.dimensions = this.data.dimensions.filter((d) => d.id !== id);
+        if (kind === "dim") {
+            const dim = this.data.dimensions.find((d) => d.id === id);
+            const key = dim?.auto ? dimensionKey(this.data, dim) : undefined;
+            if (key !== undefined)
+                this.data.suppressed = [...new Set([...(this.data.suppressed ?? []), key])];
+            this.data.dimensions = this.data.dimensions.filter((d) => d.id !== id);
+        }
         if (kind === "note") this.data.notes = this.data.notes.filter((n) => n.id !== id);
         this.selection = undefined;
         this.commit();
@@ -742,7 +748,14 @@ export class DrawingEditor {
         if (this.svg.hasPointerCapture(e.pointerId)) this.svg.releasePointerCapture(e.pointerId);
         const drag = this.drag;
         this.drag = undefined;
-        if (drag?.kind === "owner" && drag.moved) this.commit();
+        if (drag?.kind === "owner" && drag.moved) {
+            // a dimension placed by hand is the user's: automatic runs keep it where it is
+            if (drag.owner.startsWith("dim:")) {
+                const dim = this.data.dimensions.find((d) => d.id === drag.owner.slice(4));
+                if (dim !== undefined) dim.auto = undefined;
+            }
+            this.commit();
+        }
     };
 
     private readonly onWheel = (e: WheelEvent) => {
@@ -1013,6 +1026,10 @@ export class DrawingEditor {
             addProjected: (parentId: string, side: ProjectionSide) => this.addProjected(parentId, side),
             addIsometric: (parentId: string) => this.addIsometric(parentId),
             setSection: (viewId: string, on: boolean) => this.setSection(viewId, on),
+            restoreAuto: () => {
+                this.data.suppressed = undefined;
+                this.autoDimensions();
+            },
             remove: () => this.deleteSelection(),
         };
     }
