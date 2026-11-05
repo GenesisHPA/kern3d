@@ -158,7 +158,10 @@ describe("commitBooleanTargets", () => {
         const bodies = doc.modelManager.findNodes((node) => node instanceof ParametricBodyNode);
         expect(bodies).toHaveLength(1);
         // No body to combine with, so no operation to store: the feature stands alone.
-        expect((bodies[0] as ParametricBodyNode).features[0]).toEqual(feature);
+        expect((bodies[0] as ParametricBodyNode).features[0]).toEqual({
+            ...feature,
+            createdAt: expect.any(Number),
+        });
         expect((bodies[0] as ParametricBodyNode).features[0]).not.toHaveProperty("operation");
     });
 
@@ -168,7 +171,9 @@ describe("commitBooleanTargets", () => {
         standaloneBody(doc, feature);
 
         const bodies = doc.modelManager.findNodes((node) => node instanceof ParametricBodyNode);
-        expect((bodies[0] as ParametricBodyNode).features).toEqual([feature]);
+        expect((bodies[0] as ParametricBodyNode).features).toEqual([
+            { ...feature, createdAt: expect.any(Number) },
+        ]);
     });
 });
 

@@ -12,6 +12,7 @@ import { createMockDocument } from "./_helpers/propertyTestHelpers";
 import "./_helpers/cssMocks";
 import "./_helpers/mockElement";
 import "./_helpers/mockCoreProperty";
+import { PubSubMock } from "./_helpers/coreMocks";
 
 rs.mock("../src/property/featureListProperty.module.css", () => ({
     root: "fl-root",
@@ -83,8 +84,7 @@ function featureNode(parameters: FeatureItem["parameters"], item?: Partial<Featu
 }
 
 function expandFirstRow(prop: FeatureListProperty) {
-    const header = mustQuery<HTMLElement>(prop, ".fl-header");
-    (header as unknown as { _onclick: () => void })._onclick();
+    prop.expandFeature(prop.node.featureItems()[0].id);
 }
 
 function openMenu(prop: FeatureListProperty) {
@@ -108,15 +108,39 @@ describe("FeatureListProperty", () => {
         showDialogMock.clear();
     });
 
-    test("renders rows collapsed and expands them on header click", () => {
+    test("renders rows collapsed; a header click opens the feature in the edit panel", () => {
         const doc = createMockDocument();
         const node = featureNode([{ key: "length", display: "common.name", value: 12 }]);
         const prop = new FeatureListProperty(doc, node);
+        const calls: unknown[][] = [];
+        // the module under test sees the core mock's PubSub
+        const original = PubSubMock.default.pub;
+        PubSubMock.default.pub = ((...args: unknown[]) => calls.push(args)) as typeof original;
+        try {
+            expect(prop.querySelector(".fl-param")).toBeNull();
+            const header = mustQuery<HTMLElement>(prop, ".fl-header");
+            (header as unknown as { _onclick: () => void })._onclick();
+            expect(calls).toContainEqual(["editFeature", node, node.featureItems()[0].id]);
+            expect(prop.querySelector(".fl-param")).toBeNull();
+        } finally {
+            PubSubMock.default.pub = original;
+        }
+    });
 
-        expect(prop.querySelector(".fl-param")).toBeNull();
+    test("single mode shows only that feature's parameters", () => {
+        const doc = createMockDocument();
+        const node = featureNode([{ key: "length", display: "common.name", value: 12 }]);
+        const prop = new FeatureListProperty(doc, node, { single: node.featureItems()[0].id });
+        expect(prop.querySelector(".fl-header")).toBeNull();
+        expect(prop.querySelector(".fl-param")).not.toBeNull();
+    });
+
+    test("expandFeature shows the rows inline and hides them again", () => {
+        const doc = createMockDocument();
+        const node = featureNode([{ key: "length", display: "common.name", value: 12 }]);
+        const prop = new FeatureListProperty(doc, node);
         expandFirstRow(prop);
         expect(prop.querySelector(".fl-param")).not.toBeNull();
-
         expandFirstRow(prop);
         expect(prop.querySelector(".fl-param")).toBeNull();
     });
@@ -958,15 +982,14 @@ describe("FeatureListProperty", () => {
             const rows = prop.querySelectorAll(".fl-item");
 
             // f0 collapsed: nothing yet. Expand it — its body names the user ("Cut").
-            (rows[0].querySelector(".fl-header") as unknown as { _onclick: () => void })._onclick();
+            prop.expandFeature("f0");
             // The Localize labels render empty under the element mock; the dependency
             // row is identified by its clickable name spans.
             const body0 = prop.querySelectorAll(".fl-body")[0];
             const names0 = [...body0.querySelectorAll(".fl-reference")].map((x) => x.textContent);
             expect(names0).toEqual(["Cut"]);
 
-            const rows1 = prop.querySelectorAll(".fl-item");
-            (rows1[1].querySelector(".fl-header") as unknown as { _onclick: () => void })._onclick();
+            prop.expandFeature("f1");
             const body1 = prop.querySelectorAll(".fl-body")[1];
             const names1 = [...body1.querySelectorAll(".fl-reference")].map((x) => x.textContent);
             expect(names1).toEqual(["Boss"]);
@@ -974,7 +997,7 @@ describe("FeatureListProperty", () => {
 
         test("clicking a dependency name expands the target row", () => {
             const prop = new FeatureListProperty(createMockDocument(), graphNode());
-            (prop.querySelector(".fl-header") as unknown as { _onclick: () => void })._onclick();
+            prop.expandFeature("f0");
             const link = mustQuery<HTMLElement>(prop, ".fl-body .fl-reference");
             (link as unknown as { _onclick: () => void })._onclick();
 
@@ -987,7 +1010,7 @@ describe("FeatureListProperty", () => {
             (node as { featureDependencies: (id: string) => string[] }).featureDependencies = () => [];
             (node as { featureDependents: (id: string) => string[] }).featureDependents = () => [];
             const prop = new FeatureListProperty(createMockDocument(), node);
-            (prop.querySelector(".fl-header") as unknown as { _onclick: () => void })._onclick();
+            prop.expandFeature("f0");
 
             const body = mustQuery<HTMLElement>(prop, ".fl-body");
             expect(body.querySelectorAll(".fl-reference").length).toBe(0);
@@ -996,13 +1019,8 @@ describe("FeatureListProperty", () => {
         test("dependency rows reuse the render's item list instead of re-reading it per row", () => {
             const node = graphNode();
             const prop = new FeatureListProperty(createMockDocument(), node);
-            const rows = prop.querySelectorAll(".fl-item");
-            (rows[0].querySelector(".fl-header") as unknown as { _onclick: () => void })._onclick();
-            (
-                prop.querySelectorAll(".fl-item")[1].querySelector(".fl-header") as unknown as {
-                    _onclick: () => void;
-                }
-            )._onclick();
+            prop.expandFeature("f0");
+            prop.expandFeature("f1");
 
             // Three renders ran (initial + one per expansion), each fetching the items
             // once; the dependency rows read the render's own list.

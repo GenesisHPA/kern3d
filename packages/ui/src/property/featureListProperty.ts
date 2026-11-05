@@ -81,9 +81,14 @@ export class FeatureListProperty extends HTMLElement {
     /** True while the rollback bar itself is being dragged (not a feature row). */
     private draggingRollback = false;
 
+    /**
+     * `single`: show only that feature's parameters (no list, no header) — the body of the
+     * edit panel over the viewport. Without it the element is the full feature list.
+     */
     constructor(
         readonly document: IDocument,
         readonly node: INode & IFeatureListNode,
+        readonly options: { single?: string } = {},
     ) {
         super();
         const pending = pendingFocus.get(node);
@@ -119,6 +124,11 @@ export class FeatureListProperty extends HTMLElement {
         this.closeMenu();
         this.rowElements.clear();
         const items = this.node.featureItems();
+        if (this.options.single !== undefined) {
+            const item = items.find((x) => x.id === this.options.single);
+            this.replaceChildren(...(item === undefined ? [] : [this.featureBody(item, items)]));
+            return;
+        }
         // Nodes without a rollback bar (the interface's members are optional) render rows only.
         if (this.node.setRollbackBar === undefined) {
             this.replaceChildren(...items.map((item) => this.featureRow(item, false, items)));
@@ -142,9 +152,18 @@ export class FeatureListProperty extends HTMLElement {
         return this.expanded.has(item.id) || item.error !== undefined;
     }
 
+    /** A feature is edited in the panel over the viewport, not inline in this list. */
     private toggleExpand(item: FeatureItem) {
-        if (this.expanded.has(item.id)) this.expanded.delete(item.id);
-        else this.expanded.add(item.id);
+        PubSub.default.pub("editFeature", this.node, item.id);
+    }
+
+    /**
+     * Shows (or hides again) a row's parameters inline. The user edits in the panel over the
+     * viewport; this stays for a jump to a dependency and for callers that need the rows.
+     */
+    expandFeature(featureId: string) {
+        if (this.expanded.has(featureId)) this.expanded.delete(featureId);
+        else this.expanded.add(featureId);
         this.renderItems();
     }
 

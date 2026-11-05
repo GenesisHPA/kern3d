@@ -91,11 +91,13 @@ class InstanceVisual extends (VisualNode as unknown as new () => object) {
     }
 }
 
-/** Expands every feature row by clicking its header (the row's first child). */
+/** Shows every feature row's parameters inline (editing itself happens in the edit panel). */
 function expandRows(list: Element) {
-    for (const row of Array.from(list.children)) {
-        (row.firstElementChild as unknown as { _onclick?: () => void })?._onclick?.();
-    }
+    const prop = list as unknown as {
+        node: { featureItems(): readonly { id: string }[] };
+        expandFeature(id: string): void;
+    };
+    for (const item of prop.node.featureItems()) prop.expandFeature(item.id);
 }
 
 /** Opens the first row's "⋯" menu and returns it (appended to document.body). */

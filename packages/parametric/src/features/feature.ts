@@ -48,6 +48,12 @@ export interface FeatureBase {
     readonly suppressBy?: { readonly variable: string; readonly invert?: boolean };
     /** User-assigned display name, overriding the kind's default in the feature panel. */
     readonly name?: string;
+    /**
+     * When the feature was added (ms since epoch, unique within the session), stamped by the
+     * body that first stores it. Orders the document-wide timeline across bodies; a feature
+     * from an older file has none and sorts first. Optional, so older files load unchanged.
+     */
+    readonly createdAt?: number;
 }
 
 /** Union of all feature payloads; grows as new feature kinds are added. */

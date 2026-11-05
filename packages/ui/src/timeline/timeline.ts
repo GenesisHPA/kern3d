@@ -17,7 +17,7 @@ import {
     PubSub,
     Transaction,
 } from "@chili3d/core";
-import { div, input, option, select, span, svg } from "@chili3d/element";
+import { div, input, span, svg } from "@chili3d/element";
 import { glyph } from "../glyphs";
 import { DropdownController } from "../ribbon/dropdownController";
 import style from "./timeline.module.css";
@@ -42,14 +42,6 @@ export function featureBodies(document: IDocument): FeatureListBody[] {
     return result;
 }
 
-/** The body a selected node belongs to: itself, or the body that consumed it as a tool. */
-function owningBody(node: INode): FeatureListBody | undefined {
-    for (let current: INode | undefined = node; current; current = current.parent) {
-        if (isBody(current)) return current;
-    }
-    return undefined;
-}
-
 /** The rollback position one step from `bar` (undefined = after the last feature). */
 export function stepBar(bar: number | undefined, count: number, step: -1 | 1): number | undefined {
     const position = bar ?? count;
@@ -57,21 +49,55 @@ export function stepBar(bar: number | undefined, count: number, step: -1 | 1): n
     return next >= count ? undefined : next;
 }
 
+/** One operation on the document-wide strip: the feature and the body it belongs to. */
+export interface TimelineEntry {
+    readonly body: FeatureListBody;
+    readonly item: FeatureItem;
+    /** The feature's index in its own body's list (what the body's rollback bar counts). */
+    readonly index: number;
+}
+
 /**
- * The design history strip under the canvas: the features of one parametric body as icons in
- * build order, a rollback marker that can be dragged between them, and playback buttons that
- * step it. Double-click (or "Edit") opens the feature in the property panel, right-click gives
- * the feature's actions. The body is the selected one (or the one owning a selected tool), else
- * the first of the document, and the picker beside the strip switches it.
+ * Every body's features as one strip, in the order they were made. Each body's own order is
+ * kept (a k-way merge on the heads), and the creation time decides between bodies; features
+ * from older files carry none and go first, in document order.
+ */
+export function mergeTimeline(bodies: readonly FeatureListBody[]): TimelineEntry[] {
+    const lists = bodies.map((body) => ({ body, items: body.featureItems(), next: 0 }));
+    const merged: TimelineEntry[] = [];
+    for (;;) {
+        let pick: (typeof lists)[number] | undefined;
+        for (const list of lists) {
+            if (list.next >= list.items.length) continue;
+            const key = list.items[list.next].createdAt ?? 0;
+            const best = pick === undefined ? Infinity : (pick.items[pick.next].createdAt ?? 0);
+            if (key < best) pick = list;
+        }
+        if (pick === undefined) return merged;
+        merged.push({ body: pick.body, item: pick.items[pick.next], index: pick.next });
+        pick.next++;
+    }
+}
+
+function isRolledBack(entry: TimelineEntry): boolean {
+    const bar = entry.body.rollbackBarIndex;
+    return bar !== undefined && entry.index >= bar;
+}
+
+/**
+ * The design history strip under the canvas: every operation of the document — all bodies —
+ * as icons in the order they were made, one rollback marker that can be dragged between them,
+ * and playback buttons that step it. Moving the marker rolls each body back to the operations
+ * left of it. Double-click (or "Edit") opens the operation in the edit panel over the viewport;
+ * right-click gives the operation's actions.
  *
- * The strip is rebuilt only when the body's feature list or rollback bar changes — a parameter
- * typed into the panel rewrites `featuresJson` once per edit, never per keystroke of another
- * property.
+ * The strip is rebuilt only when a body's feature list or rollback bar changes, or a body
+ * comes or goes.
  */
 export class Timeline extends HTMLElement {
     private document?: IDocument;
-    private body?: FeatureListBody;
-    private readonly picker = select({ className: style.picker, title: I18n.translate("timeline.body") });
+    private bodies: FeatureListBody[] = [];
+    private entries: TimelineEntry[] = [];
     private readonly strip = div({ className: style.strip });
     private readonly marker = div({ className: style.marker, title: I18n.translate("timeline.marker") });
     private readonly empty = span({ className: style.empty, textContent: new Localize("timeline.empty") });
@@ -82,7 +108,6 @@ export class Timeline extends HTMLElement {
     constructor(readonly app: IApplication) {
         super();
         this.className = style.root;
-        this.picker.addEventListener("change", this.onPick);
         this.marker.dataset["marker"] = "rollback";
         this.marker.addEventListener("pointerdown", this.onMarkerDown);
         this.append(
@@ -93,7 +118,6 @@ export class Timeline extends HTMLElement {
                 this.button("stepForward", "timeline.stepForward", () => this.step(1)),
                 this.button("toEnd", "timeline.toEnd", () => this.moveBar(undefined)),
             ),
-            this.picker,
             this.strip,
         );
         this.render();
@@ -109,8 +133,9 @@ export class Timeline extends HTMLElement {
         this.setDocument(undefined);
     }
 
-    get currentBody() {
-        return this.body;
+    /** The operations on the strip, in strip order. */
+    get timelineEntries(): readonly TimelineEntry[] {
+        return this.entries;
     }
 
     private button(name: Parameters<typeof glyph>[0], tip: I18nKeys, onclick: () => void) {
@@ -126,94 +151,67 @@ export class Timeline extends HTMLElement {
 
     private setDocument(document: IDocument | undefined) {
         if (document === this.document) return;
-        if (this.document) {
-            this.document.selection.onNodeChanged.remove(this.onSelectionChanged);
-            this.document.modelManager.removeNodeObserver(this.onNodesChanged);
-        }
+        this.document?.modelManager.removeNodeObserver(this.onNodesChanged);
         this.document = document;
-        if (document) {
-            document.selection.onNodeChanged.sub(this.onSelectionChanged);
-            document.modelManager.addNodeObserver(this.onNodesChanged);
-        }
-        this.setBody(document ? featureBodies(document).at(0) : undefined);
+        document?.modelManager.addNodeObserver(this.onNodesChanged);
+        this.watchBodies(document ? featureBodies(document) : []);
     }
 
-    setBody(body: FeatureListBody | undefined) {
-        if (body !== this.body) {
-            this.body?.removePropertyChanged(this.onBodyChanged);
-            this.body = body;
-            this.body?.onPropertyChanged(this.onBodyChanged);
-        }
-        this.renderPicker();
+    /** Follows exactly the document's bodies: their lists and bars redraw the strip. */
+    private watchBodies(bodies: FeatureListBody[]) {
+        for (const body of this.bodies) body.removePropertyChanged(this.onBodyChanged);
+        this.bodies = bodies;
+        for (const body of this.bodies) body.onPropertyChanged(this.onBodyChanged);
         this.render();
     }
 
-    private readonly onSelectionChanged = (selected: INode[]) => {
-        const body = selected.map(owningBody).find((b) => b !== undefined);
-        if (body !== undefined && body !== this.body) this.setBody(body);
-    };
-
-    /** A body added or removed changes the picker; the shown one going away picks another. */
     private readonly onNodesChanged = (_records: NodeRecord[]) => {
-        if (!this.document) return;
-        const bodies = featureBodies(this.document);
-        if (this.body === undefined || !bodies.includes(this.body)) this.setBody(bodies.at(0));
-        else this.renderPicker();
+        if (this.document) this.watchBodies(featureBodies(this.document));
     };
 
     private readonly onBodyChanged = (property: string) => {
         if (property === "featuresJson" || property === "rollbackBarIndex") this.render();
-        else if (property === "name") this.renderPicker();
     };
 
-    private readonly onPick = () => {
-        if (!this.document) return;
-        const bodies = featureBodies(this.document);
-        this.setBody(bodies[Number(this.picker.value)]);
-    };
-
-    private renderPicker() {
-        const bodies = this.document ? featureBodies(this.document) : [];
-        this.picker.replaceChildren(
-            ...bodies.map((body, index) =>
-                option({ value: `${index}`, textContent: body.name, selected: body === this.body }),
-            ),
-        );
-        this.picker.style.display = bodies.length > 1 ? "" : "none";
+    /** The gap the marker sits in: before the first rolled-back operation, else at the end. */
+    private markerGap(): number {
+        const first = this.entries.findIndex(isRolledBack);
+        return first < 0 ? this.entries.length : first;
     }
 
-    /** Rebuilds the strip: one icon per feature and the marker at the bar's gap. */
+    /** Rebuilds the strip: one icon per operation and the marker at its gap. */
     render() {
-        const body = this.body;
-        if (body === undefined) {
+        this.entries = mergeTimeline(this.bodies);
+        if (this.entries.length === 0) {
             this.strip.replaceChildren(this.empty);
             return;
         }
-        const items = body.featureItems();
-        const bar = this.dragIndex ?? body.rollbackBarIndex ?? items.length;
-        const children: HTMLElement[] = items.map((item, index) =>
-            this.featureIcon(item, index, index >= bar),
+        const gap = this.dragIndex ?? this.markerGap();
+        const children: HTMLElement[] = this.entries.map((entry, index) =>
+            this.featureIcon(entry, index, this.dragIndex === undefined ? isRolledBack(entry) : index >= gap),
         );
-        children.splice(Math.min(bar, items.length), 0, this.marker);
-        this.marker.style.display = body.setRollbackBar === undefined ? "none" : "";
+        children.splice(Math.min(gap, this.entries.length), 0, this.marker);
+        this.marker.style.display = this.bodies.some((b) => b.setRollbackBar !== undefined) ? "" : "none";
         this.strip.replaceChildren(...children);
     }
 
-    private featureIcon(item: FeatureItem, index: number, rolledBack: boolean) {
+    private featureIcon(entry: TimelineEntry, index: number, rolledBack: boolean) {
+        const item = entry.item;
         let className = style.feature;
         if (rolledBack) className += ` ${style.rolledBack}`;
         if (item.suppressed || item.suppressedByVariable) className += ` ${style.suppressed}`;
         if (item.error !== undefined) className += ` ${style.error}`;
         else if (item.warning !== undefined) className += ` ${style.warning}`;
         const name = item.name || I18n.translate(item.display);
+        const owner = this.bodies.length > 1 ? ` — ${entry.body.name}` : "";
         const element = div({
             className,
-            title: `${index + 1}. ${name}${item.error ? `\n${item.error}` : ""}`,
-            ondblclick: () => this.edit(item),
+            title: `${index + 1}. ${name}${owner}${item.error ? `\n${item.error}` : ""}`,
+            ondblclick: () => this.edit(entry),
             oncontextmenu: (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.openMenu(item, index, e.currentTarget as HTMLElement);
+                this.openMenu(entry, index, e.currentTarget as HTMLElement);
             },
         });
         element.dataset["feature"] = item.id;
@@ -225,56 +223,63 @@ export class Timeline extends HTMLElement {
         return element;
     }
 
-    edit(item: FeatureItem) {
-        const body = this.body;
-        if (body === undefined) return;
-        PubSub.default.pub("focusFeature", body, item.id);
-        this.document?.selection.setSelectedNodes([body], false);
+    /** Opens the operation in the edit panel over the viewport. */
+    edit(entry: TimelineEntry) {
+        PubSub.default.pub("editFeature", entry.body, entry.item.id);
     }
 
-    private transact(name: string, action: (body: FeatureListBody) => void) {
-        const body = this.body;
+    private transact(name: string, action: () => void) {
         const document = this.document;
-        if (body === undefined || document === undefined) return;
-        Transaction.execute(document, name, () => action(body));
+        if (document === undefined) return;
+        Transaction.execute(document, name, action);
         document.visual.update();
     }
 
+    /**
+     * Puts the marker in gap `index` of the strip (undefined = the end): every body is rolled
+     * back to the operations of its own left of the gap, in one undo step.
+     */
     moveBar(index: number | undefined) {
-        const body = this.body;
-        if (body?.setRollbackBar === undefined) return;
-        const count = body.featureItems().length;
-        const next = index === undefined || index >= count ? undefined : Math.max(0, index);
-        if (next === body.rollbackBarIndex) return;
-        this.transact("move rollback bar", (b) => b.setRollbackBar?.(next));
+        const gap =
+            index === undefined ? this.entries.length : Math.max(0, Math.min(index, this.entries.length));
+        const changes: [FeatureListBody, number | undefined][] = [];
+        for (const body of this.bodies) {
+            if (body.setRollbackBar === undefined) continue;
+            const kept = this.entries.slice(0, gap).filter((entry) => entry.body === body).length;
+            const total = this.entries.filter((entry) => entry.body === body).length;
+            const bar = kept >= total ? undefined : kept;
+            if (bar !== body.rollbackBarIndex) changes.push([body, bar]);
+        }
+        if (changes.length === 0) return;
+        this.transact("move rollback bar", () => {
+            for (const [body, bar] of changes) body.setRollbackBar?.(bar);
+        });
     }
 
     step(direction: -1 | 1) {
-        const body = this.body;
-        if (body === undefined) return;
-        this.moveBar(stepBar(body.rollbackBarIndex, body.featureItems().length, direction));
+        const count = this.entries.length;
+        this.moveBar(stepBar(this.markerGap() >= count ? undefined : this.markerGap(), count, direction));
     }
 
-    private openMenu(item: FeatureItem, index: number, anchor: HTMLElement) {
-        const body = this.body;
-        if (body === undefined) return;
+    private openMenu(entry: TimelineEntry, index: number, anchor: HTMLElement) {
+        const { body, item } = entry;
         const suppressed = item.suppressed === true;
         const entries: [string, I18nKeys, () => void][] = [
-            ["icon-edit", "timeline.edit", () => this.edit(item)],
+            ["icon-edit", "timeline.edit", () => this.edit(entry)],
             ["icon-history", "timeline.rollHere", () => this.moveBar(index + 1)],
             [
                 suppressed ? "icon-eye" : "icon-eye-slash",
                 suppressed ? "timeline.unsuppress" : "timeline.suppress",
-                () => this.transact("toggle feature", (b) => b.setFeatureSuppressed(item.id, !suppressed)),
+                () => this.transact("toggle feature", () => body.setFeatureSuppressed(item.id, !suppressed)),
             ],
         ];
         if (body.renameFeature !== undefined) {
-            entries.push(["icon-tag", "common.rename", () => this.rename(item)]);
+            entries.push(["icon-tag", "common.rename", () => this.rename(entry)]);
         }
         entries.push([
             "icon-trash",
             "common.delete",
-            () => this.transact("remove feature", (b) => b.removeFeature(item.id)),
+            () => this.transact("remove feature", () => body.removeFeature(item.id)),
         ]);
         this.menu.open(anchor, (menu) => {
             for (const [icon, label, run] of entries) {
@@ -301,18 +306,19 @@ export class Timeline extends HTMLElement {
         });
     }
 
-    private rename(item: FeatureItem) {
+    private rename(entry: TimelineEntry) {
+        const { body, item } = entry;
         const box = input({ value: item.name ?? I18n.translate(item.display) });
         box.addEventListener("keydown", (e) => e.stopPropagation());
         PubSub.default.pub("showDialog", "common.rename", box, () => {
-            this.transact("rename feature", (b) => b.renameFeature?.(item.id, box.value.trim()));
+            this.transact("rename feature", () => body.renameFeature?.(item.id, box.value.trim()));
         });
     }
 
     // --- marker drag ---
 
     private readonly onMarkerDown = (e: PointerEvent) => {
-        if (e.button !== 0 || this.body?.setRollbackBar === undefined) return;
+        if (e.button !== 0 || !this.bodies.some((b) => b.setRollbackBar !== undefined)) return;
         e.preventDefault();
         // The strip holds the capture: the marker itself is re-inserted as it moves, and a
         // node leaving the DOM loses its pointer capture.

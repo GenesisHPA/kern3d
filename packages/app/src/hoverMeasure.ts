@@ -42,7 +42,9 @@ export function edgeReadout(edge: IEdge): string | undefined {
 
 /** The radius of a cylindrical surface (unwrapping a trimmed one), read structurally. */
 function cylinderRadius(surface: ISurface): number | undefined {
-    const s = surface as unknown as Record<string, unknown>;
+    const s = surface as unknown as Partial<
+        Record<"radius" | "axis" | "semiAngle" | "majorRadius" | "area", unknown>
+    >;
     const isCylinder =
         typeof s.radius === "number" &&
         s.axis !== undefined &&

@@ -15,19 +15,20 @@ import {
 } from "@chili3d/core";
 import { createMockSelection, TestDocument } from "@chili3d/core/test-utils";
 import { afterEach, describe, expect, test } from "@rstest/core";
-import { featureBodies, stepBar, Timeline } from "../src/timeline/timeline";
+import { featureBodies, mergeTimeline, stepBar, Timeline } from "../src/timeline/timeline";
 
 /** A parametric body stand-in: a feature list it can edit and a rollback bar. */
 class FakeBody extends VisualNode implements IFeatureListNode {
     items: FeatureItem[];
     renders = 0;
 
-    constructor(document: IDocument, name: string, count: number) {
+    constructor(document: IDocument, name: string, count: number, createdAt?: number[], prefix = "f") {
         super(document, name, `${name}-id`);
         this.items = Array.from({ length: count }, (_, i) => ({
-            id: `f${i}`,
+            id: `${prefix}${i}`,
             display: "common.ok" as I18nKeys,
             name: `feature ${i}`,
+            createdAt: createdAt?.[i],
             parameters: [],
         }));
     }
@@ -103,9 +104,8 @@ describe("stepBar", () => {
 });
 
 describe("Timeline", () => {
-    test("shows the document's body: one icon per feature and the marker at the end", () => {
-        const { timeline, body } = setup(3);
-        expect(timeline.currentBody).toBe(body);
+    test("shows the document's operations: one icon per feature and the marker at the end", () => {
+        const { timeline } = setup(3);
         expect(icons(timeline)).toEqual(["f0", "f1", "f2"]);
         expect(strip(timeline).at(-1)).toBe("|");
     });
@@ -149,39 +149,60 @@ describe("Timeline", () => {
         expect(icons(timeline)).toEqual(["f0", "f2"]);
     });
 
-    test("double-click asks the panel to open the feature and selects the body", () => {
-        const { timeline, body, doc } = setup(2);
-        const focused: [INode, string][] = [];
-        const record = (node: INode, id: string) => focused.push([node, id]);
-        const selected: INode[][] = [];
-        doc.selection.setSelectedNodes = (nodes: INode[]) => {
-            selected.push(nodes);
-            return nodes.length;
-        };
-        PubSub.default.sub("focusFeature", record);
+    test("double-click opens the operation in the edit panel", () => {
+        const { timeline, body } = setup(2);
+        const opened: [INode, string][] = [];
+        const record = (node: INode, id: string) => opened.push([node, id]);
+        PubSub.default.sub("editFeature", record);
         try {
             timeline.querySelector('[data-feature="f1"]')!.dispatchEvent(new MouseEvent("dblclick"));
-            expect(focused).toEqual([[body, "f1"]]);
-            expect(selected).toEqual([[body]]);
+            expect(opened).toEqual([[body, "f1"]]);
         } finally {
-            PubSub.default.remove("focusFeature", record);
+            PubSub.default.remove("editFeature", record);
         }
     });
 
-    test("selecting another body switches the strip to it", () => {
-        const { timeline, doc } = setup(2);
-        const other = new FakeBody(doc, "other", 1);
+    test("every body's operations are on one strip, in the order they were made", () => {
+        const { timeline, doc, body } = setup(0);
+        body.items = new FakeBody(doc, "tmp", 2, [10, 30]).items;
+        const other = new FakeBody(doc, "other", 2, [20, 40], "g");
         doc.modelManager.rootNode.add(other);
         expect(featureBodies(doc).length).toBe(2);
-        doc.selection.onNodeChanged.emit([other]);
-        expect(timeline.currentBody).toBe(other);
-        expect(icons(timeline)).toEqual(["f0"]);
+        timeline.render();
+        expect(icons(timeline)).toEqual(["f0", "g0", "f1", "g1"]);
     });
 
-    test("the body going away picks the next one, or shows the hint", () => {
+    test("the marker rolls every body back to its operations left of it, in one step", () => {
+        const { timeline, doc, body } = setup(0);
+        body.items = new FakeBody(doc, "tmp", 2, [10, 30]).items;
+        const other = new FakeBody(doc, "other", 2, [20, 40], "g");
+        doc.modelManager.rootNode.add(other);
+        timeline.render();
+        timeline.moveBar(2); // after f0, g0
+        expect(body.rollbackBarIndex).toBe(1);
+        expect(other.rollbackBarIndex).toBe(1);
+        expect(strip(timeline)).toEqual(["f0", "g0", "|", "f1", "g1"]);
+        timeline.moveBar(undefined);
+        expect(body.rollbackBarIndex).toBeUndefined();
+        expect(other.rollbackBarIndex).toBeUndefined();
+    });
+
+    test("a body going away leaves the others on the strip, or the hint", () => {
         const { timeline, doc, body } = setup(2);
+        const other = new FakeBody(doc, "other", 1, undefined, "g");
+        doc.modelManager.rootNode.add(other);
         doc.modelManager.rootNode.remove(body);
-        expect(timeline.currentBody).toBeUndefined();
+        expect(icons(timeline)).toEqual(["g0"]);
+        doc.modelManager.rootNode.remove(other);
         expect(icons(timeline)).toEqual([]);
+    });
+});
+
+describe("mergeTimeline", () => {
+    test("keeps each body's own order and puts unstamped (old) features first", () => {
+        const doc = new TestDocument({});
+        const a = new FakeBody(doc, "a", 2, [undefined as never, 50]);
+        const b = new FakeBody(doc, "b", 1, [5], "g");
+        expect(mergeTimeline([a, b]).map((e) => e.item.id)).toEqual(["f0", "g0", "f1"]);
     });
 });

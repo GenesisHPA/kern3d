@@ -1075,7 +1075,7 @@ export default {
         "browser.plane.xz": "XZ plane",
         "browser.plane.yz": "YZ plane",
         "browser.plane.lookAt": "Click to look at the plane",
-        "timeline.empty": "Select a parametric body to see its history",
+        "timeline.empty": "No operations yet: create a sketch or a body",
         "timeline.toStart": "Go to start",
         "timeline.stepBack": "Step back",
         "timeline.stepForward": "Step forward",

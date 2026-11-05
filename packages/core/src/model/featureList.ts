@@ -110,6 +110,8 @@ export interface FeatureMissingInput {
 export interface FeatureItem {
     readonly id: string;
     readonly display: I18nKeys;
+    /** When the feature was added (see `FeatureBase.createdAt`) — the timeline's cross-body order. */
+    readonly createdAt?: number;
     /** User-assigned name; the panel shows it instead of `display` when set. */
     readonly name?: string;
     /** Iconfont key shown before the display name (e.g. "icon-fillet"). */

@@ -139,7 +139,9 @@ const primitiveHandler: FeatureHandler<PrimitiveFeatureData> = {
             };
         }
         const radiusKey = DIAMETER_KEYS[key];
-        if (radiusKey !== undefined) return { ...feature, [radiusKey]: halfOf(value) };
+        if (radiusKey !== undefined) {
+            return typeof value === "boolean" ? feature : { ...feature, [radiusKey]: halfOf(value) };
+        }
         return SIZE_KEYS.includes(key) ? { ...feature, [key]: value } : feature;
     },
 

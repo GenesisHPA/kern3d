@@ -62,6 +62,8 @@ export interface PubSubEventMap {
      * timeline's double-click, which selects the body and lands on the feature's parameters.
      */
     focusFeature: (node: INode, featureId: string) => void;
+    /** Opens a feature's parameters in the edit panel over the viewport (OK keeps, Cancel undoes). */
+    editFeature: (node: INode, featureId: string) => void;
     loggerError: (message: unknown, optionalParams: unknown[]) => void;
     modelUpdate: (model: INode) => void;
     nodeDoubleClicked: (node: INode) => void;

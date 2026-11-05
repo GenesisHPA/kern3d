@@ -223,7 +223,11 @@ class Page {
             const view = globalThis.activeView;
             if (!view) return undefined;
             const p = view.worldToScreen?.({ x: ${x}, y: ${y}, z: ${z} });
-            return p ? { x: p.x, y: p.y } : undefined;
+            if (!p) return undefined;
+            // worldToScreen measures from the view's own element; the mouse events want
+            // window pixels, so the element's offset in the window is added here.
+            const box = view.dom?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
+            return { x: box.left + p.x, y: box.top + p.y };
         })()`);
         if (point === undefined) throw new Error("The view could not map a world point to the screen");
         return point;

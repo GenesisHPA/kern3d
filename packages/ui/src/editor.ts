@@ -6,6 +6,9 @@ import {
     type IApplication,
     type ICommand,
     type IDocument,
+    type IFeatureListNode,
+    type INode,
+    isFeatureListNode,
     type Material,
     PubSub,
     type Ribbon,
@@ -20,6 +23,7 @@ import { PropertyView } from "./property";
 import { MaterialDataContent, MaterialEditor } from "./property/material";
 import { showVariablesPanel } from "./property/variables";
 import { CommandContext } from "./ribbon/commandContext";
+import { FeatureEditPanel } from "./ribbon/featureEditPanel";
 import { Statusbar } from "./statusbar";
 import { Timeline } from "./timeline/timeline";
 import { MainToolbar } from "./toolbar/toolbar";
@@ -30,6 +34,7 @@ export class Editor extends HTMLElement {
     private readonly _commandContextContainer = div({});
     private _contentEl: HTMLDivElement | null = null;
     private commandContext?: CommandContext;
+    private featureEditPanel?: FeatureEditPanel;
     private chatDock?: HTMLElement;
     private chatPanel?: ChatPanel;
     private floatingChat?: FloatPanel;
@@ -51,8 +56,9 @@ export class Editor extends HTMLElement {
         const viewport = new LayoutViewport(app);
         viewport.classList.add(style.viewport);
         this._viewportContainer = div({ className: style.viewportContainer }, viewport);
+        // The assistant stays closed until asked for (its toolbar button / toggleChatPanel):
+        // a project opens onto the full viewport.
         this.render();
-        this.showChat();
     }
 
     private render() {
@@ -269,6 +275,7 @@ export class Editor extends HTMLElement {
         PubSub.default.sub("editVariables", this._handleVariablesEdit);
         PubSub.default.sub("openCommandContext", this.openContext);
         PubSub.default.sub("closeCommandContext", this.closeContext);
+        PubSub.default.sub("editFeature", this.openFeatureEdit);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
         this.markingMenu ??= new MarkingMenu(
             this.app,
@@ -283,6 +290,7 @@ export class Editor extends HTMLElement {
         PubSub.default.remove("editVariables", this._handleVariablesEdit);
         PubSub.default.remove("openCommandContext", this.openContext);
         PubSub.default.remove("closeCommandContext", this.closeContext);
+        PubSub.default.remove("editFeature", this.openFeatureEdit);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
         this.markingMenu?.dispose();
         this.markingMenu = undefined;
@@ -293,7 +301,25 @@ export class Editor extends HTMLElement {
         this.closeFloatingChat();
     }
 
+    /**
+     * A feature's parameters in the panel a command would use, at the same place. One panel at a
+     * time: a new edit or a command starting closes it (keeping what was typed, as OK does).
+     */
+    private readonly openFeatureEdit = (node: INode, featureId: string) => {
+        if (!isFeatureListNode(node)) return;
+        const document = this.app.activeView?.document;
+        if (document === undefined) return;
+        this.featureEditPanel?.ok();
+        const panel = new FeatureEditPanel(document, node as INode & IFeatureListNode, featureId, () => {
+            if (this.featureEditPanel === panel) this.featureEditPanel = undefined;
+        });
+        this.featureEditPanel = panel;
+        this._commandContextContainer.append(panel);
+        this._viewportContainer.append(this._commandContextContainer);
+    };
+
     private readonly openContext = (command: ICommand) => {
+        this.featureEditPanel?.ok();
         if (this.commandContext) {
             this.closeContext();
         }

@@ -911,7 +911,7 @@ export default {
         "browser.plane.xz": "Плоскость XZ",
         "browser.plane.yz": "Плоскость YZ",
         "browser.plane.lookAt": "Щелчок — взгляд на плоскость",
-        "timeline.empty": "Выберите параметрическое тело, чтобы увидеть историю",
+        "timeline.empty": "История пуста: создайте эскиз или тело",
         "timeline.toStart": "В начало",
         "timeline.stepBack": "Шаг назад",
         "timeline.stepForward": "Шаг вперёд",

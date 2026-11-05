@@ -177,6 +177,29 @@ function recordResolutions(resolved: ResolvedByFeature, featureId: string, step:
     if (step.unresolved !== undefined) resolved.unresolved.set(featureId, step.unresolved);
 }
 
+let lastCreationStamp = 0;
+
+/** A creation time unique within the session, so two features added in one tick still order. */
+function nextCreationStamp(): number {
+    lastCreationStamp = Math.max(Date.now(), lastCreationStamp + 1);
+    return lastCreationStamp;
+}
+
+/**
+ * The list with a creation time on every feature that is new to this body. A feature that
+ * already had one — or that replaces a stored feature of the same id that had one (an edit
+ * rebuilds the object) — keeps it, so editing never moves a feature in the timeline.
+ */
+export function stampCreation(features: FeatureData[], previous: readonly FeatureData[]): FeatureData[] {
+    const known = new Map(previous.map((f) => [f.id, f.createdAt]));
+    return features.map((feature) => {
+        if (feature.createdAt !== undefined) return feature;
+        const before = known.get(feature.id);
+        if (known.has(feature.id)) return before === undefined ? feature : { ...feature, createdAt: before };
+        return { ...feature, createdAt: nextCreationStamp() };
+    });
+}
+
 /** A body whose shape is replayed from its feature list — see the module header above. */
 @serializable()
 export class ParametricBodyNode
@@ -466,14 +489,22 @@ export class ParametricBodyNode
 
     constructor(options: ParametricBodyNodeOptions) {
         super({ document: options.document, id: options.id });
-        this.setPrivateValue("featuresJson", options.featuresJson ?? JSON.stringify(options.features ?? []));
+        // A body built from feature data (a new body) stamps its features; one restored from
+        // `featuresJson` (a file, undo) keeps exactly what was stored.
+        this.setPrivateValue(
+            "featuresJson",
+            options.featuresJson ?? JSON.stringify(stampCreation(options.features ?? [], [])),
+        );
         this.setPrivateValue("rollbackBarIndex", options.rollbackBarIndex);
         this.document.modelManager.addNodeObserver(this.handleReferencedNodeChanged);
         ensureVariableSync(options.document);
     }
 
     setFeaturesEmitShapeChanged(features: FeatureData[]): void {
-        this.setPropertyEmitShapeChanged("featuresJson", JSON.stringify(features));
+        this.setPropertyEmitShapeChanged(
+            "featuresJson",
+            JSON.stringify(stampCreation(features, this.features)),
+        );
     }
 
     protected override setPropertyEmitShapeChanged<K extends keyof this>(
@@ -550,6 +581,7 @@ export class ParametricBodyNode
             return {
                 id: feature.id,
                 name: feature.name,
+                createdAt: feature.createdAt,
                 display:
                     typeof display === "function"
                         ? display(feature)
