@@ -419,6 +419,10 @@ export default {
         "drawing.standardViews": "3 standard views",
         "drawing.auto": "Auto drawing",
         "drawing.autoDims": "Auto dimensions",
+        "drawing.featureDims": "Feature dimensions",
+        "drawing.prompt.pickFeature":
+            "Click a hole, cylinder or face on a view — its dimensions are placed by the rules",
+        "toast.drawing.noFeature": "No hole or face to dimension here",
         "drawing.view.section": "Section",
         "drawing.projectedView": "Projected view",
         "drawing.dim.horizontal": "Horizontal",

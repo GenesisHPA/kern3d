@@ -6,7 +6,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type IShape, Matrix4, Plane, XYZ } from "@chili3d/core";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
-import { autoDimension, autoDrawing, cylindersOf, dimensionKey } from "../../src/drawing/autoDrawing";
+import {
+    autoDimension,
+    autoDrawing,
+    cylindersOf,
+    dimensionKey,
+    featureDimensions,
+} from "../../src/drawing/autoDrawing";
 import { composeDrawing, dimensionValue } from "../../src/drawing/compose";
 import { type DrawingData, defaultDrawingData, isRadialDimension } from "../../src/drawing/drawingData";
 import { ViewGeometryCache } from "../../src/drawing/drawingViews";
@@ -203,5 +209,92 @@ describe("automatic drawing by the rules", () => {
         expect(kept.length).toBe(1);
         expect(data.views.some((v) => v.id === kept[0].viewId)).toBe(true);
         expect(data.dimensions.filter((d) => isRadialDimension(d)).length).toBe(1);
+    });
+
+    test("a busy part: views keep a readable scale, dimensions stay off the other views", () => {
+        const box = (x: number, y: number, z: number, dx: number, dy: number, dz: number) =>
+            shapeFactory.box(
+                new Plane({ origin: new XYZ({ x, y, z }), normal: XYZ.unitZ, xvec: XYZ.unitX }),
+                dx,
+                dy,
+                dz,
+            ).value;
+        let part = shapeFactory.booleanFuse(
+            [box(0, 0, 0, 80, 40, 30)],
+            [box(60, 5, 30, 20, 30, 25)],
+            true,
+        ).value;
+        part = shapeFactory.booleanFuse([part], [cylinder(25, 20, 30, 12, 18)], true).value;
+        const tools = [
+            box(0, 0, 20, 15, 40, 10),
+            box(40, 0, 0, 12, 8, 12),
+            cylinder(25, 20, -5, 6, 60),
+            cylinder(25, 20, 38, 9, 20),
+            cylinder(8, 8, -5, 2.5, 30),
+            cylinder(8, 32, -5, 2.5, 30),
+            cylinder(70, 20, 40, 3, 30),
+            cylinder(-5, 20, 10, 4, 100, XYZ.unitX),
+            cylinder(70, -5, 45, 3.5, 60, XYZ.unitY),
+            cylinder(48, -5, 6, 2, 20, XYZ.unitY),
+            box(30, 36, 5, 20, 10, 8),
+        ];
+        const { data, cache } = drawingOf(cut(part, ...tools), "busy");
+        const root = data.views[0];
+        // the views alone fit at 1:1 on A3; dimensions must not drive the scale below 1:2
+        expect(root.scale).toBeGreaterThanOrEqual(0.5);
+        insideFrame(data, cache);
+        // no dimension runs over another view's outline
+        const sheet = composeDrawing(data, cache.all(data));
+        const bounds = ownerBounds(sheet.primitives);
+        const rect = (v: (typeof data.views)[number]) => {
+            const b = cache.geometryOf(v)!.bounds;
+            const w = ((b.maxX - b.minX) * v.scale) / 2;
+            const h = ((b.maxY - b.minY) * v.scale) / 2;
+            return { minX: v.x - w, maxX: v.x + w, minY: v.y - h, maxY: v.y + h };
+        };
+        for (const d of data.dimensions) {
+            const r = bounds.get(`dim:${d.id}`)!;
+            for (const v of data.views) {
+                if (v.id === d.viewId) continue;
+                const o = rect(v);
+                const overlap =
+                    r.minX < o.maxX - 1 && r.maxX > o.minX + 1 && r.minY < o.maxY - 1 && r.maxY > o.minY + 1;
+                expect([d.id, v.orientation, overlap]).toEqual([d.id, v.orientation, false]);
+            }
+        }
+    });
+
+    test("feature dimensions: a clicked hole gets its Ø and position, a clicked edge its position", () => {
+        const plate = shapeFactory.box(Plane.XY, 120, 80, 20).value;
+        const cache = new ViewGeometryCache(() => ({
+            shape: cut(plate, cylinder(30, 25, -5, 5, 30)),
+            transform: Matrix4.identity(),
+        }));
+        const data = defaultDrawingData();
+        autoDrawing(data, "part", cache);
+        data.dimensions = [];
+        const top = data.views.find((v) => v.orientation === "top")!;
+        const value = (list: typeof data.dimensions) =>
+            list
+                .map(
+                    (d) =>
+                        `${d.prefix ?? ""}${isRadialDimension(d) ? "Ø" : ""}${Math.round(dimensionValue(d) * 100) / 100}`,
+                )
+                .sort();
+        // the top view sees the plate in its own frame (x, y); click just inside the hole
+        const hole = featureDimensions(data, top.id, [31, 25], cache);
+        expect(value(hole)).toEqual(["25", "30", "Ø10"]);
+        data.dimensions.push(...hole);
+        expect(featureDimensions(data, top.id, [31, 25], cache)).toEqual([]);
+        // the right edge of the plate: a base edge, so the overall width
+        const edge = featureDimensions(data, top.id, [120, 60], cache);
+        expect(value(edge)).toEqual(["120"]);
+        // stacked outside the 30 already on that side
+        data.dimensions.push(...edge);
+        const sheet = composeDrawing(data, cache.all(data));
+        const b = ownerBounds(sheet.primitives);
+        const of = (d: (typeof data.dimensions)[number]) => b.get(`dim:${d.id}`)!;
+        const thirty = hole.find((d) => !isRadialDimension(d) && Math.abs(dimensionValue(d) - 30) < 1e-6)!;
+        expect(of(edge[0]).minY).toBeLessThan(of(thirty).minY - 5);
     });
 });

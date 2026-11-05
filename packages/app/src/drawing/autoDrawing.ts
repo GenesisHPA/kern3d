@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { symmetryAxes } from "./centerMarks";
+import { linearGeometry } from "./compose";
 import {
     type DrawingData,
     type DrawingDimensionData,
@@ -21,6 +22,7 @@ import {
     viewBasisOf,
 } from "./drawingViews";
 import type { HlrInput, Polyline2, ViewGeometry } from "./hlr";
+import { pointSegmentDistance } from "./hlr";
 import { placementOf, toSheet, type ViewPlacement } from "./placement";
 import { cutTraceHost, traceOn } from "./sectionMarks";
 import { drawingArea, reservedRects } from "./sheet";
@@ -141,6 +143,24 @@ export function modelTolerance(input: HlrInput): number {
     }
     const size = Number.isFinite(lo[0]) ? Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) : 1;
     return size * 1e-5 + 1e-6;
+}
+
+/** The model's extent along each axis: [min, max] of every edge point. */
+function extentsOf(input: HlrInput): [number, number][] {
+    const result: [number, number][] = [
+        [Infinity, -Infinity],
+        [Infinity, -Infinity],
+        [Infinity, -Infinity],
+    ];
+    for (const e of input.edges) {
+        for (const p of e.points) {
+            for (let i = 0; i < 3; i++) {
+                result[i][0] = Math.min(result[i][0], p[i]);
+                result[i][1] = Math.max(result[i][1], p[i]);
+            }
+        }
+    }
+    return result;
 }
 
 /** The swept angle of a sampled arc round `center`. */
@@ -500,8 +520,22 @@ export function planDimensions(
     input: HlrInput,
     geometries: ReadonlyMap<string, ViewGeometry>,
     cylinders = cylindersOf(input),
+    mode: "full" | "basic" = "full",
 ): Planned[] {
     const tolerance = modelTolerance(input);
+    const basic = mode === "basic";
+    const extents = extentsOf(input);
+    // a turned outer surface: its diameter is the part's size across its axis
+    const outer = (c: Cylinder) =>
+        !c.concave &&
+        c.axisIndex !== undefined &&
+        [0, 1, 2]
+            .filter((i) => i !== c.axisIndex)
+            .every(
+                (i) =>
+                    Math.abs(c.point[i] - c.radius - extents[i][0]) <= tolerance * 100 &&
+                    Math.abs(c.point[i] + c.radius - extents[i][1]) <= tolerance * 100,
+            );
     const views = viewPriority(data).filter((v) => geometries.has(v.id));
     const occupied = occupiedSides(data);
     const planned: Planned[] = [];
@@ -605,6 +639,9 @@ export function planDimensions(
     const ordered = [...cylinders].sort((a, b) => b.radius - a.radius);
     for (const c of ordered) {
         if (called.has(c)) continue;
+        // the basic set of a busy part: its overall sizes (the outer diameter of a turned one)
+        // — holes there crowd each other's callouts, they are clicked in one by one
+        if (basic && !outer(c)) continue;
         if (!c.full) {
             const key = c.radius.toFixed(4);
             if (radii.has(key)) continue;
@@ -688,6 +725,16 @@ export function planDimensions(
             if (a === undefined || b === undefined) return;
             planned.push(linear(view, k, a, b));
         };
+        if (basic) {
+            // the overall size along the axis, when faces bound it at both ends
+            const last = coordinates[coordinates.length - 1];
+            if (
+                Math.abs(base.value - extents[axis][0]) <= tolerance * 100 &&
+                Math.abs(last.value - extents[axis][1]) <= tolerance * 100
+            )
+                place(base, last);
+            continue;
+        }
         for (const [opening, bottom] of depths) place(opening, bottom);
         for (const c of coordinates) {
             if (done.has(c)) continue;
@@ -1149,6 +1196,254 @@ export function placeDimensions(
  * Replaces the automatic dimensions of the drawing with a fresh set (dimensions placed by
  * hand stay), spacing the views to make room for them.
  */
+const MAX_TIERS = 6;
+const MAX_LINEAR = 18;
+
+function tooBusy(planned: Planned[]): boolean {
+    const linear = planned.filter((p): p is PlannedLinear => p.type === "linear");
+    if (linear.length > MAX_LINEAR) return true;
+    const counts = new Map<string, number>();
+    for (const p of linear)
+        counts.set(`${p.viewId}|${p.side}`, (counts.get(`${p.viewId}|${p.side}`) ?? 0) + 1);
+    return [...counts.values()].some((n) => n > MAX_TIERS);
+}
+
+/**
+ * The dimensions of one feature, clicked at `point` (model 2D) on a view — what the rules give
+ * it, the way automatic dimensioning would place them, stacked outside the dimensions the view
+ * already has:
+ * - a hole seen as a circle: its Ø ("N отв." for a set) and its centre's position from the
+ *   view's base edges (none along an axis of symmetry);
+ * - a cylinder seen side-on (a hole in a section, a turned step): its Ø across and, for a blind
+ *   hole, the depth from the face it opens on;
+ * - an edge seen as a line: that face's position from the base, or the overall size when it is
+ *   a base edge itself.
+ * Nothing is placed twice; an empty list when nothing is near.
+ */
+export function featureDimensions(
+    data: DrawingData,
+    viewId: string,
+    point: Point2,
+    cache: ViewGeometryCache,
+): DrawingDimensionData[] {
+    const view = data.views.find((v) => v.id === viewId);
+    if (view === undefined || !orthographic(view)) return [];
+    const g = cache.geometryOf(view);
+    const input = cache.inputFor(view.sourceId);
+    if (g === undefined || input === undefined || !Number.isFinite(g.bounds.minX)) return [];
+    const tolerance = modelTolerance(input);
+    const t2 = Math.hypot(g.bounds.maxX - g.bounds.minX, g.bounds.maxY - g.bounds.minY) * 1e-3 + 1e-6;
+    const reach = Math.max(t2 * 10, 3 / view.scale);
+    const cylinders = cylindersOf(input, tolerance);
+    const side = (k: number) => sideFor(occupiedSides(data).get(view.id), k);
+    const lows: Point2 = [g.bounds.minX, g.bounds.minY];
+    const highs: Point2 = [g.bounds.maxX, g.bounds.maxY];
+    const symmetry = symmetryAxes(g);
+    const planned: Planned[] = [];
+    const linear = (k: number, a: Point2, b: Point2, prefix?: string): PlannedLinear => ({
+        type: "linear",
+        viewId,
+        kind: k === 0 ? "horizontal" : "vertical",
+        a,
+        b,
+        side: side(k),
+        prefix,
+    });
+    const contourAt = (k: number, x: number) => {
+        const s = side(k);
+        return pointAt(g, k, x, s === "up" || s === "right", t2);
+    };
+    // the position of `x` along sheet axis k from the base edge
+    const position = (k: number, x: number, at: Point2) => {
+        if (Math.abs(x - lows[k]) <= t2) return;
+        const onAxis = k === 0 ? symmetry.vertical : symmetry.horizontal;
+        if (onAxis !== undefined && Math.abs(onAxis - x) <= t2 * 2) return;
+        const from = contourAt(k, lows[k]);
+        if (from !== undefined) planned.push(linear(k, from, at));
+    };
+
+    // 1. a circle facing the viewer, the innermost one the click is in or on
+    const facing = cylinders
+        .filter((c) => c.full && circleIn(view, c))
+        .map((c) => ({ c, p: project2(view, c.point) }))
+        .filter(({ c, p }) => view.showHidden || arcShows(g, p, c.radius))
+        .filter(({ c, p }) => Math.hypot(point[0] - p[0], point[1] - p[1]) <= c.radius + reach)
+        .sort((a, b) => a.c.radius - b.c.radius);
+    if (facing.length > 0) {
+        const { c, p } = facing[0];
+        const set = cylinders.filter((x) => x.full && sameHole(x, c, tolerance));
+        const prefix = c.concave && set.length > 1 ? `${set.length} отв. ` : undefined;
+        planned.push({
+            type: "radial",
+            viewId,
+            kind: "diameter",
+            center: p,
+            radius: c.radius,
+            angle: leaderAngle(view, g, p, []),
+            prefix,
+        });
+        position(0, p[0], p);
+        position(1, p[1], p);
+        return placeFeature(data, view, g, planned, cache);
+    }
+
+    // 2. a cylinder seen side-on: the click on its outline or inside it
+    const across = cylinders
+        .filter((c) => c.full && sideOn(view, c))
+        .map((c) => {
+            const a = project2(view, c.axis);
+            const k = Math.abs(a[0]) > 0.999 ? 1 : Math.abs(a[1]) > 0.999 ? 0 : -1;
+            return { c, k, p: project2(view, c.point) };
+        })
+        .filter(({ c, k, p }) => {
+            if (k < 0) return false;
+            const along = 1 - k;
+            const ends = [c.lo, c.hi].map(
+                (x) =>
+                    project2(view, scaled(c.axis, x))[along] +
+                    (p[along] - project2(view, scaled(c.axis, dot(c.point, c.axis)))[along]),
+            );
+            const inSpan =
+                point[along] >= Math.min(...ends) - reach && point[along] <= Math.max(...ends) + reach;
+            return (
+                inSpan &&
+                Math.abs(point[k] - p[k]) <= c.radius + reach &&
+                lineAt(g.visible, k, p[k] - c.radius, t2)
+            );
+        })
+        .sort((a, b) => a.c.radius - b.c.radius);
+    if (across.length > 0) {
+        const { c, k, p } = across[0];
+        const along = 1 - k;
+        const shift = p[along] - project2(view, scaled(c.axis, dot(c.point, c.axis)))[along];
+        const ends = [c.lo, c.hi]
+            .map((x) => project2(view, scaled(c.axis, x))[along] + shift)
+            .sort((x, y) => x - y);
+        const s = side(k);
+        const at = s === "up" || s === "right" ? ends[1] : ends[0];
+        const a: Point2 = k === 0 ? [p[0] - c.radius, at] : [at, p[1] - c.radius];
+        const b: Point2 = k === 0 ? [p[0] + c.radius, at] : [at, p[1] + c.radius];
+        planned.push(linear(k, a, b, "Ø"));
+        if (c.concave) {
+            // blind: one end on the part's outline (the opening), the other inside it
+            const atEdge = ends.map(
+                (x) => Math.abs(x - lows[along]) <= t2 * 2 || Math.abs(x - highs[along]) <= t2 * 2,
+            );
+            if (atEdge[0] !== atEdge[1]) {
+                const opening = atEdge[0] ? ends[0] : ends[1];
+                const bottom = atEdge[0] ? ends[1] : ends[0];
+                const from = contourAt(along, opening);
+                const to: Point2 = along === 0 ? [bottom, p[1]] : [p[0], bottom];
+                if (from !== undefined) planned.push(linear(along, from, to));
+            }
+        }
+        position(k, p[k], p);
+        return placeFeature(data, view, g, planned, cache);
+    }
+
+    // 3. an edge seen as a straight line across a sheet axis
+    let best: { k: number; x: number; d: number } | undefined;
+    for (const line of g.visible) {
+        const q = line.points;
+        for (let i = 0; i + 3 < q.length; i += 2) {
+            const [x1, y1, x2, y2] = [q[i], q[i + 1], q[i + 2], q[i + 3]];
+            const d = pointSegmentDistance(point[0], point[1], x1, y1, x2, y2);
+            if (d > reach || (best !== undefined && d >= best.d)) continue;
+            if (Math.abs(x1 - x2) <= t2 && Math.abs(y1 - y2) > t2) best = { k: 0, x: x1, d };
+            else if (Math.abs(y1 - y2) <= t2 && Math.abs(x1 - x2) > t2) best = { k: 1, x: y1, d };
+        }
+    }
+    if (best !== undefined) {
+        const { k, x } = best;
+        const base = Math.abs(x - lows[k]) <= t2 || Math.abs(x - highs[k]) <= t2;
+        const from = contourAt(k, lows[k]);
+        const to = contourAt(k, base ? highs[k] : x);
+        if (from !== undefined && to !== undefined) planned.push(linear(k, from, to));
+        return placeFeature(data, view, g, planned, cache);
+    }
+    return [];
+}
+
+/** Places a feature's dimensions outside those its view already has, skipping duplicates. */
+function placeFeature(
+    data: DrawingData,
+    view: DrawingViewData,
+    g: ViewGeometry,
+    planned: Planned[],
+    cache: ViewGeometryCache,
+): DrawingDimensionData[] {
+    const placement = placementOf(view, g);
+    const rect = sheetRect(placement);
+    const existing = new Set(data.dimensions.map((d) => dimensionKey(data, d)));
+    const crowded = crowdedSides(data);
+    // how far out each side's dimension lines already run
+    const used = new Map<Side, number>();
+    for (const d of data.dimensions) {
+        if (d.viewId !== view.id || isRadialDimension(d)) continue;
+        const q = linearGeometry(placement, d).q1;
+        const pairs: [Side, number][] =
+            d.kind === "horizontal"
+                ? [
+                      ["up", q[1] - rect.maxY],
+                      ["down", rect.minY - q[1]],
+                  ]
+                : [
+                      ["left", rect.minX - q[0]],
+                      ["right", q[0] - rect.maxX],
+                  ];
+        for (const [s, distance] of pairs)
+            if (distance > 0) used.set(s, Math.max(used.get(s) ?? 0, distance));
+    }
+    const result: DrawingDimensionData[] = [];
+    const linear = planned
+        .filter((p): p is PlannedLinear => p.type === "linear")
+        .sort((a, b) => lengthOf(a) - lengthOf(b));
+    for (const p of planned) {
+        if (p.type !== "radial") continue;
+        const d: DrawingDimensionData = {
+            id: newDrawingItemId("d"),
+            kind: p.kind,
+            viewId: view.id,
+            center: p.center,
+            radius: p.radius,
+            angle: p.angle,
+            prefix: p.prefix,
+        };
+        if (!existing.has(dimensionKey(data, d))) result.push(d);
+    }
+    for (const p of linear) {
+        const probe: DrawingDimensionData = {
+            id: "",
+            kind: p.kind,
+            viewId: view.id,
+            a: p.a,
+            b: p.b,
+            offset: 0,
+        };
+        if (existing.has(dimensionKey(data, probe))) continue;
+        const first = firstTier(crowded, p);
+        const distance = Math.max(first, (used.get(p.side) ?? first - TIER_STEP) + TIER_STEP);
+        used.set(p.side, distance);
+        const [x1, y1] = toSheet(placement, p.a[0], p.a[1]);
+        let offset: number;
+        if (p.side === "up") offset = rect.maxY + distance - y1;
+        else if (p.side === "down") offset = rect.minY - distance - y1;
+        else if (p.side === "left") offset = x1 - (rect.minX - distance);
+        else offset = x1 - (rect.maxX + distance);
+        result.push({
+            id: newDrawingItemId("d"),
+            kind: p.kind,
+            viewId: view.id,
+            a: p.a,
+            b: p.b,
+            offset,
+            prefix: p.prefix,
+        });
+    }
+    void cache;
+    return result;
+}
+
 /**
  * What a dimension measures, independent of the drawing's view ids: the view's direction and
  * whether it is cut, the kind, and the measured points. An automatic dimension the user
@@ -1170,7 +1465,10 @@ export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGe
     const cylinders = cylindersOf(input);
     const own = { ...data, views: data.views.filter((v) => v.sourceId === sourceId) };
     const geometries = cache.all(own);
-    const planned = planDimensions(own, input, geometries, cylinders);
+    let planned = planDimensions(own, input, geometries, cylinders);
+    // more than a few rows on a side: the part is too busy to dimension by rules alone — the
+    // sheet gets its overall sizes, the rest is clicked in feature by feature
+    if (tooBusy(planned)) planned = planDimensions(own, input, geometries, cylinders, "basic");
     const margins = marginsOf(data, planned);
     arrangeViews(data, margins, geometries);
     placeIsometric(data, margins, cache);

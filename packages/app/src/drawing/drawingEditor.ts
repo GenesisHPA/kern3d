@@ -12,7 +12,14 @@ import {
     type WorkspaceTab,
     workspaceTabs,
 } from "@chili3d/core";
-import { autoDimension, autoDrawing, dimensionKey, sectionThrough, settleSectionLabels } from "./autoDrawing";
+import {
+    autoDimension,
+    autoDrawing,
+    dimensionKey,
+    featureDimensions,
+    sectionThrough,
+    settleSectionLabels,
+} from "./autoDrawing";
 import {
     composeDrawing,
     fromSheet,
@@ -59,7 +66,8 @@ type Tool =
     | { kind: "projected"; parentId: string }
     | { kind: "linear"; dimension: LinearDimensionKind; picks: { viewId: string; point: Point2 }[] }
     | { kind: "radial"; dimension: "diameter" | "radius" }
-    | { kind: "note" };
+    | { kind: "note" }
+    | { kind: "feature" };
 
 type Drag =
     | { kind: "pan"; x: number; y: number; box: ViewBox }
@@ -427,6 +435,7 @@ export class DrawingEditor {
             linear: "drawing.prompt.pickPoint",
             radial: "drawing.prompt.pickCircle",
             note: "drawing.prompt.placeNote",
+            feature: "drawing.prompt.pickFeature",
         };
         let text = t(prompts[this.tool.kind]);
         if (this.tool.kind === "linear" && this.tool.picks.length === 2)
@@ -471,6 +480,7 @@ export class DrawingEditor {
             this.button("drawing.standardViews", () => this.addStandardViews()),
             this.button("drawing.auto", () => this.autoDrawing()),
             this.button("drawing.autoDims", () => this.autoDimensions()),
+            this.button("drawing.featureDims", () => this.setTool({ kind: "feature" }), "feature"),
             this.button("drawing.projectedView", () => this.startProjected(), "projected"),
             this.separator(),
             this.button("drawing.dim.horizontal", () => this.startLinear("horizontal"), "horizontal"),
@@ -886,7 +896,25 @@ export class DrawingEditor {
             case "note":
                 this.placeNote(p);
                 return;
+            case "feature":
+                this.featureClick(p);
+                return;
         }
+    }
+
+    /** "Размеры элемента": the clicked hole, cylinder or face gets its dimensions by the rules. */
+    private featureClick(p: Point2) {
+        const viewId = this.viewAt(p);
+        const placement = viewId === undefined ? undefined : this.placement(viewId);
+        if (viewId === undefined || placement === undefined) return;
+        const dims = featureDimensions(this.data, viewId, fromSheet(placement, p[0], p[1]), this.cache);
+        if (dims.length === 0) {
+            PubSub.default.pub("showToast", "toast.drawing.noFeature");
+            return;
+        }
+        this.data.dimensions.push(...dims);
+        this.commit();
+        this.refresh();
     }
 
     private placeBaseView(p: Point2) {

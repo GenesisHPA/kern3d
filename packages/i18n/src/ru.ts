@@ -362,6 +362,10 @@ export default {
         "drawing.standardViews": "3 основных вида",
         "drawing.auto": "Авточертёж",
         "drawing.autoDims": "Авторазмеры",
+        "drawing.featureDims": "Размеры элемента",
+        "drawing.prompt.pickFeature":
+            "Кликните по отверстию, цилиндру или грани на виде — размеры поставятся по правилам",
+        "toast.drawing.noFeature": "Здесь нет отверстия или грани для размера",
         "drawing.view.section": "Разрез",
         "drawing.projectedView": "Проекционный вид",
         "drawing.dim.horizontal": "Горизонтальный",
