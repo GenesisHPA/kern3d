@@ -224,8 +224,8 @@ export class MainToolbar extends HTMLElement {
                     title: I18n.translate("command.doc.open"),
                     onclick: () => PubSub.default.pub("displayHome", true),
                 },
-                svg({ className: style.appLogo, icon: "icon-chili" }),
-                span({ className: style.appName, textContent: "Chili3D" }),
+                svg({ className: style.appLogo, icon: "icon-kern3d-small" }),
+                span({ className: style.appName, textContent: "Kern3D" }),
             ),
             collection({
                 className: style.quickCommands,

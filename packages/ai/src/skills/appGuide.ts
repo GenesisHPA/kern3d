@@ -63,7 +63,7 @@ function navigationProfiles(): string {
     }).join("\n");
 }
 
-const INTRO = `Chili3D app guide — how to operate the application itself.
+const INTRO = `Kern3D app guide — how to operate the application itself.
 
 Use this document to TEACH. The user is sitting in front of the app and can click along, so answer with the actual path: the tab, the group, the button, the hotkey, the click sequence. Every command named below carries the label the user's own language gives it and the hotkey their navigation profile binds — so name the button in their language, and lean on the tab, the group and the hotkey to disambiguate, since those are language-independent.
 
@@ -172,7 +172,7 @@ function buildAppGuideDoc(): string {
 export const appGuide: Skill = {
     name: "app-guide",
     description:
-        'How to operate the Chili3D app itself: where every command lives (ribbon tabs and groups, toolbars, hotkeys), viewport navigation and selection, the model tree and property panel, sketch mode, parametric features, file operations and settings — load it to answer any "how do I…" or "where is…" question',
+        'How to operate the Kern3D app itself: where every command lives (ribbon tabs and groups, toolbars, hotkeys), viewport navigation and selection, the model tree and property panel, sketch mode, parametric features, file operations and settings — load it to answer any "how do I…" or "where is…" question',
     get content() {
         return buildAppGuideDoc();
     },

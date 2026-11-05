@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <polygon points="128,24 218.07,76 128,128 37.93,76" fill="#EEF1F3"/>
+  <polygon points="37.93,76 128,128 128,232 37.93,180" fill="#B5BEC6"/>
+  <polygon points="128,128 218.07,76 218.07,180 128,232" fill="#5E6A75"/>
+  <path d="M128,24 L218.07,76 V180 L128,232 L37.93,180 V76 Z M37.93,76 L128,128 L218.07,76 M128,128 V232" fill="none" stroke="#1F2429" stroke-width="20" stroke-linejoin="round"/>
+  <ellipse cx="128" cy="76" rx="36" ry="20.78" fill="#FF6A13"/>
+</svg>

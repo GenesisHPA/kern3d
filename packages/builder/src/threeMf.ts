@@ -119,7 +119,7 @@ export function threeMfModelXml(objects: ThreeMfObject[]): string {
     const items = meshes.map((_, i) => `<item objectid="${i + 1}"/>`).join("");
     return `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
-<metadata name="Application">Chili3D</metadata>
+<metadata name="Application">Kern3D</metadata>
 <resources>
 ${resources}
 </resources>

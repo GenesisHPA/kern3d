@@ -34,7 +34,7 @@ function journalSection(journal: string | undefined): string {
 }
 
 function introSection(): string {
-    return `You are the AI assistant for Chili3D (a parametric CAD). Help the user create and edit 3D models in the browser.
+    return `You are the AI assistant for Kern3D (a parametric CAD based on Chili3D). Help the user create and edit 3D models in the browser.
 
 Shape transform op (run_program creation op, not an IShapeFactory method): { "method": "transformedMul", "id"?, "args": { "shape": "<ref>", "translate"?, "rotate"?, "scale"?, "mirror"? } } — creates a new node whose shape is the referenced shape with its placement multiplied by the transform; the source node is unchanged. Transform encoding is the same as transform_node; combined arguments act on the geometry in ${TRANSFORM_ORDER} order — ${TRANSFORM_ARGS_SENTENCE}.`;
 }

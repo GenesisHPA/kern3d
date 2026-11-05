@@ -178,7 +178,7 @@ describe("STL conversion", () => {
         const text = new TextDecoder().decode(result.value);
         expect(text.startsWith("solid")).toBe(true);
         expect(text).toContain("facet normal");
-        expect(text.trimEnd().endsWith("endsolid chili3d")).toBe(true);
+        expect(text.trimEnd().endsWith("endsolid kern3d")).toBe(true);
     });
 
     test("ASCII STL uses the provided solid name", () => {

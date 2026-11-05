@@ -152,7 +152,7 @@ describe("RibbonUI", () => {
         expect(ui.querySelector(".r-title-bar")).not.toBeNull();
 
         const appName = mustQuery(ui, "#appName");
-        expect(appName.textContent).toContain("Chili3D - v");
+        expect(appName.textContent).toContain("Kern3D - v");
     });
 
     test("should render ribbon groups for each tab", () => {

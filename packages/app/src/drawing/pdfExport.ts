@@ -157,7 +157,7 @@ export function sheetToPdf(sheet: ComposedSheet, font?: FontOutline): Uint8Array
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>`,
         `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
-        "<< /Producer (Chili3D) /Title (Drawing) >>",
+        "<< /Producer (Kern3D) /Title (Drawing) >>",
     ];
     let pdf = "%PDF-1.4\n";
     const offsets: number[] = [];

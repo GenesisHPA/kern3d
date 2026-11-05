@@ -605,7 +605,7 @@ export default {
         "helix.turns": "Turns",
         "home.recent": "Recent Projects",
         "home.recent.empty": "No recent documents yet. Create or open a document to get started.",
-        "home.welcome": "Welcome to chili3d",
+        "home.welcome": "Welcome to Kern3D",
         "home.welcome.subtitle": "Design and model in 3D, right in your browser.",
         "items.header": "Items",
         "items.tool.delete": "Delete",

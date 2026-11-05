@@ -1,23 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="description" content="A 3D CAD application that runs directly in your browser for online model design and editing。一款直接在浏览器中运行的3D CAD应用程序，实现在线模型设计与编辑" />
-        <meta name="keywords" content="Web CAD, WebAssembly, WASM, Three.js, OCCT, Opencascade, 3D CAD, 在线 CAD, 在线建模" />
-        <meta name="author" content="仙阁" />
-        <title>Chili3D</title>
-        <link rel="icon" href="favicon.svg">
+        <meta name="description" content="Kern3D — параметрическая 3D САПР, работающая прямо в браузере. От Genesis Tactical, на основе Chili3D." />
+        <meta name="keywords" content="Kern3D, САПР, CAD, 3D моделирование, WebAssembly, OCCT, Open CASCADE" />
+        <meta name="author" content="Genesis Tactical" />
+        <meta name="theme-color" content="#1F2429" />
+        <title>Kern3D</title>
+        <link rel="icon" href="favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
         <link rel="stylesheet" type="text/css" href="index.css" />
-        <script type="text/javascript">
-            (function(c,l,a,r,i,t,y){
-                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-            })(window, document, "clarity", "script", "k1qrtibhcl");
-        </script>
     </head>
     <body>
-        <noscript>You need to enable JavaScript to run this app.</noscript>
+        <noscript>Для работы Kern3D включите JavaScript.</noscript>
+        <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+            <symbol id="icon-kern3d" viewBox="0 0 256 256">
+                <path d="M128,24 L218.07,76 V180 L128,232 L37.93,180 V76 Z" fill="none" stroke="#8A949C" stroke-width="26" stroke-linejoin="round"/>
+                <polygon points="128,24 218.07,76 128,128 37.93,76" fill="#EEF1F3"/>
+                <polygon points="37.93,76 128,128 128,232 37.93,180" fill="#B5BEC6"/>
+                <polygon points="128,128 218.07,76 218.07,180 128,232" fill="#5E6A75"/>
+                <path d="M128,24 L218.07,76 V180 L128,232 L37.93,180 V76 Z M37.93,76 L128,128 L218.07,76 M128,128 V232" fill="none" stroke="#1F2429" stroke-width="12" stroke-linejoin="round"/>
+                <ellipse cx="128" cy="76" rx="24" ry="13.86" fill="none" stroke="#FF6A13" stroke-width="8"/>
+                <path d="M152.25,90 L163.51,96.5 M103.75,62 L92.49,55.5 M152.25,62 L163.51,55.5 M103.75,90 L92.49,96.5" fill="none" stroke="#FF6A13" stroke-width="8" stroke-linecap="round"/>
+                <ellipse cx="128" cy="76" rx="8.5" ry="4.91" fill="#FF6A13"/>
+            </symbol>
+            <symbol id="icon-kern3d-small" viewBox="0 0 256 256">
+                <path d="M128,24 L218.07,76 V180 L128,232 L37.93,180 V76 Z" fill="none" stroke="#8A949C" stroke-width="34" stroke-linejoin="round"/>
+                <polygon points="128,24 218.07,76 128,128 37.93,76" fill="#EEF1F3"/>
+                <polygon points="37.93,76 128,128 128,232 37.93,180" fill="#B5BEC6"/>
+                <polygon points="128,128 218.07,76 218.07,180 128,232" fill="#5E6A75"/>
+                <path d="M128,24 L218.07,76 V180 L128,232 L37.93,180 V76 Z M37.93,76 L128,128 L218.07,76 M128,128 V232" fill="none" stroke="#1F2429" stroke-width="20" stroke-linejoin="round"/>
+                <ellipse cx="128" cy="76" rx="36" ry="20.78" fill="#FF6A13"/>
+            </symbol>
+        </svg>
     </body>
 </html>

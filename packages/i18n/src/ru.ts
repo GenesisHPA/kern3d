@@ -518,7 +518,7 @@ export default {
         "helix.turns": "Витки",
         "home.recent": "Недавние проекты",
         "home.recent.empty": "Пока нет недавних документов. Создайте или откройте документ, чтобы начать.",
-        "home.welcome": "Добро пожаловать в chili3d",
+        "home.welcome": "Добро пожаловать в Kern3D",
         "home.welcome.subtitle": "Проектируйте и моделируйте в 3D прямо в браузере.",
         "items.header": "Компоненты",
         "items.tool.delete": "Удалить",

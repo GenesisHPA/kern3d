@@ -78,11 +78,11 @@ export class Home extends HTMLElement {
     private logoSection() {
         return div(
             { className: style.logo },
-            svg({ icon: "icon-chili" }),
+            svg({ icon: "icon-kern3d" }),
             div(
                 { className: style.logoText },
-                span({ className: style.wordmark, textContent: "CHILI3D" }),
-                span({ className: style.version, textContent: `v${__APP_VERSION__}` }),
+                span({ className: style.wordmark, textContent: "Kern3D" }),
+                span({ className: style.version, textContent: `v${__APP_VERSION__} · на основе Chili3D` }),
             ),
         );
     }

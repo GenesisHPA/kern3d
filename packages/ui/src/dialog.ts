@@ -64,7 +64,7 @@ function createDialogContent(
 ) {
     return div(
         { className: style.root },
-        div({ className: style.title }, I18n.translate(title) ?? "chili3d"),
+        div({ className: style.title }, I18n.translate(title) ?? "Kern3D"),
         div({ className: style.content }, content),
         div({ className: style.buttons }, ...buttons.map((btn) => createDialogButton(btn, closeDialog))),
     );
