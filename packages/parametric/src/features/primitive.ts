@@ -96,17 +96,18 @@ const primitiveHandler: FeatureHandler<PrimitiveFeatureData> = {
             { key: "dy", display: "box.dy", value: feature.dy ?? 10, unit: LENGTH_UNITS, visibleWhen: BOX },
             { key: "dz", display: "box.dz", value: feature.dz ?? 10, unit: LENGTH_UNITS, visibleWhen: BOX },
             // One row per kind the field serves, all reading the same field.
+            // round kinds are sized by diameter; the feature keeps the radius (half of it)
             ...rowsForKinds([CYLINDER, SPHERE, CONE], {
-                key: "radius",
-                display: "circle.radius",
-                value: feature.radius,
-                fallback: 5,
+                key: "diameter",
+                display: "dimension.diameter",
+                value: feature.radius === undefined ? undefined : doubleOf(feature.radius),
+                fallback: 10,
             }),
             ...rowsForKinds([CONE], {
-                key: "radius2",
-                display: "feature.primitive.radius2",
-                value: feature.radius2,
-                fallback: 2,
+                key: "diameter2",
+                display: "feature.primitive.diameter2",
+                value: feature.radius2 === undefined ? undefined : doubleOf(feature.radius2),
+                fallback: 4,
             }),
             ...rowsForKinds([CYLINDER, CONE], {
                 key: "height",
@@ -137,6 +138,8 @@ const primitiveHandler: FeatureHandler<PrimitiveFeatureData> = {
                 },
             };
         }
+        const radiusKey = DIAMETER_KEYS[key];
+        if (radiusKey !== undefined) return { ...feature, [radiusKey]: halfOf(value) };
         return SIZE_KEYS.includes(key) ? { ...feature, [key]: value } : feature;
     },
 
@@ -185,6 +188,31 @@ const KIND_ICON: Record<PrimitiveKind, string> = {
 };
 
 const SIZE_KEYS = ["dx", "dy", "dz", "radius", "radius2", "height"];
+
+/**
+ * Half of a size shown as a diameter. A number is halved; an expression keeps its text and is
+ * divided, so a variable-driven diameter stays driven (`doubleOf` reads it back unchanged).
+ */
+export function halfOf(value: ParameterValue): ParameterValue {
+    if (typeof value === "number") return value / 2;
+    const text = value.trim();
+    const numeric = Number(text);
+    if (text !== "" && Number.isFinite(numeric)) return numeric / 2;
+    return `(${text}) / 2`;
+}
+
+/** The diameter a stored radius reads as — the inverse of `halfOf`, text included. */
+export function doubleOf(value: ParameterValue): ParameterValue {
+    if (typeof value === "number") return value * 2;
+    const text = value.trim();
+    const numeric = Number(text);
+    if (text !== "" && Number.isFinite(numeric)) return numeric * 2;
+    const halved = /^\((.*)\) \/ 2$/.exec(text);
+    return halved ? halved[1] : `(${text}) * 2`;
+}
+
+/** The diameter rows write the radius fields they read. */
+const DIAMETER_KEYS: Record<string, "radius" | "radius2"> = { diameter: "radius", diameter2: "radius2" };
 
 /** `visibleWhen` gates for the size rows — one per kind the row serves. */
 /** One row per kind a size field serves, all reading the same field. */

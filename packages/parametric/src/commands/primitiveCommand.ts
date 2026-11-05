@@ -33,7 +33,7 @@ import {
     XYZ,
 } from "@chili3d/core";
 import type { PrimitiveFeatureData, PrimitiveKind } from "../features/feature";
-import { measurePrimitiveShape, primitiveFrameXvec } from "../features/primitive";
+import { halfOf, measurePrimitiveShape, primitiveFrameXvec } from "../features/primitive";
 import type { ParametricBodyNode } from "../parametricBodyNode";
 import {
     candidateBodies,
@@ -49,17 +49,7 @@ import { normalizeSignedRect, type RectDragData, rectDataOnPlane, signedHeightAx
 const OPERATION_NEW: I18nKeys = "option.command.operation.new";
 const OPERATION_JOIN: I18nKeys = "option.command.operation.join";
 
-/**
- * Half of a size the panel holds as a diameter. A number is halved; an expression keeps its
- * text and is divided, so a variable-driven diameter stays driven.
- */
-export function halfOf(value: ParameterValue): ParameterValue {
-    if (typeof value === "number") return value / 2;
-    const text = value.trim();
-    const numeric = Number(text);
-    if (text !== "" && Number.isFinite(numeric)) return numeric / 2;
-    return `(${text}) / 2`;
-}
+export { halfOf };
 
 /** The float tip while the radius point is dragged: the circle's diameter. */
 function diameterPrompt(radius: number): string {

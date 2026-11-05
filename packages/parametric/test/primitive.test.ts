@@ -12,6 +12,7 @@ import {
     type PrimitiveFeatureData,
     type PrimitiveKind,
 } from "../src/features/feature";
+import { doubleOf } from "../src/features/primitive";
 import { ParametricBodyNode } from "../src/parametricBodyNode";
 
 function mockShapeFactory(methods: Record<string, (...args: any[]) => any>) {
@@ -132,6 +133,17 @@ function primitive(extra: Partial<PrimitiveFeatureData> = {}): PrimitiveFeatureD
     return { id: "f1", type: "primitive", primitive: "box", ...extra };
 }
 
+describe("diameter helpers", () => {
+    test.each([
+        [10, 20],
+        ["3", 6],
+        ["(d) / 2", "d"],
+        ["w", "(w) * 2"],
+    ])("doubleOf(%j) -> %j", (input, expected) => {
+        expect(doubleOf(input)).toBe(expected);
+    });
+});
+
 describe("primitive feature", () => {
     let doc: TestDocument;
     let mocks: ReturnType<typeof setupMocks>;
@@ -160,10 +172,10 @@ describe("primitive feature", () => {
             "dx",
             "dy",
             "dz",
-            "radius",
-            "radius",
-            "radius",
-            "radius2",
+            "diameter",
+            "diameter",
+            "diameter",
+            "diameter2",
             "height",
             "height",
         ]);
@@ -186,8 +198,9 @@ describe("primitive feature", () => {
         expect(rows[11].visibleWhen).toEqual([{ key: "primitive", value: "cylinder" }]);
         // The kind's defaults stand in for fields the user never typed.
         expect(rows[4].value).toBe(10);
-        expect(rows[7].value).toBe(5);
-        expect(rows[10].value).toBe(2);
+        // round sizes read as diameters: twice the radius defaults (5 and 2)
+        expect(rows[7].value).toBe(10);
+        expect(rows[10].value).toBe(4);
     });
 
     test("setParameter: the type takes a known kind and rejects an unknown one", () => {
@@ -205,6 +218,9 @@ describe("primitive feature", () => {
         expect(handler.setParameter(feature, "dx", 30).dx).toBe(30);
         expect(handler.setParameter(feature, "radius2", "w / 2").radius2).toBe("w / 2");
         expect(handler.setParameter(feature, "operation", "cut")).toBe(feature);
+        // the diameter rows write half of it into the radius fields, expressions kept driven
+        expect(handler.setParameter(feature, "diameter", 12).radius).toBe(6);
+        expect(handler.setParameter(feature, "diameter2", "w").radius2).toBe("(w) / 2");
         expect(handler.setParameter(feature, "bogus", 1)).toBe(feature);
     });
 
