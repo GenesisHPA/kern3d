@@ -203,6 +203,8 @@ describe("mergeTimeline", () => {
         const doc = new TestDocument({});
         const a = new FakeBody(doc, "a", 2, [undefined as never, 50]);
         const b = new FakeBody(doc, "b", 1, [5], "g");
-        expect(mergeTimeline([a, b]).map((e) => e.item.id)).toEqual(["f0", "g0", "f1"]);
+        expect(
+            mergeTimeline([a, b] as unknown as Parameters<typeof mergeTimeline>[0]).map((e) => e.item.id),
+        ).toEqual(["f0", "g0", "f1"]);
     });
 });

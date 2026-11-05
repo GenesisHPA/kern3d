@@ -6,11 +6,15 @@ import {
     AsyncController,
     Combobox,
     Config,
+    CurveUtils,
     command,
     Dimensions,
     type EdgeMeshData,
     type I18nKeys,
+    type ICurve,
     Id,
+    type IEdge,
+    type IFace,
     type IStep,
     type IView,
     LENGTH_UNITS,
@@ -21,6 +25,7 @@ import {
     PubSub,
     property,
     type ShapeMeshData,
+    ShapeTypes,
     type SnapResult,
     Transaction,
     ViewUtils,
@@ -28,7 +33,7 @@ import {
     type XYZ,
 } from "@chili3d/core";
 import type { HoleFeatureData, HoleSketchPoints } from "../features/feature";
-import { findSketchPointAt, holePointUV, type SketchPointSnap } from "../features/hole";
+import { findSketchPointAt, holePointUV, previewHoleTools, type SketchPointSnap } from "../features/hole";
 import { pointCrossMesh } from "../sketch/curveMesh";
 import type { PlaneFaceRef } from "../sketch/planeRef";
 import { HoleCenterPickHandler, type SketchPointGlyphHit } from "./holeCenterPickHandler";
@@ -50,6 +55,28 @@ import { deduceHoleFace, type PickedHoleFace } from "./holeFace";
  * center then follows the entity on every rebuild. The first bound point pins the sketch —
  * later picks snap to its points only, and one near another sketch's point stays a raw pick.
  */
+/** Whether `point` is the center of a circular edge of `face` — an existing hole's rim. */
+export function isOpeningCenterOf(face: IFace, point: XYZ): boolean {
+    for (const edge of face.findSubShapes(ShapeTypes.edge) as IEdge[]) {
+        let curve: ICurve | undefined;
+        try {
+            curve = edge.curve;
+            const basis = CurveUtils.isTrimmed(curve) ? curve.basisCurve : curve;
+            if (
+                CurveUtils.isCircle(basis) &&
+                basis.center.distanceTo(point) < 1e-4 * Math.max(1, basis.radius)
+            ) {
+                return true;
+            }
+        } catch {
+            // a degenerate edge has no curve
+        } finally {
+            (curve as { dispose?: () => void } | undefined)?.dispose?.();
+        }
+    }
+    return false;
+}
+
 const STYLE_SIMPLE: I18nKeys = "feature.hole.style.simple";
 const STYLE_COUNTERBORE: I18nKeys = "feature.hole.style.counterbore";
 const STYLE_COUNTERSINK: I18nKeys = "feature.hole.style.countersink";
@@ -226,6 +253,16 @@ export class HoleFeatureCommand extends MultistepCommand {
      */
     private async collectRawPoints(): Promise<boolean> {
         this.isConfirm = false; // a restart re-enters here with the flag from the last run
+        this.onPropertyChanged(this.onOptionChanged);
+        try {
+            return await this.rawPointLoop();
+        } finally {
+            this.removePropertyChanged(this.onOptionChanged);
+            this.redrawPreview = undefined;
+        }
+    }
+
+    private async rawPointLoop(): Promise<boolean> {
         while (true) {
             this.controller = new AsyncController();
             const step = new PointOnPlaneStep("prompt.select.holeCenters", this.pointData, false, true);
@@ -253,18 +290,76 @@ export class HoleFeatureCommand extends MultistepCommand {
         plane: () => this.picked!.worldFrame,
         validator: this.pointOnFace,
         preview: this.previewPoints,
+        // a panel edit (diameter, depth, style…) redraws the holes at once
+        onPreviewReady: (redraw) => {
+            this.redrawPreview = redraw;
+        },
         onKeyDown: (e) => {
             this.isConfirm = e.code === "Space" || e.code === "Enter";
         },
     });
 
-    /** A center counts only where it lands on the face itself (a boundary tolerance included). */
+    /**
+     * A center counts where it lands on the face itself (a boundary tolerance included), or on
+     * the axis of a round opening in it — the center of an existing hole, so a wider, shallower
+     * hole can be drilled over it (a hand-made counterbore).
+     */
     private readonly pointOnFace = (point: XYZ): boolean => {
         const picked = this.picked;
         if (picked === undefined) return false;
         const projected = picked.worldFrame.project(point);
-        return picked.worldFace.intersectLine(projected, picked.worldFrame.normal, 1e-6) !== undefined;
+        if (picked.worldFace.intersectLine(projected, picked.worldFrame.normal, 1e-6) !== undefined)
+            return true;
+        return this.isOpeningCenter(projected);
     };
+
+    private isOpeningCenter(point: XYZ): boolean {
+        return isOpeningCenterOf(this.picked!.worldFace, point);
+    }
+
+    /** Redraws the step's preview; set while the raw-center step is up. */
+    private redrawPreview: (() => void) | undefined;
+
+    private readonly onOptionChanged = () => {
+        this.redrawPreview?.();
+    };
+
+    /** Whether the cursor's center would be accepted — the preview never fails the pick. */
+    private previewable(point: XYZ): boolean {
+        try {
+            return this.pointOnFace(point);
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * The hole solids at `centers` with the panel's current values, as wireframe meshes. A
+     * value the hole cannot be built from (an empty field mid-typing) just shows no hole.
+     */
+    private holeMeshes(centers: readonly XYZ[]): ShapeMeshData[] {
+        try {
+            return this.buildHoleMeshes(centers);
+        } catch {
+            return [];
+        }
+    }
+
+    private buildHoleMeshes(centers: readonly XYZ[]): ShapeMeshData[] {
+        const picked = this.picked;
+        const shape = picked?.body?.shape;
+        if (picked === undefined || centers.length === 0 || shape === undefined || !shape.isOk) return [];
+        const feature = this.feature(picked.ref, [], undefined);
+        const tools = previewHoleTools(
+            feature,
+            this.document.variables.evaluate().scope,
+            picked.worldFrame,
+            shape.value,
+            centers,
+        );
+        if (!tools.isOk) return [];
+        return tools.value.map((tool) => this.meshShape(tool));
+    }
 
     /**
      * Records the pick as a sketch-point binding and returns true when it snapped to one.
@@ -314,15 +409,22 @@ export class HoleFeatureCommand extends MultistepCommand {
      */
     private readonly previewPoints = (point: XYZ | undefined): ShapeMeshData[] => {
         const points: ShapeMeshData[] = this.stepDatas.map((data) => this.meshPoint(data.point!));
-        for (const bound of this.boundCenters) points.push(this.crossPoint(bound.center));
+        const centers: XYZ[] = this.stepDatas.map((data) => this.picked!.worldFrame.project(data.point!));
+        for (const bound of this.boundCenters) {
+            points.push(this.crossPoint(bound.center));
+            centers.push(bound.center);
+        }
         if (point !== undefined) {
             const snap =
                 this.document.application.activeView === undefined
                     ? undefined
                     : this.snapAt(this.document.application.activeView!, point);
             points.push(snap === undefined ? this.meshPoint(point) : this.crossPoint(snap.center));
+            const under = snap?.center ?? this.picked!.worldFrame.project(point);
+            if (this.previewable(under)) centers.push(under);
         }
-        return points;
+        // the holes themselves, as they will be cut, follow the cursor and the panel
+        return [...points, ...this.holeMeshes(centers)];
     };
 
     protected override executeMainTask(): void {

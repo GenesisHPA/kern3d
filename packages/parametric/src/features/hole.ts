@@ -586,6 +586,33 @@ interface BuiltHoleTool {
     readonly edgeIds: (string | undefined)[];
 }
 
+/**
+ * The hole solids `feature` would cut at the given centers (in `plane`'s frame and `input`'s
+ * coordinates) — built exactly as an evaluation builds them, for the command's live preview.
+ * The caller owns the returned shapes.
+ */
+export function previewHoleTools(
+    feature: HoleFeatureData,
+    scope: Scope,
+    plane: Plane,
+    input: IShape,
+    centers: readonly XYZ[],
+): Result<IShape[]> {
+    const params = resolveHoleParams(feature, scope);
+    if (!params.isOk) return Result.err(params.error);
+    const dir = plane.normal.multiply(-1);
+    const shapes: IShape[] = [];
+    for (const [slot, center] of centers.entries()) {
+        const tool = buildHoleTool(feature, params.value, center, dir, plane.xvec, input, slot);
+        if (!tool.isOk) {
+            shapes.forEach((x) => x.dispose());
+            return Result.err(tool.error);
+        }
+        shapes.push(tool.value.shape);
+    }
+    return Result.ok(shapes);
+}
+
 function buildHoleTools(
     feature: HoleFeatureData,
     params: HoleParams,
