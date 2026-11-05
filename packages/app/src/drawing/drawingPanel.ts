@@ -10,6 +10,8 @@ import {
     type DrawingViewData,
     PROJECTION_ANGLES,
     type ProjectionSide,
+    pageCount,
+    pageOf,
     SHEET_FORMATS,
     SHEET_ORIENTATIONS,
     TITLE_BLOCK_KINDS,
@@ -35,6 +37,7 @@ export interface DrawingPanelHost {
     setSection(viewId: string, on: boolean): void;
     /** Brings back the automatic dimensions the user deleted. */
     restoreAuto(): void;
+    moveToPage(viewId: string, page: number): void;
     remove(): void;
 }
 
@@ -287,6 +290,18 @@ export class DrawingPanel {
             this.row("drawing.view.orientation", el("span", t(`drawing.view.${view.orientation}`)));
         }
         this.row("drawing.view.scale", this.scaleControl(view));
+        const pages = pageCount(this.host.data());
+        if (pages > 1) {
+            this.row(
+                "drawing.page",
+                this.select(
+                    Array.from({ length: pages }, (_, i) => String(i)),
+                    String(pageOf(view)),
+                    (v) => String(Number(v) + 1),
+                    (v) => this.host.moveToPage(view.id, Number(v)),
+                ),
+            );
+        }
         this.row(
             "drawing.view.hidden",
             this.checkbox(view.showHidden, (v) => {

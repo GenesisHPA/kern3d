@@ -400,3 +400,28 @@ describe("DrawingNode", () => {
         expect(node.content).toBe(before);
     });
 });
+
+describe("several sheets", () => {
+    test("each sheet draws its own views; the following ones carry form 2а with their number", () => {
+        const data = defaultDrawingData();
+        data.pages = 2;
+        data.views.push(view({ id: "a", x: 100, y: 150 }), view({ id: "b", x: 200, y: 150, page: 1 }));
+        const geometries = new Map([
+            ["a", rectangleGeometry()],
+            ["b", rectangleGeometry()],
+        ]);
+        const first = composeDrawing(data, geometries, 0);
+        const second = composeDrawing(data, geometries, 1);
+        const owners = (s: typeof first) => new Set(s.primitives.map((p) => p.owner).filter(Boolean));
+        expect(owners(first).has("view:a")).toBe(true);
+        expect(owners(first).has("view:b")).toBe(false);
+        expect(owners(second).has("view:b")).toBe(true);
+        const texts = (s: typeof first) => s.primitives.flatMap((p) => (p.kind === "text" ? [p.text] : []));
+        expect(texts(first)).toContain("Листов 2");
+        // form 2а: no "Разраб." rows, the sheet number in its box
+        expect(texts(second)).not.toContain("Разраб.");
+        expect(texts(second)).toContain("2");
+        const pdf = new TextDecoder().decode(sheetToPdf([first, second]));
+        expect(pdf).toContain("/Count 2");
+    });
+});

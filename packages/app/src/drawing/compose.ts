@@ -10,6 +10,8 @@ import {
     isRadialDimension,
     type LinearDimensionData,
     type Point2,
+    pageCount,
+    pageOf,
     type RadialDimensionData,
 } from "./drawingData";
 import type { Circle2, Polyline2, ViewGeometry } from "./hlr";
@@ -444,11 +446,18 @@ function composeNote(note: DrawingNoteData): DrawingPrimitive[] {
 }
 
 /** The base view's scale as the title block states it, unless the user typed one. */
-export function titleFields(data: DrawingData): DrawingData["titleBlock"]["fields"] {
+export function titleFields(data: DrawingData, page = 0): DrawingData["titleBlock"]["fields"] {
     const fields = { ...data.titleBlock.fields };
     if (!fields.scale) {
-        const base = data.views.find((v) => v.parentId === undefined) ?? data.views[0];
+        const first = data.views.filter((v) => pageOf(v) === 0);
+        const base = first.find((v) => v.parentId === undefined) ?? first[0];
         if (base !== undefined) fields.scale = formatScale(base.scale);
+    }
+    // the sheet numbers follow the sheets, unless the user typed a single-sheet number
+    const count = pageCount(data);
+    if (count > 1 || page > 0) {
+        fields.sheet = String(page + 1);
+        fields.sheets = String(count);
     }
     return fields;
 }
@@ -457,12 +466,14 @@ export function titleFields(data: DrawingData): DrawingData["titleBlock"]["field
 export function composeDrawing(
     data: DrawingData,
     geometries: ReadonlyMap<string, ViewGeometry>,
+    page = 0,
 ): ComposedSheet {
     const [width, height] = sheetSize(data.sheet);
-    const primitives = composeFrame(data, titleFields(data));
+    const primitives = composeFrame(data, titleFields(data, page), page);
     const comma = data.titleBlock.kind === "gost";
     const placements = new Map<string, ViewPlacement>();
     for (const view of data.views) {
+        if (pageOf(view) !== page) continue;
         const placement = placementOf(view, geometries.get(view.id));
         placements.set(view.id, placement);
         primitives.push(...composeView(placement));
@@ -478,6 +489,6 @@ export function composeDrawing(
     }
     primitives.push(...cuttingPlaneMarks(data, placements));
     primitives.push(...viewLabels(data, placements, primitives));
-    for (const note of data.notes) primitives.push(...composeNote(note));
+    for (const note of data.notes) if (pageOf(note) === page) primitives.push(...composeNote(note));
     return { width, height, primitives };
 }

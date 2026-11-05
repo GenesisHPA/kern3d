@@ -419,6 +419,9 @@ export default {
         "drawing.standardViews": "3 standard views",
         "drawing.auto": "Auto drawing",
         "drawing.autoDims": "Auto dimensions",
+        "drawing.page": "Sheet",
+        "drawing.page.add": "+ Sheet",
+        "drawing.page.remove": "Remove sheet",
         "drawing.featureDims": "Feature dimensions",
         "drawing.prompt.pickFeature":
             "Click a hole, cylinder or face on a view — its dimensions are placed by the rules",

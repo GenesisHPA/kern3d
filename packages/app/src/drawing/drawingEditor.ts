@@ -35,6 +35,8 @@ import {
     newDrawingItemId,
     type Point2,
     type ProjectionSide,
+    pageCount,
+    pageOf,
 } from "./drawingData";
 import style from "./drawingEditor.module.css";
 import { loadDrawingFont } from "./drawingFont";
@@ -137,6 +139,9 @@ export class DrawingEditor {
     private readonly status: HTMLDivElement;
     private readonly toolButtons = new Map<string, HTMLButtonElement>();
     private readonly sourceSelect: HTMLSelectElement;
+    private readonly pageSelect: HTMLSelectElement;
+    /** The sheet shown and edited, 0-based. */
+    private page = 0;
     private readonly panel: DrawingPanel;
     private readonly cache: ViewGeometryCache;
     private data: DrawingData;
@@ -175,6 +180,9 @@ export class DrawingEditor {
         this.status = window.document.createElement("div");
         this.status.className = style.status;
         this.sourceSelect = window.document.createElement("select");
+        this.pageSelect = window.document.createElement("select");
+        this.pageSelect.title = t("drawing.page");
+        this.pageSelect.onchange = () => this.showPage(Number(this.pageSelect.value));
         this.panel = new DrawingPanel(this.panelHost());
         const root = window.document.createElement("div");
         root.className = style.root;
@@ -318,9 +326,11 @@ export class DrawingEditor {
 
     refresh(recompute = false) {
         if (recompute) this.cache.clear();
+        this.page = Math.min(this.page, pageCount(this.data) - 1);
         alignProjectedViews(this.data);
         this.geometries = this.cache.all(this.data);
-        this.composed = composeDrawing(this.data, this.geometries);
+        this.composed = composeDrawing(this.data, this.geometries, this.page);
+        this.updatePages();
         this.bounds = ownerBounds(this.composed.primitives);
         const { width, height } = this.composed;
         this.paper.setAttribute("width", String(width));
@@ -502,6 +512,10 @@ export class DrawingEditor {
             this.button("drawing.update", () => this.refresh(true)),
             this.button("drawing.fit", () => this.fit()),
             this.separator(),
+            this.pageSelect,
+            this.button("drawing.page.add", () => this.addPage()),
+            this.button("drawing.page.remove", () => this.removePage()),
+            this.separator(),
             this.button("drawing.export.svg", () => this.exportSvg()),
             this.button("drawing.export.pdf", () => void this.exportPdf()),
             this.button("drawing.export.dxf", () => this.exportDxf()),
@@ -537,7 +551,9 @@ export class DrawingEditor {
             PubSub.default.pub("showToast", "toast.drawing.selectBody");
             return;
         }
+        const before = new Set(this.data.views.map((v) => v.id));
         layoutStandardViews(this.data, source, this.geometryOf);
+        for (const v of this.data.views) if (!before.has(v.id)) v.page = this.page || undefined;
         this.commit();
         this.refresh();
     }
@@ -586,6 +602,76 @@ export class DrawingEditor {
         this.refresh();
     }
 
+    // ---- sheets ---------------------------------------------------------------------------------
+
+    private updatePages() {
+        const count = pageCount(this.data);
+        if (this.pageSelect.options.length !== count) {
+            this.pageSelect.replaceChildren(
+                ...Array.from({ length: count }, (_, i) => {
+                    const o = window.document.createElement("option");
+                    o.value = String(i);
+                    o.textContent = `${t("drawing.page")} ${i + 1}`;
+                    return o;
+                }),
+            );
+        }
+        this.pageSelect.value = String(this.page);
+    }
+
+    private showPage(page: number) {
+        this.page = Math.max(0, Math.min(page, pageCount(this.data) - 1));
+        this.selection = undefined;
+        this.refresh();
+        this.fit();
+    }
+
+    /** A new empty sheet after the last one, shown at once. */
+    private addPage() {
+        this.data.pages = pageCount(this.data) + 1;
+        this.commit();
+        this.showPage(this.data.pages - 1);
+    }
+
+    /** Removes the shown sheet with its views, their dimensions and its notes (never the last sheet). */
+    private removePage() {
+        const count = pageCount(this.data);
+        if (count <= 1) return;
+        const page = this.page;
+        for (const view of this.data.views.filter((v) => pageOf(v) === page)) removeView(this.data, view.id);
+        this.data.notes = this.data.notes.filter((n) => pageOf(n) !== page);
+        for (const item of [...this.data.views, ...this.data.notes]) {
+            if (pageOf(item) > page) item.page = pageOf(item) - 1 || undefined;
+        }
+        this.data.pages = count - 1 > 1 ? count - 1 : undefined;
+        this.commit();
+        this.showPage(Math.min(page, count - 2));
+    }
+
+    /** Moves a view, and the views projected from it, to another sheet; there it stands alone. */
+    moveToPage(viewId: string, page: number) {
+        const view = this.data.views.find((v) => v.id === viewId);
+        if (view === undefined || page === pageOf(view)) return;
+        const moving = new Set([view.id]);
+        let grew = true;
+        while (grew) {
+            grew = false;
+            for (const v of this.data.views) {
+                if (v.parentId !== undefined && moving.has(v.parentId) && !moving.has(v.id)) {
+                    moving.add(v.id);
+                    grew = true;
+                }
+            }
+        }
+        for (const v of this.data.views) if (moving.has(v.id)) v.page = page || undefined;
+        // out of projection with its parent: no longer kept aligned to it
+        view.parentId = undefined;
+        view.side = undefined;
+        this.selection = undefined;
+        this.commit();
+        this.refresh();
+    }
+
     private escape() {
         if (this.tool.kind !== "select") this.setTool({ kind: "select" });
         else if (this.selection !== undefined) this.select(undefined);
@@ -629,6 +715,7 @@ export class DrawingEditor {
         const parent = this.data.views.find((v) => v.id === parentId);
         if (parent === undefined) return;
         const view = projectedView(this.data, parent, side, this.geometryOf);
+        view.page = parent.page;
         this.data.views.push(view);
         this.selection = `view:${view.id}`;
         this.commit();
@@ -639,6 +726,7 @@ export class DrawingEditor {
         const parent = this.data.views.find((v) => v.id === parentId);
         if (parent === undefined) return;
         const view = isometricView(this.data, parent, this.geometryOf);
+        view.page = parent.page;
         this.data.views.push(view);
         this.selection = `view:${view.id}`;
         this.commit();
@@ -925,6 +1013,7 @@ export class DrawingEditor {
         }
         const base = this.data.views.find((v) => v.parentId === undefined);
         const view = newView(source, "front", base?.scale ?? 1, p[0], p[1]);
+        view.page = this.page || undefined;
         this.data.views.push(view);
         this.selection = `view:${view.id}`;
         this.tool = { kind: "select" };
@@ -1008,6 +1097,7 @@ export class DrawingEditor {
             y: p[1],
             text: t("drawing.note.default"),
             height: 3.5,
+            page: this.page || undefined,
         };
         this.data.notes.push(note);
         this.selection = `note:${note.id}`;
@@ -1019,23 +1109,29 @@ export class DrawingEditor {
 
     // ---- export ---------------------------------------------------------------------------------
 
-    private fileName(extension: string) {
-        return `${this.node.name.replace(/[\\/:*?"<>|]+/g, "_")}.${extension}`;
+    private fileName(extension: string, page?: number) {
+        const name = this.node.name.replace(/[\\/:*?"<>|]+/g, "_");
+        const suffix =
+            page === undefined || pageCount(this.data) <= 1 ? "" : ` (${t("drawing.page")} ${page + 1})`;
+        return `${name}${suffix}.${extension}`;
     }
 
     private exportSvg() {
-        download([sheetToSvg(this.composed)], this.fileName("svg"));
+        download([sheetToSvg(this.composed)], this.fileName("svg", this.page));
     }
 
     private exportDxf() {
-        download([sheetToDxf(this.composed)], this.fileName("dxf"));
+        download([sheetToDxf(this.composed)], this.fileName("dxf", this.page));
     }
 
     private async exportPdf() {
         this.status.textContent = t("drawing.prompt.exporting");
         const font = await loadDrawingFont();
         if (font === undefined) PubSub.default.pub("showToast", "toast.drawing.fontFallback");
-        download([sheetToPdf(this.composed, font) as BlobPart], this.fileName("pdf"));
+        const sheets = Array.from({ length: pageCount(this.data) }, (_, page) =>
+            composeDrawing(this.data, this.geometries, page),
+        );
+        download([sheetToPdf(sheets, font) as BlobPart], this.fileName("pdf"));
         this.updateStatus();
     }
 
@@ -1054,6 +1150,7 @@ export class DrawingEditor {
             addProjected: (parentId: string, side: ProjectionSide) => this.addProjected(parentId, side),
             addIsometric: (parentId: string) => this.addIsometric(parentId),
             setSection: (viewId: string, on: boolean) => this.setSection(viewId, on),
+            moveToPage: (viewId: string, page: number) => this.moveToPage(viewId, page),
             restoreAuto: () => {
                 this.data.suppressed = undefined;
                 this.autoDimensions();

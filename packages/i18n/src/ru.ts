@@ -362,6 +362,9 @@ export default {
         "drawing.standardViews": "3 основных вида",
         "drawing.auto": "Авточертёж",
         "drawing.autoDims": "Авторазмеры",
+        "drawing.page": "Лист",
+        "drawing.page.add": "+ Лист",
+        "drawing.page.remove": "Удалить лист",
         "drawing.featureDims": "Размеры элемента",
         "drawing.prompt.pickFeature":
             "Кликните по отверстию, цилиндру или грани на виде — размеры поставятся по правилам",

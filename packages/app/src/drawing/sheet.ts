@@ -47,10 +47,38 @@ export function reservedRects(sheet: SheetData, kind: TitleBlockKind): Rect[] {
 }
 
 /** Where views can go: the inner frame above the title block's height. */
-export function drawingArea(sheet: SheetData, kind: TitleBlockKind): Rect {
+export function drawingArea(sheet: SheetData, kind: TitleBlockKind, page = 0): Rect {
     const frame = frameRect(sheet, kind);
     const [, blockHeight] = TITLE_BLOCK_SIZE[kind];
-    return { ...frame, minY: frame.minY + blockHeight };
+    return { ...frame, minY: frame.minY + (page > 0 && kind === "gost" ? 15 : blockHeight) };
+}
+
+/**
+ * The title block of a following sheet, ГОСТ 2.104 form 2а: 185 × 15 — the change columns,
+ * the designation, and the sheet number.
+ */
+function gostFollowingBlock(right: number, bottom: number, f: Fields): DrawingPrimitive[] {
+    const pen = new BlockPen(right - 185, bottom + 15);
+    pen.h(0, 0, 185, LINE_WIDTH.thick);
+    for (const y of [5, 10]) pen.h(y, 0, 65, LINE_WIDTH.thin);
+    pen.h(7, 175, 185, LINE_WIDTH.thin);
+    for (const x of [7, 17, 40, 55, 65]) pen.v(x, 0, 15, x === 65 ? LINE_WIDTH.thick : LINE_WIDTH.thin);
+    pen.v(175, 0, 15, LINE_WIDTH.thick);
+    const small = 2.5;
+    for (const [x, label] of [
+        [3.5, "Изм"],
+        [12, "Лист"],
+        [28.5, "№ докум."],
+        [47.5, "Подп."],
+        [60, "Дата"],
+    ] as [number, string][]) {
+        pen.label(x, 12.5, label, small, "middle");
+    }
+    pen.label(180, 3.5, "Лист", small, "middle");
+    if (f.sheet) pen.label(180, 11, f.sheet, 3.5, "middle");
+    if (f.designation) pen.label(120, 7.5, f.designation, 7, "middle");
+    pen.v(0, 0, 15, LINE_WIDTH.thick);
+    return pen.primitives;
 }
 
 function rect(x0: number, y0: number, x1: number, y1: number, width: number): DrawingPrimitive {
@@ -197,7 +225,7 @@ function isoTitleBlock(right: number, bottom: number, f: Fields, projection: Dra
 }
 
 /** The sheet border, the inner frame and the title block, with `fields` filled in. */
-export function composeFrame(data: DrawingData, fields: Fields): DrawingPrimitive[] {
+export function composeFrame(data: DrawingData, fields: Fields, page = 0): DrawingPrimitive[] {
     const [w, h] = sheetSize(data.sheet);
     const kind = data.titleBlock.kind;
     const frame = frameRect(data.sheet, kind);
@@ -206,7 +234,11 @@ export function composeFrame(data: DrawingData, fields: Fields): DrawingPrimitiv
         rect(frame.minX, frame.minY, frame.maxX, frame.maxY, LINE_WIDTH.frame),
     ];
     if (kind === "gost") {
-        primitives.push(...gostTitleBlock(frame.maxX, frame.minY, fields));
+        primitives.push(
+            ...(page > 0
+                ? gostFollowingBlock(frame.maxX, frame.minY, fields)
+                : gostTitleBlock(frame.maxX, frame.minY, fields)),
+        );
         // graph 26: the designation again, turned 180°, in the top-left corner
         primitives.push(rect(frame.minX, frame.maxY - 14, frame.minX + 70, frame.maxY, LINE_WIDTH.thick));
         if (fields.designation) {

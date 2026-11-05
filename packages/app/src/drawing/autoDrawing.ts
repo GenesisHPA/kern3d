@@ -12,6 +12,7 @@ import {
     newDrawingItemId,
     type Point2,
     type ProjectionSide,
+    pageOf,
     type Vec3,
 } from "./drawingData";
 import {
@@ -1458,7 +1459,29 @@ export function dimensionKey(data: DrawingData, d: DrawingDimensionData): string
     return `${where}|${d.kind}|${r(d.a[0])},${r(d.a[1])}|${r(d.b[0])},${r(d.b[1])}`;
 }
 
+/**
+ * Runs `work` on the first sheet alone — its views, their dimensions — and puts the result
+ * back beside the other sheets, which automatic runs leave as they are.
+ */
+function onFirstSheet(data: DrawingData, work: (first: DrawingData) => void) {
+    const others = data.views.filter((v) => pageOf(v) !== 0);
+    const otherIds = new Set(others.map((v) => v.id));
+    const first: DrawingData = {
+        ...data,
+        views: data.views.filter((v) => pageOf(v) === 0),
+        dimensions: data.dimensions.filter((d) => !otherIds.has(d.viewId)),
+    };
+    work(first);
+    data.views = [...first.views, ...others];
+    data.dimensions = [...first.dimensions, ...data.dimensions.filter((d) => otherIds.has(d.viewId))];
+    data.suppressed = first.suppressed;
+}
+
 export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
+    onFirstSheet(data, (first) => autoDimensionSheet(first, sourceId, cache));
+}
+
+function autoDimensionSheet(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
     const input = cache.inputFor(sourceId);
     data.dimensions = data.dimensions.filter((d) => !d.auto);
     if (input === undefined) return;
@@ -1489,6 +1512,10 @@ export function autoDimension(data: DrawingData, sourceId: string, cache: ViewGe
  * lines, dimensions, and an isometric view where the sheet has room — replacing every view.
  */
 export function autoDrawing(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
+    onFirstSheet(data, (first) => autoDrawingSheet(first, sourceId, cache));
+}
+
+function autoDrawingSheet(data: DrawingData, sourceId: string, cache: ViewGeometryCache) {
     // dimensions made or changed by hand move over to the new view looking the same way
     const orientationOf = new Map(data.views.map((v) => [v.id, v.orientation]));
     const manual = data.dimensions
@@ -1508,5 +1535,5 @@ export function autoDrawing(data: DrawingData, sourceId: string, cache: ViewGeom
     }
     autoSections(data, cylindersOf(input), modelTolerance(input));
     settleSectionLabels(data, cache.all(data));
-    autoDimension(data, sourceId, cache);
+    autoDimensionSheet(data, sourceId, cache);
 }

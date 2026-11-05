@@ -147,18 +147,24 @@ export function pdfContent(sheet: ComposedSheet, font: FontOutline | undefined):
 }
 
 /** The complete PDF file. Everything in it is ASCII, so string length is byte length. */
-export function sheetToPdf(sheet: ComposedSheet, font?: FontOutline): Uint8Array {
-    const content = pdfContent(sheet, font);
-    const width = n(sheet.width * MM_TO_PT);
-    const height = n(sheet.height * MM_TO_PT);
+export function sheetToPdf(sheets: ComposedSheet | ComposedSheet[], font?: FontOutline): Uint8Array {
+    const pages = Array.isArray(sheets) ? sheets : [sheets];
+    // 1 catalog, 2 pages, 3 font, 4 info, then a page object and its content per sheet
     const objects = [
         "<< /Type /Catalog /Pages 2 0 R >>",
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>`,
-        `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+        `<< /Type /Pages /Kids [${pages.map((_, i) => `${5 + 2 * i} 0 R`).join(" ")}] /Count ${pages.length} >>`,
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
         "<< /Producer (Kern3D) /Title (Drawing) >>",
     ];
+    pages.forEach((sheet, i) => {
+        const content = pdfContent(sheet, font);
+        const width = n(sheet.width * MM_TO_PT);
+        const height = n(sheet.height * MM_TO_PT);
+        objects.push(
+            `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${6 + 2 * i} 0 R >>`,
+            `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+        );
+    });
     let pdf = "%PDF-1.4\n";
     const offsets: number[] = [];
     objects.forEach((body, i) => {
@@ -168,7 +174,7 @@ export function sheetToPdf(sheet: ComposedSheet, font?: FontOutline): Uint8Array
     const xref = pdf.length;
     pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
     for (const offset of offsets) pdf += `${offset.toString().padStart(10, "0")} 00000 n \n`;
-    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R /Info 6 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R /Info 4 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
     const bytes = new Uint8Array(pdf.length);
     for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i);
     return bytes;

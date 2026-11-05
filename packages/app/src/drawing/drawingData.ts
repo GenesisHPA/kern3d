@@ -103,6 +103,8 @@ export interface DrawingViewData {
     showCenterMarks: boolean;
     label?: string;
     section?: SectionData;
+    /** The sheet the view is on, 0-based; undefined is the first. */
+    page?: number;
 }
 
 export type Point2 = [number, number];
@@ -155,6 +157,7 @@ export interface DrawingNoteData {
     text: string;
     /** Character height on paper, mm. */
     height: number;
+    page?: number;
 }
 
 export interface DrawingData {
@@ -166,6 +169,17 @@ export interface DrawingData {
     notes: DrawingNoteData[];
     /** Automatic dimensions the user deleted (their keys): automatic runs do not bring them back. */
     suppressed?: string[];
+    /** How many sheets the drawing has; undefined is one. */
+    pages?: number;
+}
+
+/** The sheet a view or note is on. */
+export function pageOf(item: { page?: number }): number {
+    return item.page ?? 0;
+}
+
+export function pageCount(data: DrawingData): number {
+    return Math.max(1, data.pages ?? 1);
 }
 
 export function defaultDrawingData(): DrawingData {
@@ -222,7 +236,12 @@ function parseView(raw: unknown): DrawingViewData | undefined {
         showCenterMarks: r["showCenterMarks"] !== false,
         label: typeof r["label"] === "string" ? r["label"] : undefined,
         section: parseSection(r["section"]),
+        page: parsePage(r["page"]),
     };
+}
+
+function parsePage(raw: unknown): number | undefined {
+    return typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : undefined;
 }
 
 function parseSection(raw: unknown): SectionData | undefined {
@@ -277,6 +296,7 @@ function parseNote(raw: unknown): DrawingNoteData | undefined {
         y: finite(r["y"], 0),
         text: typeof r["text"] === "string" ? r["text"] : "",
         height: Math.max(0.5, finite(r["height"], 3.5)),
+        page: parsePage(r["page"]),
     };
 }
 
@@ -322,6 +342,7 @@ export function parseDrawingData(json: string | undefined): DrawingData {
         views: parseList(raw["views"], parseView),
         dimensions: parseList(raw["dimensions"], parseDimension),
         notes: parseList(raw["notes"], parseNote),
+        pages: parsePage(raw["pages"]),
         suppressed: Array.isArray(raw["suppressed"])
             ? (raw["suppressed"] as unknown[]).filter((x): x is string => typeof x === "string")
             : undefined,
