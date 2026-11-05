@@ -12,3 +12,6 @@ types
 /test/scenarios
 
 /docs/manual/book/
+
+# desktop icons live in desktop/build (the rule above is for build output)
+!desktop/build/

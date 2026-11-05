@@ -1,0 +1,76 @@
+{
+    "name": "kern3d-desktop",
+    "productName": "Kern3D",
+    "version": "0.8.0",
+    "description": "Kern3D — параметрическая 3D САПР",
+    "author": "Genesis Tactical",
+    "license": "AGPL-3.0-only",
+    "homepage": "https://genesistactical.net/kern3d/",
+    "private": true,
+    "main": "main.cjs",
+    "scripts": {
+        "prepare-app": "node scripts/prepare.mjs",
+        "start": "npm run prepare-app && electron .",
+        "dist": "npm run prepare-app && electron-builder --win --publish never",
+        "release": "npm run prepare-app && electron-builder --win --publish always"
+    },
+    "dependencies": {
+        "electron-updater": "6.8.11"
+    },
+    "devDependencies": {
+        "electron": "45.2.3",
+        "electron-builder": "26.18.0"
+    },
+    "build": {
+        "appId": "net.genesistactical.kern3d",
+        "productName": "Kern3D",
+        "copyright": "Genesis Tactical; based on Chili3D by xiangechen (AGPL-3.0)",
+        "directories": {
+            "output": "release",
+            "buildResources": "build"
+        },
+        "files": [
+            "main.cjs",
+            "icon.png",
+            "app/**/*",
+            "package.json"
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "build/icon.ico",
+            "artifactName": "Kern3D-Setup.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "Kern3D",
+            "installerIcon": "build/icon.ico",
+            "uninstallerIcon": "build/icon.ico",
+            "license": "../LICENSE",
+            "language": "1049",
+            "multiLanguageInstaller": false
+        },
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "GenesisHPA",
+                "repo": "kern3d",
+                "releaseType": "release"
+            }
+        ],
+        "electronLanguages": [
+            "ru",
+            "en-US"
+        ]
+    }
+}

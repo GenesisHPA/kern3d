@@ -608,7 +608,7 @@ export default {
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",
         "home.welcome": "Welcome to Kern3D",
-        "home.welcome.subtitle": "Design and model in 3D, right in your browser.",
+        "home.welcome.subtitle": "Sketch, model, assemble and draw in 3D.",
         "items.header": "Items",
         "items.tool.delete": "Delete",
         "items.tool.expandAll": "Expand All",

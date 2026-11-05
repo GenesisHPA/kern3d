@@ -521,7 +521,7 @@ export default {
         "home.credits":
             "Kern3D от Genesis Tactical · на основе Chili3D, автор xiangechen (仙阁) · лицензия AGPL-3.0",
         "home.welcome": "Добро пожаловать в Kern3D",
-        "home.welcome.subtitle": "Проектируйте и моделируйте в 3D прямо в браузере.",
+        "home.welcome.subtitle": "Эскизы, 3D-модели, сборки и чертежи.",
         "items.header": "Компоненты",
         "items.tool.delete": "Удалить",
         "items.tool.expandAll": "Раскрыть все",
