@@ -37,6 +37,7 @@ import { captureEdgeRef, type EdgeRef } from "../features/edgeRef";
 import type { ChamferFeatureData, ChamferMode, FilletFeatureData } from "../features/feature";
 import { reportSilentIdLoss } from "../features/idDiagnostics";
 import { ParametricBodyNode } from "../parametricBodyNode";
+import { changedFacesMesh } from "./changedFaces";
 
 /** Shared flow for fillet/chamfer: pick edges of a parametric body, enter the value. */
 abstract class EdgeCornerFeatureCommand extends MultistepCommand {
@@ -108,13 +109,7 @@ abstract class EdgeCornerFeatureCommand extends MultistepCommand {
         const meshes = this.buildPreviewMeshes(node, edges);
         if (meshes === undefined) return;
 
-        this.previewOwner = edges[0].owner;
-        this.document.visual.highlighter.addState(
-            this.previewOwner,
-            VisualStates.faceTransparent,
-            ShapeTypes.shape,
-        );
-        this.previewId = this.document.visual.context.displayMesh(meshes, { meshOpacity: 1 });
+        this.previewId = this.document.visual.context.displayMesh(meshes, { meshOpacity: 0.85, onTop: true });
         this.document.visual.update();
     };
 
@@ -140,9 +135,17 @@ abstract class EdgeCornerFeatureCommand extends MultistepCommand {
         const world = cornerPreview(node, edges, value, this.featureType, sides);
         if (world === undefined) return undefined;
         const { faces, edges: outlines } = world.mesh;
+        // only the faces the corner makes, in orange over the part: the body stays as it is (and
+        // pickable for more edges) and a small chamfer still shows at once
+        let changed: ShapeMeshData | undefined;
+        if (faces !== undefined && node.shape.isOk) {
+            const before = node.shape.value.transformedMul(edges[0].transform);
+            changed = changedFacesMesh(before, world, faces);
+            before.dispose();
+        }
+        void outlines;
         world.dispose();
-        if (faces === undefined) return undefined;
-        return [faces, outlines].filter((x) => x !== undefined);
+        return changed === undefined ? undefined : [changed];
     }
 
     private removePreview() {

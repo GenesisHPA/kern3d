@@ -29,16 +29,20 @@ export const ARROW_HOVER_TOLERANCE = 10; // px, screen-space distance to the arr
 /** Baseline (world units) for the px/mm measurement; long enough to beat worldToScreen rounding. */
 const SCALE_MEASURE_BASELINE = 100;
 
-/** Solid cylinder shaft + cone head, starting at `start` and pointing along `direction`. */
+/**
+ * A slim arrow — a needle shaft and a short narrow head — starting at `start` and pointing
+ * along `direction`. Drawn at `ARROW_LENGTH_PX` on screen: the shaft is about 1.5 px across,
+ * the head 16 px long and 7 px wide.
+ */
 export function arrowMeshes(start: XYZ, direction: XYZ, length: number, color: number): ShapeMeshData[] {
-    const headLength = Math.max(length * 0.45, 8);
+    const headLength = length * 0.2;
     const shaftLength = length - headLength;
     return [
-        shapeFactory.cylinder(direction, start, headLength * 0.1, shaftLength),
+        shapeFactory.cylinder(direction, start, length * 0.01, shaftLength),
         shapeFactory.cone(
             direction,
             start.add(direction.multiply(shaftLength)),
-            headLength * 0.3,
+            length * 0.045,
             0,
             headLength,
         ),
