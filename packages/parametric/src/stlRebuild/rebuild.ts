@@ -98,7 +98,7 @@ export function rebuildPart(
         const treatments: EdgeTreatment[] = [];
         const plans = planExtrusions(mesh, frame, tol, { treatments });
         if (plans.length === 0) return undefined;
-        const model = buildModel(document, plans, name, tol);
+        const model = buildModel(document, plans, name, tol, reference);
         const shape = bodyShape(model);
         const failed = failedFeature(model);
         if (failed !== undefined || shape === undefined)

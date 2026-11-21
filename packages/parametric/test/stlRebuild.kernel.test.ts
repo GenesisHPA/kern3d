@@ -187,7 +187,7 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
         const t = report.timings;
         log(
             `REBUILD ${path.basename(file)}: first ${(report.firstRatio * 100).toFixed(2)}% → ${(report.ratio * 100).toFixed(2)}%, ` +
-                `surface off ${((report.surfaceOff ?? 1) * 100).toFixed(1)}%, features ${report.features} (corrections ${report.corrections}, edges ${report.rounded ?? 0}), ${((Date.now() - started) / 1000).toFixed(1)} s` +
+                `surface off ${((report.surfaceOff ?? 1) * 100).toFixed(1)}%, features ${report.features} (corrections ${report.corrections}, edges ${report.rounded ?? 0}, mesh pieces ${report.model?.body.features.filter((f) => f.type === "imported").length ?? 0}), ${((Date.now() - started) / 1000).toFixed(1)} s` +
                 ` [${counts}]` +
                 (t
                     ? ` (plan ${t.plan} ms, build ${t.build} ms, compare ${t.compare} ms, correct ${t.correct} ms)`

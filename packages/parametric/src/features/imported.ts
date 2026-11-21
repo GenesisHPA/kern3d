@@ -22,7 +22,16 @@ const importedHandler: FeatureHandler<ImportedFeatureData> = {
     evaluate(feature, context): Result<IShape> {
         const read = shapeConverter.convertFromBrep(feature.brep);
         if (!read.isOk) return Result.err(read.error);
-        const shape = read.value;
+        let shape = read.value;
+        if (feature.operation !== undefined && context.input !== undefined) {
+            const combined =
+                feature.operation === "fuse"
+                    ? shapeFactory.booleanFuse([context.input], [shape], true)
+                    : shapeFactory.booleanCut([context.input], [shape]);
+            shape.dispose();
+            if (!combined.isOk) return Result.err(combined.error);
+            shape = combined.value;
+        }
         if (context.tracking !== undefined) {
             const faces = shape.findSubShapes(ShapeTypes.face);
             const edges = shape.findSubShapes(ShapeTypes.edge);

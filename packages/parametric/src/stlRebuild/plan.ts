@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { fitProfile, type Profile2D, profileArea } from "./fit2d";
-import type { TriMesh } from "./mesh";
+import { meshVolume, type TriMesh } from "./mesh";
 import { type Loop2D, loopArea, type Slab, type SliceFrame, sectionAt, slabsOf } from "./slices";
 
 /** One extrude of the rebuilt part: profiles sketched at `base` along the frame's axis, `depth` up. */
@@ -21,6 +21,12 @@ export interface PlannedExtrude {
     readonly straight?: readonly Profile2D[];
     /** An oblique extrude: the profiles' shift (u, v) over the whole depth. */
     readonly lean?: readonly [number, number];
+    /**
+     * A stretch no feature describes (its walls lean, but neither as a draft, a lean nor an
+     * edge round): the part itself is taken here, clipped to the slab, `profiles` being the
+     * straight stand-in should that fail.
+     */
+    readonly fromMesh?: boolean;
 }
 
 interface FittedSlab {
@@ -32,6 +38,7 @@ interface FittedSlab {
     readonly draft?: number;
     readonly straight?: Profile2D[];
     readonly lean?: [number, number];
+    readonly fromMesh?: boolean;
 }
 
 /** Whether (u, v) is inside the material of a slab's loops (even-odd over all of them). */
@@ -132,6 +139,7 @@ function taperOf(
     bottom: number,
     top: number,
     tol: number,
+    slack = 0.004,
 ): TaperedLoop[] | undefined {
     const span = top - bottom;
     const sections = SAMPLES.map((f) => ({
@@ -141,7 +149,12 @@ function taperOf(
         ),
     }));
     const base = sections[0].loops;
-    if (base.length === 0 || sections.some((s) => s.loops.length !== base.length)) return undefined;
+    if (base.length === 0 || sections.some((s) => s.loops.length !== base.length)) {
+        DEBUG_HOOK?.(
+            `    taper ${bottom.toFixed(2)}..${top.toFixed(2)}: loop counts ${sections.map((x) => x.loops.length)}`,
+        );
+        return undefined;
+    }
     const result: TaperedLoop[] = [];
     for (const loop of base) {
         const c = centroid(loop);
@@ -170,6 +183,9 @@ function taperOf(
                 Math.hypot(bc[0] - c[0], bc[1] - c[1]) >
                 Math.max(tol * 4, span * 0.01) + Math.abs(a0 - loopArea(best)) / Math.max(p0, 1e-9)
             ) {
+                DEBUG_HOOK?.(
+                    `    taper ${bottom.toFixed(2)}..${top.toFixed(2)}: centre slides ${Math.hypot(bc[0] - c[0], bc[1] - c[1]).toFixed(3)}`,
+                );
                 return undefined;
             }
             const dz = section.z - sections[0].z;
@@ -181,7 +197,12 @@ function taperOf(
         }
         const slope = den > 0 ? num / den : 0;
         const residual = Math.max(...points.map(([dz, d]) => Math.abs(d - slope * dz)));
-        if (residual > Math.max(tol * 2, span * 0.004)) return undefined;
+        if (residual > Math.max(tol * 2, span * slack)) {
+            DEBUG_HOOK?.(
+                `    taper ${bottom.toFixed(2)}..${top.toFixed(2)}: residual ${residual.toFixed(4)} > ${Math.max(tol * 2, span * slack).toFixed(4)}`,
+            );
+            return undefined;
+        }
         const draft = (Math.atan(slope) * 180) / Math.PI;
         if (Math.abs(draft) >= 80) return undefined;
         result.push({ loop, draft: Math.abs(draft) < 0.05 ? 0 : draft });
@@ -251,6 +272,49 @@ function obliqueOf(
 }
 
 /**
+ * Whether a curved band is worth four short cones instead of one straight slab: the volume the
+ * straight slab gets wrong (its section against the band's, height by height) less what four
+ * linear pieces would, against 0.2 % of the part. Read off nine sections, no kernel call.
+ */
+function splitPays(mesh: TriMesh, frame: SliceFrame, slab: Slab, tol: number, partVolume: number): boolean {
+    const { straight, pieces } = bandError(mesh, frame, slab, tol);
+    return straight - pieces > partVolume * 0.002;
+}
+
+/** The volume a straight slab and four linear pieces get wrong across a band (nine sections). */
+function bandError(
+    mesh: TriMesh,
+    frame: SliceFrame,
+    slab: Slab,
+    tol: number,
+): { straight: number; pieces: number } {
+    const span = slab.top - slab.bottom;
+    const n = 8;
+    const areas: number[] = [];
+    for (let k = 0; k <= n; k++) {
+        const z = slab.bottom + span * (0.002 + (0.996 * k) / n);
+        areas.push(
+            sectionAt(mesh, frame, z, span * 0.01)
+                .filter((l) => Math.abs(loopArea(l)) > tol * tol)
+                .reduce((a, l) => a + loopArea(l), 0),
+        );
+    }
+    const mid = areas[n / 2];
+    const dz = span / n;
+    let straight = 0;
+    let pieces = 0;
+    for (let k = 0; k <= n; k++) {
+        straight += Math.abs(areas[k] - mid) * dz;
+        // four pieces: linear between every second sample
+        const a = Math.floor(k / 2) * 2;
+        const b = Math.min(a + 2, n);
+        const t = b === a ? 0 : (k - a) / (b - a);
+        pieces += Math.abs(areas[k] - (areas[a] + (areas[b] - areas[a]) * t)) * dz;
+    }
+    return { straight, pieces };
+}
+
+/**
  * A slab with leaning walls as one or more tapered slabs: the whole slab when its taper is
  * linear (a draft, a cone, a countersink), else split in four and each part tapered on its own
  * (a round, followed by short cones). Undefined when even the parts do not taper cleanly.
@@ -261,12 +325,14 @@ function taperedSlabs(
     slab: Slab,
     tol: number,
     depth = 0,
+    maxDepth = 0,
 ): { bottom: number; top: number; loops: TaperedLoop[] }[] | undefined {
-    const loops = taperOf(mesh, frame, slab.bottom, slab.top, tol);
+    // a piece of a split band is a chord of a curve: it may bow by a few % of its height
+    const loops = taperOf(mesh, frame, slab.bottom, slab.top, tol, depth > 0 ? 0.03 : 0.004);
     if (loops !== undefined) return [{ bottom: slab.bottom, top: slab.top, loops }];
-    // a round is not cut into cones (it would take four features and still be off): a slab whose
-    // taper is not linear stays straight here, and an edge round is recognised as one instead
-    if (depth >= 0) return undefined;
+    // a curved band is cut into short cones only when asked (`maxDepth`): an edge round is
+    // recognised as a round instead, and a band is split only when that pays (`splitPays`)
+    if (depth >= maxDepth) return undefined;
     const parts: { bottom: number; top: number; loops: TaperedLoop[] }[] = [];
     const n = 4;
     const span = slab.top - slab.bottom;
@@ -277,6 +343,7 @@ function taperedSlabs(
             { ...slab, bottom: slab.bottom + (span * i) / n, top: slab.bottom + (span * (i + 1)) / n },
             tol,
             depth + 1,
+            maxDepth,
         );
         if (part === undefined) return undefined;
         parts.push(...part);
@@ -313,10 +380,14 @@ export function planExtrusions(
     /** Tapered holes and islands that do not lean with their slab: extruded on their own. */
     const separate: PlannedExtrude[] = [];
     const raw = slabsOf(mesh, frame);
+    const partVolume = Math.abs(meshVolume(mesh));
     const source = options.treatments ? absorbEdgeBands(mesh, frame, raw, tol, options.treatments) : raw;
     for (const s of source) {
         if (s.loops.length === 0) continue;
-        const tapered = s.slanted >= SLANTED ? taperedSlabs(mesh, frame, s, tol) : undefined;
+        let tapered = s.slanted >= SLANTED ? taperedSlabs(mesh, frame, s, tol) : undefined;
+        if (tapered === undefined && s.slanted >= SLANTED && splitPays(mesh, frame, s, tol, partVolume)) {
+            tapered = taperedSlabs(mesh, frame, s, tol, 0, 1);
+        }
         const lean =
             s.slanted >= SLANTED && tapered === undefined
                 ? obliqueOf(mesh, frame, s.bottom, s.top, tol)
@@ -336,7 +407,16 @@ export function planExtrusions(
             continue;
         }
         if (tapered === undefined) {
-            slabs.push({ bottom: s.bottom, top: s.top, loops: s.loops, profiles: fit(s.loops) });
+            // leaning walls no feature here describes: the part's own piece, if it is worth it
+            const fromMesh =
+                s.slanted >= SLANTED && bandError(mesh, frame, s, tol).straight > partVolume * 5e-4;
+            slabs.push({
+                bottom: s.bottom,
+                top: s.top,
+                loops: s.loops,
+                profiles: fit(s.loops),
+                ...(fromMesh ? { fromMesh: true } : {}),
+            });
             continue;
         }
         for (const part of tapered) {
@@ -426,6 +506,8 @@ export function planExtrusions(
             s.draft === undefined &&
             last.lean === undefined &&
             s.lean === undefined &&
+            !last.fromMesh &&
+            !s.fromMesh &&
             Math.abs(last.top - s.bottom) <= q &&
             slabKey(last, q) === slabKey(s, q)
         ) {
@@ -446,6 +528,7 @@ export function planExtrusions(
             ...(options.operation ? { operation: options.operation } : {}),
             ...(s.draft !== undefined ? { draft: s.draft, straight: s.straight } : {}),
             ...(s.lean !== undefined ? { lean: s.lean } : {}),
+            ...(s.fromMesh ? { fromMesh: true } : {}),
         });
     }
     if (options.operation === undefined) {

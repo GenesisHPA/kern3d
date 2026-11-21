@@ -1,7 +1,7 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { EMPTY_SCOPE, type IDocument, type IEdge, Plane, ShapeTypes, XYZ } from "@chili3d/core";
+import { EMPTY_SCOPE, type IDocument, type IEdge, type IShape, Plane, ShapeTypes, XYZ } from "@chili3d/core";
 import { captureEdgeRef, type EdgeRef } from "../features/edgeRef";
 import type { ExtrudeFeatureData, FeatureData } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
@@ -106,6 +106,7 @@ export function buildModel(
     plans: readonly PlannedExtrude[],
     name: string,
     tol: number,
+    reference?: IShape,
 ): BuiltModel {
     const body = new ParametricBodyNode({ document, features: [] });
     body.name = name;
@@ -114,6 +115,7 @@ export function buildModel(
     // one feature at a time: a taper the kernel refuses is redone straight, so one bad cone
     // does not take the whole body down
     for (const plan of plans) {
+        if (plan.fromMesh && reference !== undefined && appendMeshPiece(model, plan, reference)) continue;
         appendExtrude(model, document, plan, tol);
         const failed = !body.shape.isOk || body.featureItems().at(-1)?.error !== undefined;
         if (!failed || plan.draft === undefined) continue;
@@ -294,4 +296,68 @@ function leanDirection(
         end: { x: end.x, y: end.y, z: end.z },
     };
     return { ref: { nodeId: sketch.id, edge }, depth: length };
+}
+
+/**
+ * The part's own piece for a slab no feature describes: the reference solid clipped to the
+ * slab (a box over the slab's loops, between its two heights), kept as an imported piece fused
+ * into the body. False — nothing added — when the clip or the fuse fails.
+ */
+function appendMeshPiece(model: BuiltModel, plan: PlannedExtrude, reference: IShape): boolean {
+    const { axis, xvec, yvec } = plan.frame;
+    let minU = Number.POSITIVE_INFINITY;
+    let minV = Number.POSITIVE_INFINITY;
+    let maxU = Number.NEGATIVE_INFINITY;
+    let maxV = Number.NEGATIVE_INFINITY;
+    for (const profile of plan.profiles) {
+        const points =
+            profile.kind === "circle"
+                ? [
+                      [profile.c[0] - profile.r, profile.c[1] - profile.r],
+                      [profile.c[0] + profile.r, profile.c[1] + profile.r],
+                  ]
+                : profile.curves.flatMap((c) =>
+                      c.kind === "arc"
+                          ? [c.a, [c.c[0] - c.r, c.c[1] - c.r], [c.c[0] + c.r, c.c[1] + c.r]]
+                          : [c.a],
+                  );
+        for (const [u, v] of points) {
+            minU = Math.min(minU, u);
+            minV = Math.min(minV, v);
+            maxU = Math.max(maxU, u);
+            maxV = Math.max(maxV, v);
+        }
+    }
+    if (!Number.isFinite(minU)) return false;
+    // a margin all round, so the clip never runs along the part's own walls
+    const margin = Math.max(maxU - minU, maxV - minV) * 0.2 + 1;
+    const origin = [0, 1, 2].map(
+        (k) => axis[k] * plan.base + xvec[k] * (minU - margin) + yvec[k] * (minV - margin),
+    );
+    const plane = new Plane({
+        origin: new XYZ({ x: origin[0], y: origin[1], z: origin[2] }),
+        normal: xyz(axis),
+        xvec: xyz(xvec),
+    });
+    const box = shapeFactory.box(plane, maxU - minU + 2 * margin, maxV - minV + 2 * margin, plan.depth);
+    if (!box.isOk) return false;
+    const piece = shapeFactory.booleanCommon([reference], [box.value]);
+    box.value.dispose();
+    if (!piece.isOk) return false;
+    const brep = shapeConverter.convertToBrep(piece.value);
+    piece.value.dispose();
+    if (!brep.isOk) return false;
+    const before = model.body.features;
+    model.body.setFeaturesEmitShapeChanged([
+        ...before,
+        {
+            id: `rebuild-mesh-${before.length + 1}`,
+            type: "imported",
+            brep: brep.value,
+            ...(before.length > 0 ? { operation: "fuse" as const } : {}),
+        },
+    ]);
+    if (model.body.shape.isOk && model.body.featureItems().at(-1)?.error === undefined) return true;
+    model.body.setFeaturesEmitShapeChanged(before);
+    return false;
 }
