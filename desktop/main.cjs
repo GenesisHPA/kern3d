@@ -115,8 +115,7 @@ function enableWebSerial(win) {
                 type: "warning",
                 title: "Kern3D",
                 message: "Плата JCZ (EzCAD) не найдена.",
-                detail:
-                    "Подключите станок по USB. Если установлен драйвер EzCAD (Lmcv4u), замените его на WinUSB программой Zadig (устройство USB\\VID_9588&PID_9899).",
+                detail: "Подключите станок по USB. Если установлен драйвер EzCAD (Lmcv4u), замените его на WinUSB программой Zadig (устройство USB\\VID_9588&PID_9899).",
             });
             callback();
             return;
@@ -134,6 +133,77 @@ function enableWebSerial(win) {
     });
 }
 
+/** desktop/scripts/usb-driver.ps1, next to the app when packaged. */
+function usbDriverScript() {
+    return app.isPackaged
+        ? path.join(process.resourcesPath, "usb-driver.ps1")
+        : path.join(__dirname, "scripts", "usb-driver.ps1");
+}
+
+function runPowerShell(args) {
+    const { execFile } = require("node:child_process");
+    return new Promise((resolve) => {
+        execFile(
+            "powershell.exe",
+            ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", ...args],
+            { windowsHide: true, timeout: 180000 },
+            (error, stdout, stderr) => resolve({ error, stdout: String(stdout), stderr: String(stderr) }),
+        );
+    });
+}
+
+function lastJson(text) {
+    const line = text.trim().split(/\r?\n/).filter(Boolean).pop() ?? "";
+    try {
+        return JSON.parse(line);
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The JCZ board's Windows driver: its status, and a switch to WinUSB or back to EzCAD's own,
+ * run by the bundled script with administrator rights (Windows asks the user). Only our own
+ * page may ask, and only for these two targets.
+ */
+function enableUsbDriverSwitch() {
+    const { ipcMain } = require("electron");
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const fromApp = (event) => isInternal(event.senderFrame?.url ?? "");
+    ipcMain.handle("usb-driver:status", async (event) => {
+        if (process.platform !== "win32" || !fromApp(event)) return { found: false, driver: "unsupported" };
+        const r = await runPowerShell(["-File", usbDriverScript(), "-Action", "status"]);
+        return lastJson(r.stdout) ?? { found: false, driver: "none", error: r.stderr || r.error?.message };
+    });
+    ipcMain.handle("usb-driver:install", async (event, to) => {
+        if (process.platform !== "win32" || !fromApp(event)) return { ok: false, error: "unsupported" };
+        if (to !== "winusb" && to !== "ezcad") return { ok: false, error: "bad target" };
+        const log = path.join(os.tmpdir(), `kern3d-usb-driver-${Date.now()}.json`);
+        const q = (s) => `'${s.replace(/'/g, "''")}'`;
+        const inner = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", `"${usbDriverScript()}"`]
+            .concat(["-Action", "install", "-To", to, "-Log", `"${log}"`])
+            .map(q)
+            .join(",");
+        // the elevated copy runs hidden; a refused rights prompt makes Start-Process throw
+        const r = await runPowerShell([
+            "-Command",
+            `try { Start-Process powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList ${inner} -ErrorAction Stop } catch { 'cancelled' }`,
+        ]);
+        let result;
+        try {
+            result = JSON.parse(fs.readFileSync(log, "utf8").replace(/^﻿/, ""));
+            fs.rmSync(log, { force: true });
+        } catch {
+            result = {
+                ok: false,
+                error: r.stdout.includes("cancelled") ? "cancelled" : r.stderr || "no result",
+            };
+        }
+        return result;
+    });
+}
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1440,
@@ -145,7 +215,12 @@ function createWindow() {
         backgroundColor: "#1F2429",
         autoHideMenuBar: true,
         show: false,
-        webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+        webPreferences: {
+            contextIsolation: true,
+            sandbox: true,
+            nodeIntegration: false,
+            preload: path.join(__dirname, "preload.cjs"),
+        },
     });
     win.once("ready-to-show", () => win.show());
     win.webContents.setWindowOpenHandler(({ url }) => {
@@ -201,6 +276,7 @@ if (!app.requestSingleInstanceLock()) {
     app.whenReady().then(() => {
         Menu.setApplicationMenu(null);
         serveBundledApp();
+        enableUsbDriverSwitch();
         mainWindow = createWindow();
         setupUpdates(mainWindow);
     });

@@ -8,7 +8,7 @@
 
 import type { Pt } from "./geometry";
 import type { JobState } from "./grblController";
-import { jczLightHeader, jczLightRound, jczProgram } from "./jczProgram";
+import { GalvoMapper, jczLightHeader, jczLightRound, jczProgram } from "./jczProgram";
 import type { DriverEvent, DriverStatus, LaserDriver, LaserProgram } from "./laserDriver";
 import { t } from "./laserUi";
 import {
@@ -329,6 +329,7 @@ export class JczDriver implements LaserDriver {
             await this.send([Cmd.FiberSetMo, 0]);
             this.portBits = 0;
             await this.send([Cmd.WritePort, 0]);
+            await this.park();
             this.setJob("done");
         };
         this.streaming = start()
@@ -376,6 +377,18 @@ export class JczDriver implements LaserDriver {
         this.portBits = 0;
         await this.send([Cmd.WritePort, 0]);
         this.aborting = false;
+        await this.park();
+    }
+
+    /**
+     * The galvo back on the job's zero, light and laser off: the board otherwise leaves the
+     * mirrors wherever the last list ended.
+     */
+    private async park() {
+        const [x, y] = new GalvoMapper(this.profile()).zero();
+        this.galvoX = x;
+        this.galvoY = y;
+        await this.send([Cmd.GotoXY, x, y, 0, 0xffff]);
     }
 
     stop() {
@@ -459,9 +472,7 @@ export class JczDriver implements LaserDriver {
     }
 
     goToOrigin() {
-        this.galvoX = GALVO_CENTER;
-        this.galvoY = GALVO_CENTER;
-        void this.send([Cmd.GotoXY, GALVO_CENTER, GALVO_CENTER, 0, 0xffff]);
+        void this.park().catch((error) => this.log(String((error as Error)?.message ?? error), "err"));
     }
 
     /** The field centre is the zero of a galvo; shifting it is the field offset in the settings. */

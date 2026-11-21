@@ -32,9 +32,16 @@
         },
         "files": [
             "main.cjs",
+            "preload.cjs",
             "icon.png",
             "app/**/*",
             "package.json"
+        ],
+        "extraResources": [
+            {
+                "from": "scripts/usb-driver.ps1",
+                "to": "usb-driver.ps1"
+            }
         ],
         "win": {
             "target": [

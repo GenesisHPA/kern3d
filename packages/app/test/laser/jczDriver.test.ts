@@ -166,7 +166,9 @@ describe("JCZ driver on a fake board", () => {
         const ops = board.ops().slice(before);
         expect(ops.slice(0, 3)).toEqual([Cmd.ResetList, Cmd.WritePort, Cmd.FiberSetMo]);
         expect(ops.slice(3, 5)).toEqual([Cmd.SetEndOfList, Cmd.ExecuteList]);
-        expect(ops.slice(-2)).toEqual([Cmd.FiberSetMo, Cmd.WritePort]);
+        // laser off, then the galvo parked on the job's zero (the field centre here)
+        expect(ops.slice(-3)).toEqual([Cmd.FiberSetMo, Cmd.WritePort, Cmd.GotoXY]);
+        expect(board.commands[board.commands.length - 1].slice(0, 3)).toEqual([Cmd.GotoXY, 0x8000, 0x8000]);
         expect(board.lists).toHaveLength(1);
         const list = board.listOps();
         expect(list[0][0]).toBe(List.ReadyMark);
@@ -193,9 +195,10 @@ describe("JCZ driver on a fake board", () => {
             Cmd.ExecuteList,
             Cmd.FiberSetMo,
             Cmd.WritePort,
+            Cmd.GotoXY,
         ]);
         expect(board.lists).toHaveLength(1);
-        expect(board.commands[board.commands.length - 1].slice(0, 2)).toEqual([Cmd.WritePort, 0]);
+        expect(board.commands[board.commands.length - 2].slice(0, 2)).toEqual([Cmd.WritePort, 0]);
     });
 
     test("the red pointer loops in light-mode lists until stopped: light port, jumps, never a mark", async () => {
@@ -217,10 +220,26 @@ describe("JCZ driver on a fake board", () => {
         expect(list.some((c) => c[0] === List.MarkTo)).toBe(false);
         driver.stopFraming();
         for (let i = 0; i < 50 && driver.framing; i++) await tick();
-        for (let i = 0; i < 50 && board.commands[board.commands.length - 1][0] !== Cmd.WritePort; i++)
+        for (let i = 0; i < 50 && board.commands[board.commands.length - 1][0] !== Cmd.GotoXY; i++)
             await tick();
         expect(driver.framing).toBe(false);
-        expect(board.commands[board.commands.length - 1].slice(0, 2)).toEqual([Cmd.WritePort, 0]);
+        // light off, then the mirrors back on the zero instead of wherever the loop was
+        expect(board.commands[board.commands.length - 2].slice(0, 2)).toEqual([Cmd.WritePort, 0]);
+        expect(board.commands[board.commands.length - 1].slice(0, 3)).toEqual([Cmd.GotoXY, 0x8000, 0x8000]);
+    });
+
+    test("the zero the galvo is parked on follows the field offset", async () => {
+        const { board, driver, profile } = await connected();
+        profile.jcz.offsetX = 15;
+        profile.jcz.swapXY = false;
+        const before = board.commands.length;
+        driver.goToOrigin();
+        for (let i = 0; i < 20 && board.commands.length === before; i++) await tick();
+        const [op, x, y] = board.commands[board.commands.length - 1];
+        expect(op).toBe(Cmd.GotoXY);
+        // 15 mm of a 150 mm field is a tenth of the galvo's 0…0xffff range
+        expect(x).toBe(0x8000 + Math.round(0xffff / 10));
+        expect(y).toBe(0x8000);
     });
 
     test("a board that cannot be opened leaves the driver disconnected", async () => {

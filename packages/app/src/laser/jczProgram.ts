@@ -71,6 +71,11 @@ export class GalvoMapper {
 
     private readonly jcz: JczSettings;
 
+    /** The words of the job's zero: the bed's centre, where the galvo rests between runs. */
+    zero(): [number, number] {
+        return this.map({ x: this.cx, y: this.cy });
+    }
+
     map(p: Pt): [number, number] {
         const j = this.jcz;
         const x0 = p.x - this.cx + j.offsetX + this.extra.x;

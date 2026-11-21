@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { PubSub } from "@chili3d/core";
+import { type BoardDriverStatus, desktopUsbDriver } from "./desktopUsbDriver";
 import { importMarkcfg, importMarkParam } from "./ezcadImport";
 import type { Pt } from "./geometry";
 import { GrblDriver } from "./grblDriver";
@@ -155,7 +156,14 @@ export class LaserMachine {
             if (!webUsbAvailable()) {
                 parts.push(el("div", { className: style.warning, textContent: t("laser.machine.noUsb") }));
             }
-            parts.push(el("div", { className: style.muted, textContent: t("laser.machine.jcz.driverHint") }));
+            if (desktopUsbDriver() !== undefined) {
+                parts.push(row("laser.machine.jcz.driver", this.boardDriverText, this.boardDriverButton));
+                void this.refreshBoardDriver();
+            } else {
+                parts.push(
+                    el("div", { className: style.muted, textContent: t("laser.machine.jcz.driverHint") }),
+                );
+            }
         } else {
             if (!webSerialAvailable()) {
                 parts.push(el("div", { className: style.warning, textContent: t("laser.machine.noSerial") }));
@@ -211,6 +219,83 @@ export class LaserMachine {
     private rebuild() {
         this.build();
         this.update();
+    }
+
+    // ---- the board's Windows driver (desktop app) -------------------------------------------
+
+    private readonly boardDriverText = el("span", { className: style.muted });
+    private readonly boardDriverButton = button(
+        "laser.machine.jcz.toKern3d",
+        () => void this.switchBoardDriver(),
+    );
+    private boardDriver: BoardDriverStatus | undefined;
+    private switchingDriver = false;
+
+    private async refreshBoardDriver() {
+        const api = desktopUsbDriver();
+        if (api === undefined) return;
+        this.boardDriver = await api.status().catch(() => undefined);
+        this.showBoardDriver();
+    }
+
+    private showBoardDriver() {
+        const s = this.boardDriver;
+        const b = this.boardDriverButton;
+        if (this.switchingDriver) {
+            this.boardDriverText.textContent = t("laser.machine.jcz.switching");
+            b.disabled = true;
+            return;
+        }
+        this.boardDriverText.textContent = t(
+            s?.found ? `laser.machine.jcz.driver.${s.driver}` : "laser.machine.jcz.driver.notFound",
+        );
+        const toEzcad = s?.driver === "winusb";
+        b.textContent = t(toEzcad ? "laser.machine.jcz.toEzcad" : "laser.machine.jcz.toKern3d");
+        b.title = t(toEzcad ? "laser.machine.jcz.toEzcad.hint" : "laser.machine.jcz.toKern3d.hint");
+        b.disabled = s?.found !== true || (toEzcad && s.ezcadAvailable === false);
+    }
+
+    /**
+     * Switches the board's driver (Windows asks for administrator rights): to WinUSB for Kern3D,
+     * or back to EzCAD's own. A connected board is let go first. True when it took.
+     */
+    private async switchBoardDriver(to?: "winusb" | "ezcad"): Promise<boolean> {
+        const api = desktopUsbDriver();
+        if (api === undefined || this.switchingDriver) return false;
+        const target = to ?? (this.boardDriver?.driver === "winusb" ? "ezcad" : "winusb");
+        if (this.driver?.connected) await this.disconnect();
+        this.switchingDriver = true;
+        this.showBoardDriver();
+        let result: BoardDriverStatus | undefined;
+        try {
+            result = await api.install(target);
+        } catch (error) {
+            result = {
+                found: false,
+                driver: "none",
+                ok: false,
+                error: String((error as Error)?.message ?? error),
+            };
+        }
+        this.switchingDriver = false;
+        const ok = result.ok === true;
+        if (ok) {
+            this.log(
+                t(target === "winusb" ? "laser.machine.jcz.nowKern3d" : "laser.machine.jcz.nowEzcad"),
+                "out",
+            );
+            PubSub.default.pub(
+                "showToast",
+                target === "winusb" ? "laser.machine.jcz.nowKern3d" : "laser.machine.jcz.nowEzcad",
+            );
+        } else if (result.error === "cancelled") {
+            this.log(t("laser.machine.jcz.switchCancelled"), "err");
+        } else {
+            this.log(`${t("laser.machine.jcz.switchFailed")}: ${result.error ?? result.driver}`, "err");
+            PubSub.default.pub("showToast", "laser.machine.jcz.switchFailed");
+        }
+        await this.refreshBoardDriver();
+        return ok;
     }
 
     /** The galvo board's field and red-pointer alignment, and the import of EzCAD's own files. */
@@ -527,6 +612,17 @@ export class LaserMachine {
         if (this.driver?.connected) {
             await this.disconnect();
             return;
+        }
+        if (this.host.profile.controller === "jcz" && desktopUsbDriver() !== undefined) {
+            // the board on EzCAD's driver: switch it over first (Windows' rights prompt is the confirmation)
+            await this.refreshBoardDriver();
+            const s = this.boardDriver;
+            if (s?.found && s.driver !== "winusb") {
+                this.log(t("laser.machine.jcz.needsSwitch"), "out");
+                if (!(await this.switchBoardDriver("winusb"))) return;
+                // the board comes back on its new driver
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
         }
         const driver = this.createDriver();
         this.unsubscribe?.();
