@@ -179,6 +179,14 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
             log(`REBUILD ${path.basename(file)}: reference failed ${reference.error}`);
             return;
         }
+        if (process.env["KERN3D_STL_FACES"]) {
+            // only the reference's size, for tuning the rebuild's budgets
+            const faces = reference.value.findSubShapes(ShapeTypes.face).length;
+            log(
+                `FACES ${path.basename(file)}: ${faces} faces, ${trianglesOf(stl).length / 9} triangles, reference ${Date.now() - tRef} ms`,
+            );
+            return;
+        }
         setRebuildDebug((line) => log(`  ${path.basename(file)}: ${line}`));
         const report = rebuildPart(document(), trianglesOf(stl), reference.value, path.basename(file));
         setRebuildDebug(undefined);
