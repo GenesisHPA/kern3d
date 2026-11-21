@@ -157,7 +157,11 @@ export class LaserMachine {
                 parts.push(el("div", { className: style.warning, textContent: t("laser.machine.noUsb") }));
             }
             if (desktopUsbDriver() !== undefined) {
-                parts.push(row("laser.machine.jcz.driver", this.boardDriverText, this.boardDriverButton));
+                // the button on its own line: its label is long and the panel narrow
+                parts.push(
+                    row("laser.machine.jcz.driver", this.boardDriverText),
+                    el("div", { className: style.buttons }, this.boardDriverButton),
+                );
                 void this.refreshBoardDriver();
             } else {
                 parts.push(
@@ -223,7 +227,7 @@ export class LaserMachine {
 
     // ---- the board's Windows driver (desktop app) -------------------------------------------
 
-    private readonly boardDriverText = el("span", { className: style.muted });
+    private readonly boardDriverText = el("div", { className: style.muted });
     private readonly boardDriverButton = button(
         "laser.machine.jcz.toKern3d",
         () => void this.switchBoardDriver(),
