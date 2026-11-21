@@ -56,12 +56,33 @@ export function numberField(
     const digits = options.digits ?? 3;
     input.value = String(Number.parseFloat(value.toFixed(digits)));
     input.onfocus = () => input.select();
-    input.onchange = () => {
-        let v = Number.parseFloat(input.value.replace(",", "."));
+    const commit = (raw: number) => {
+        let v = raw;
         if (!Number.isFinite(v)) return;
         if (options.min !== undefined) v = Math.max(options.min, v);
         if (options.max !== undefined) v = Math.min(options.max, v);
         onChange(v);
+    };
+    input.onchange = () => commit(Number.parseFloat(input.value.replace(",", ".")));
+    // Our own stepping instead of the browser's spin arrows (hidden in the CSS): a panel that
+    // re-renders on a change replaces the field under a held arrow, which then never sees the
+    // mouse go up and keeps counting on its own. ↑/↓ (Shift ×10) and the wheel step once each.
+    const step = (direction: number, big: boolean) => {
+        const base = typeof options.step === "number" ? options.step : 1;
+        const current = Number.parseFloat(input.value.replace(",", ".")) || 0;
+        const next = Number.parseFloat((current + direction * base * (big ? 10 : 1)).toFixed(digits));
+        input.value = String(next);
+        commit(next);
+    };
+    input.onkeydown = (e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        step(e.key === "ArrowUp" ? 1 : -1, e.shiftKey);
+    };
+    input.onwheel = (e) => {
+        if (document.activeElement !== input) return;
+        e.preventDefault();
+        step(e.deltaY < 0 ? 1 : -1, e.shiftKey);
     };
     return input;
 }

@@ -442,3 +442,15 @@
     border-radius: 3px;
     font-family: inherit;
 }
+
+/* no spin arrows: numberField steps with ↑/↓ and the wheel itself (see laserUi.ts) */
+.dialog input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.dialog input[type="number"]::-webkit-inner-spin-button,
+.dialog input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
