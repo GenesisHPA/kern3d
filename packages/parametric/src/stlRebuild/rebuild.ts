@@ -94,15 +94,15 @@ export function rebuildPart(
     const referenceMesh = mesh;
     const goal = options.goal ?? 0.002;
     /** One axis tried whole: planned, built, its edges rounded, measured. */
-    const attempt = (frame: (typeof frames)[number]) => {
+    const attempt = (frame: (typeof frames)[number], meshPieces = false) => {
         const treatments: EdgeTreatment[] = [];
-        const plans = planExtrusions(mesh, frame, tol, { treatments });
+        const plans = planExtrusions(mesh, frame, tol, { treatments, meshPieces });
         if (plans.length === 0) return undefined;
         const model = buildModel(document, plans, name, tol, reference);
         const shape = bodyShape(model);
         const failed = failedFeature(model);
         if (failed !== undefined || shape === undefined)
-            return { model, ratio: 1, rounded: 0, plans, error: failed ?? "no shape" };
+            return { model, ratio: 1, rounded: 0, plans, frame, error: failed ?? "no shape" };
         // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
         let ratio = measure(referenceMesh, shape);
         let rounded = 0;
@@ -117,7 +117,7 @@ export function rebuildPart(
                 model.body.setFeaturesEmitShapeChanged(before);
             }
         }
-        return { model, ratio, rounded, plans, error: undefined as string | undefined };
+        return { model, ratio, rounded, plans, frame, error: undefined as string | undefined };
     };
     const discard = (model: BuiltModel) => {
         for (const n of [model.body, ...model.sketches]) n.parent?.remove(n);
@@ -143,7 +143,7 @@ export function rebuildPart(
     const t2 = t1;
     if (best === undefined)
         return { ratio: 1, firstRatio: 1, features: 0, corrections: 0, error: "no sections" };
-    const { model, rounded } = best;
+    let { model, rounded } = best;
     if (best.error !== undefined) {
         return {
             model,
@@ -211,6 +211,20 @@ export function rebuildPart(
         diff.missingShape?.dispose();
         diff.extraShape?.dispose();
         if (!improved) break;
+    }
+    // still off: the stretches no feature describes taken as the part's own pieces — last, so
+    // a part that features can describe never gets them
+    if (ratio > goal && Date.now() < deadline + 60_000) {
+        const alt = attempt(best.frame, true);
+        if (alt !== undefined && alt.error === undefined && alt.ratio < ratio) {
+            discard(model);
+            model = alt.model;
+            rounded = alt.rounded;
+            ratio = alt.ratio;
+            corrections = 0;
+        } else if (alt !== undefined) {
+            discard(alt.model);
+        }
     }
     const timings = { plan: t1 - t0, build: t2 - t1, compare: t3 - t2, correct: Date.now() - t3 };
     const finalShape = bodyShape(model);

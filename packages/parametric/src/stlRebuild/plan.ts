@@ -371,6 +371,8 @@ export function planExtrusions(
         role?: PlannedExtrude["role"];
         /** When given, rounded and chamfered edges are recognised: their slabs go, the edges are collected here. */
         treatments?: EdgeTreatment[];
+        /** Take the part's own piece where no feature describes a slab (`PlannedExtrude.fromMesh`). */
+        meshPieces?: boolean;
     } = {},
 ): PlannedExtrude[] {
     const q = Math.max(tol * 5, 1e-4);
@@ -409,7 +411,9 @@ export function planExtrusions(
         if (tapered === undefined) {
             // leaning walls no feature here describes: the part's own piece, if it is worth it
             const fromMesh =
-                s.slanted >= SLANTED && bandError(mesh, frame, s, tol).straight > partVolume * 5e-4;
+                options.meshPieces === true &&
+                s.slanted >= SLANTED &&
+                bandError(mesh, frame, s, tol).straight > partVolume * 5e-4;
             slabs.push({
                 bottom: s.bottom,
                 top: s.top,
