@@ -15,6 +15,39 @@ export const COMMANDS = [
     ["stop", "Не присылать новости о релизах"],
 ];
 
+/**
+ * The question buttons shown under the greeting: a short label and the words that find its FAQ
+ * entry by title (the numbers follow the FAQ file, so they are looked up, not hard-coded).
+ */
+export const SUGGESTED = [
+    ["📥 Где скачать", "где скачать"],
+    ["🖱 Вращать и приближать", "мышью"],
+    ["✏️ Редактировать эскиз", "отредактировать готовый эскиз"],
+    ["📏 Размер в эскизе", "диаметр окружности"],
+    ["⬆️ Выдавить эскиз", "выдавить эскиз"],
+    ["🕳 Отверстие", "сделать отверстие"],
+    ["🔩 Резьба", "сделать резьбу"],
+    ["📦 Импорт STL", "импортировать stl"],
+    ["📐 Чертёж", "сделать чертёж"],
+    ["🐞 Сообщить об ошибке", "сообщить об ошибке"],
+];
+
+/** Inline keyboard of the suggested questions (two per row) and «все вопросы». */
+export function questionKeyboard(faq) {
+    const buttons = [];
+    for (const [label, words] of SUGGESTED) {
+        const entry = faq.find((c) => c.title.toLowerCase().includes(words));
+        if (entry) buttons.push({ text: label, callback_data: `faq:${entry.number}` });
+    }
+    const rows = [];
+    for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
+    rows.push([{ text: "📚 Все вопросы", callback_data: "faq:list" }]);
+    return { inline_keyboard: rows };
+}
+
+/** A reply that carries the question buttons. */
+const withQuestions = (ctx, text) => ({ text, reply_markup: questionKeyboard(ctx.kb.faq) });
+
 const isGroup = (chat) => chat?.type === "group" || chat?.type === "supergroup";
 
 /** `/cmd@bot args` → `{ name, target, args }`, or null when the text is not a command. */
@@ -185,7 +218,12 @@ export async function replyFor(ctx, message) {
         switch (command.name) {
             case "start":
             case "help":
-                return helpText(ctx.me);
+                return withQuestions(
+                    ctx,
+                    `${helpText(ctx.me)}
+
+<b>О чём спросить:</b>`,
+                );
             case "version":
                 return versionText(ctx);
             case "download":
@@ -193,7 +231,7 @@ export async function replyFor(ctx, message) {
             case "changes":
                 return changesText(ctx, command.args);
             case "faq":
-                return faqText(ctx, command.args);
+                return command.args ? faqText(ctx, command.args) : withQuestions(ctx, faqText(ctx, ""));
             case "search":
                 return command.args
                     ? ctx.kb.answer(command.args)
@@ -208,19 +246,41 @@ export async function replyFor(ctx, message) {
     }
     if (!shouldAnswer(message, ctx.me)) return null;
     const question = questionText(message, ctx.me);
-    if (question === "") return helpText(ctx.me);
+    if (question === "") return withQuestions(ctx, "Задайте вопрос о Kern3D или выберите:");
     return ctx.kb.answer(question);
+}
+
+/** A pressed question button: its FAQ entry (or the list), sent to the chat the button is in. */
+export function callbackReply(ctx, data) {
+    const match = /^faq:(\d+|list)$/.exec(String(data ?? ""));
+    if (!match) return null;
+    return match[1] === "list" ? withQuestions(ctx, faqText(ctx, "")) : faqText(ctx, match[1]);
+}
+
+async function handleCallback(ctx, query) {
+    const reply = callbackReply(ctx, query.data);
+    await ctx.tg.answerCallbackQuery(query.id).catch(() => {});
+    const message = query.message;
+    if (!reply || !message?.chat) return;
+    const { text, reply_markup } = typeof reply === "string" ? { text: reply } : reply;
+    const extra = reply_markup ? { reply_markup } : {};
+    if (message.message_thread_id && message.is_topic_message)
+        extra.message_thread_id = message.message_thread_id;
+    await ctx.tg.sendMessage(message.chat.id, text, extra);
 }
 
 /** Handles one update: computes the reply and sends it (in groups as a reply to the question). */
 export async function handleUpdate(ctx, update) {
+    if (update.callback_query) return handleCallback(ctx, update.callback_query);
     const message = update.message;
     if (!message?.text || !message.chat) return;
-    const reply = await replyFor(ctx, message);
-    if (!reply) return;
+    const result = await replyFor(ctx, message);
+    if (!result) return;
+    const { text: reply, reply_markup } = typeof result === "string" ? { text: result } : result;
     const extra = isGroup(message.chat)
         ? { reply_parameters: { message_id: message.message_id, allow_sending_without_reply: true } }
         : {};
+    if (reply_markup) extra.reply_markup = reply_markup;
     if (message.message_thread_id && message.is_topic_message)
         extra.message_thread_id = message.message_thread_id;
     await ctx.tg.sendMessage(message.chat.id, reply, extra);

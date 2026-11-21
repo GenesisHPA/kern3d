@@ -3,7 +3,15 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { before, describe, it } from "node:test";
-import { handleUpdate, parseCommand, questionText, replyFor, shouldAnswer } from "../src/handlers.mjs";
+import {
+    callbackReply,
+    handleUpdate,
+    parseCommand,
+    questionText,
+    replyFor,
+    SUGGESTED,
+    shouldAnswer,
+} from "../src/handlers.mjs";
 import { createKnowledge } from "../src/knowledge.mjs";
 import { emptyState, loadState, saveState } from "../src/state.mjs";
 import { createTelegram } from "../src/telegram.mjs";
@@ -64,11 +72,41 @@ describe("commands", () => {
 
     it("/faq lists numbered entries and /faq N shows one", async () => {
         const { ctx } = context();
-        const list = await replyFor(ctx, msg("/faq"));
+        const listed = await replyFor(ctx, msg("/faq"));
+        const list = listed.text;
+        assert.ok(listed.reply_markup.inline_keyboard.length > 0);
         assert.match(list, /^<b>Частые вопросы<\/b>/);
         assert.match(list, /\n1\. /);
         assert.match(await replyFor(ctx, msg("/faq 1")), /^<b>Где скачать Kern3D\?<\/b>/);
         assert.match(await replyFor(ctx, msg("/faq 999")), /Нет вопроса/);
+    });
+
+    it("/start shows the question buttons, each one opening its FAQ entry", async () => {
+        const { ctx, sent } = context();
+        const start = await replyFor(ctx, msg("/start"));
+        assert.match(start.text, /О чём спросить/);
+        const buttons = start.reply_markup.inline_keyboard.flat();
+        // every suggested question was found in the FAQ, plus «все вопросы»
+        assert.equal(buttons.length, SUGGESTED.length + 1);
+        for (const button of buttons) assert.ok(callbackReply(ctx, button.callback_data));
+        const thread = buttons.find((b) => b.text.includes("Резьба"));
+        assert.match(callbackReply(ctx, thread.callback_data), /резьб/i);
+        assert.equal(callbackReply(ctx, "evil"), null);
+
+        const answered = [];
+        ctx.tg.answerCallbackQuery = async (id) => answered.push(id);
+        await handleUpdate(ctx, {
+            update_id: 1,
+            callback_query: {
+                id: "q1",
+                data: thread.callback_data,
+                message: { chat: { id: 7, type: "private" } },
+            },
+        });
+        assert.deepEqual(answered, ["q1"]);
+        assert.equal(sent.length, 1);
+        assert.equal(sent[0].chatId, 7);
+        assert.match(sent[0].text, /резьб/i);
     });
 
     it("/changes shows the newest released section or a given version", async () => {

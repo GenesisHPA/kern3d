@@ -87,7 +87,7 @@ export function createTelegram(token, options = {}) {
         getUpdates: (offset, signal) =>
             call(
                 "getUpdates",
-                { offset, timeout: 50, allowed_updates: ["message"] },
+                { offset, timeout: 50, allowed_updates: ["message", "callback_query"] },
                 { signal, timeoutMs: 65_000 },
             ),
         sendMessage: (chatId, text, extra = {}) =>
@@ -98,6 +98,8 @@ export function createTelegram(token, options = {}) {
                 link_preview_options: { is_disabled: true },
                 ...extra,
             }),
+        answerCallbackQuery: (id, text) =>
+            call("answerCallbackQuery", { callback_query_id: id, ...(text ? { text } : {}) }),
         getChatMember: (chatId, userId) => call("getChatMember", { chat_id: chatId, user_id: userId }),
         setMyCommands: (commands) => call("setMyCommands", { commands }),
     };
