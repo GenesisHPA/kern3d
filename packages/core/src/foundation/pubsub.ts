@@ -6,7 +6,7 @@ import type { IDocument } from "../document";
 import type { I18nKeys } from "../i18n";
 import type { Material } from "../material";
 import type { INode } from "../model";
-import type { DialogButton, FloatPanelOptions } from "../ui";
+import type { DialogButton, FloatPanelOptions, RibbonWorkspaceKeys } from "../ui";
 import type { CursorType, IView } from "../visual";
 import type { AsyncController } from "./asyncController";
 import type { IDisposable } from "./disposable";
@@ -102,6 +102,12 @@ export interface PubSubEventMap {
     viewClosed: (view: IView) => void;
     viewCursor: (cursor: CursorType) => void;
     visibleChanged: (model: INode) => void;
+    /**
+     * The user picked a workspace in the toolbar's switcher (also the one already shown): a
+     * module whose workspace works in an editor of its own opens it (the laser workspace opens
+     * the document's job).
+     */
+    workspaceSelected: (workspace: RibbonWorkspaceKeys) => void;
 }
 
 type EventCallback = (...args: any[]) => void;

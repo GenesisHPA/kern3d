@@ -1404,5 +1404,6 @@ export default {
         "laser.machine.pointerOff": "Pointer off M-code",
         "laser.machine.connectFirst": "Connect the machine first («Станок» tab)",
         "laser.machine.alertToast": "{0}",
+        "laser.jobs": "Laser jobs of the document",
     },
 } satisfies Locale;

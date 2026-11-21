@@ -1335,6 +1335,7 @@ export const I18N_KEYS = [
     "laser.machine.pointerOff",
     "laser.machine.connectFirst",
     "laser.machine.alertToast",
+    "laser.jobs",
 ] as const;
 
 export type I18nKeys = (typeof I18N_KEYS)[number];

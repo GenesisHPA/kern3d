@@ -143,9 +143,11 @@ export class MainToolbar extends HTMLElement {
     }
 
     switchWorkspace(workspace: RibbonWorkspaceKeys) {
-        if (workspace === this.workspace) return;
-        const tab = this.ribbon.tabs.find((t) => t.workspace === workspace && t.visible);
-        if (tab) this.ribbon.activeTab = tab;
+        if (workspace !== this.workspace) {
+            const tab = this.ribbon.tabs.find((t) => t.workspace === workspace && t.visible);
+            if (tab) this.ribbon.activeTab = tab;
+        }
+        PubSub.default.pub("workspaceSelected", workspace);
     }
 
     private refresh() {

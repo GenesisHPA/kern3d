@@ -186,6 +186,20 @@ describe("MainToolbar", () => {
         expect(panelOf(toolbar, "ribbon.tab.parametric")!.style.display).toBe("none");
     });
 
+    test("picking a workspace tells the modules, also when it is already shown", () => {
+        const { toolbar } = makeToolbar();
+        const picked: string[] = [];
+        const listener = (workspace: string) => picked.push(workspace);
+        PubSub.default.sub("workspaceSelected", listener);
+        try {
+            toolbar.switchWorkspace("ribbon.workspace.drawing");
+            toolbar.switchWorkspace("ribbon.workspace.drawing");
+        } finally {
+            PubSub.default.remove("workspaceSelected", listener);
+        }
+        expect(picked).toEqual(["ribbon.workspace.drawing", "ribbon.workspace.drawing"]);
+    });
+
     test("a contextual tab opened by the sketch shows up and keeps the design workspace", () => {
         const { toolbar, ribbon } = makeToolbar();
         ribbon.openTab("ribbon.tab.sketch");

@@ -3,6 +3,7 @@
 
 import {
     AsyncController,
+    type IDocument,
     PubSub,
     readFileAsync,
     ShapeNode,
@@ -28,7 +29,7 @@ import {
 import style from "./laserEditor.module.css";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
 import { LaserMachine } from "./laserMachine";
-import type { LaserNode } from "./laserNode";
+import { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
 import { bedRect, loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
@@ -80,7 +81,15 @@ const CORNER_SIGNS: [number, number][] = [
 export class LaserEditor {
     private static readonly editors = new Map<string, LaserEditor>();
 
+    /** The job last opened or edited in each document: what the «Лазер» workspace opens. */
+    private static readonly lastJob = new WeakMap<IDocument, string>();
+
+    static lastEdited(document: IDocument): string | undefined {
+        return LaserEditor.lastJob.get(document);
+    }
+
     static open(node: LaserNode) {
+        LaserEditor.lastJob.set(node.document, node.id);
         let editor = LaserEditor.editors.get(node.id);
         if (editor === undefined) {
             editor = new LaserEditor(node);
@@ -216,6 +225,8 @@ export class LaserEditor {
 
     private reveal() {
         if (!this.dialog.open) this.dialog.show();
+        LaserEditor.lastJob.set(this.node.document, this.node.id);
+        this.updateJobPicker();
         if (!this.fitted) {
             this.fitted = true;
             this.fit();
@@ -265,6 +276,7 @@ export class LaserEditor {
         Transaction.execute(this.node.document, "laser", () => {
             this.node.content = content;
         });
+        LaserEditor.lastJob.set(this.node.document, this.node.id);
         this.changed();
     }
 
@@ -537,9 +549,33 @@ export class LaserEditor {
         ];
     }
 
+    /** The document's laser jobs, to switch between them; shown only when there are several. */
+    private readonly jobPicker = el("select", { title: t("laser.jobs") });
+
+    private laserJobs(): LaserNode[] {
+        return this.node.document.modelManager.findNodes((n) => n instanceof LaserNode) as LaserNode[];
+    }
+
+    private updateJobPicker() {
+        const jobs = this.laserJobs();
+        this.jobPicker.style.display = jobs.length > 1 ? "" : "none";
+        this.jobPicker.replaceChildren(
+            ...jobs.map((job) => {
+                const option = el("option", { value: job.id, textContent: job.name });
+                option.selected = job.id === this.node.id;
+                return option;
+            }),
+        );
+    }
+
     private createToolbar(): HTMLDivElement {
         const bar = el("div", { className: style.toolbar });
+        this.jobPicker.onchange = () => {
+            const job = this.laserJobs().find((n) => n.id === this.jobPicker.value);
+            if (job !== undefined && job !== this.node) LaserEditor.open(job);
+        };
         bar.append(
+            this.jobPicker,
             ...this.toolbarItems(),
             this.separator(),
             button("laser.toModel", () => workspaceTabs.activate(undefined)),
@@ -551,6 +587,7 @@ export class LaserEditor {
     // ---- rendering --------------------------------------------------------------------------
 
     render() {
+        this.updateJobPicker();
         this.world.setAttribute("transform", "matrix(1 0 0 -1 0 0)");
         this.renderBed();
         this.renderObjects();

@@ -1240,5 +1240,6 @@ export default {
         "laser.machine.pointerOff": "M-код выключения указателя",
         "laser.machine.connectFirst": "Сначала подключите станок (вкладка «Станок»)",
         "laser.machine.alertToast": "{0}",
+        "laser.jobs": "Задания лазера документа",
     },
 } satisfies Locale;

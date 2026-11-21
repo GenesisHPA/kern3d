@@ -1,10 +1,10 @@
 {
-    "//": "The laser workspace end to end without a machine: a job is created and opened over the model, a square outline and a small gradient picture are put on the bed (through the node, the way undo would), the square is selected from the object list, and the G-code is generated and previewed. Screenshots show the bed, the selection and the toolpath.",
+    "//": "The laser workspace end to end without a machine: choosing the «Лазер» workspace creates a job and opens it over the model (choosing it again reopens the last job edited, a second job brings up the job picker), a square outline and a small gradient picture are put on the bed (through the node, the way undo would), the square is selected from the object list, and the G-code is generated and previewed. Screenshots show the bed, the selection and the toolpath.",
     "start": "document",
     "steps": [
         {
-            "kind": "runCommand",
-            "name": "laser.create"
+            "kind": "eval",
+            "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); return true; })()"
         },
         {
             "kind": "waitFor",
@@ -53,6 +53,19 @@
         {
             "kind": "screenshot",
             "name": "04-machine"
+        },
+        {
+            "kind": "runCommand",
+            "name": "laser.create"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const jobs = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group'); if (jobs.length !== 2) throw new Error('expected two jobs, got ' + jobs.length); const picker = document.querySelector('dialog[open] select'); if (!picker || picker.options.length !== 2 || picker.style.display === 'none') throw new Error('no job picker'); document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); const again = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group'); if (again.length !== 2) throw new Error('the workspace made another job'); return picker.value === again[1].id; })()",
+            "log": true
+        },
+        {
+            "kind": "screenshot",
+            "name": "05-two-jobs"
         }
     ]
 }
