@@ -21,8 +21,69 @@ import type { LaserFontRef } from "./shapes";
  */
 
 const LOCAL_URL = "local:";
+const SYSTEM_URL = "system:";
 
+/** The desktop app's access to the fonts installed in Windows (absent in a browser). */
+interface DesktopFonts {
+    list(): Promise<{ family: string }[]>;
+    read(family: string): Promise<ArrayBuffer | undefined>;
+}
+
+function desktopFonts(): DesktopFonts | undefined {
+    return (globalThis as { kern3dDesktop?: { fonts?: DesktopFonts } }).kern3dDesktop?.fonts;
+}
+
+/**
+ * The fonts every Windows has, listed first and in this order, as EzCAD and office programs
+ * show them; whichever of them this computer has.
+ */
+export const STANDARD_FONTS = [
+    "Arial",
+    "Times New Roman",
+    "Courier New",
+    "Calibri",
+    "Verdana",
+    "Tahoma",
+    "Segoe UI",
+    "Georgia",
+    "Trebuchet MS",
+    "Arial Black",
+    "Impact",
+    "Comic Sans MS",
+    "Consolas",
+    "Lucida Console",
+    "Palatino Linotype",
+] as const;
+
+let systemList: Promise<LaserFontRef[]> | undefined;
+
+/** The installed fonts the desktop app can read, standard ones first; empty in a browser. */
+export function systemFonts(): Promise<LaserFontRef[]> {
+    const api = desktopFonts();
+    if (api === undefined) return Promise.resolve([]);
+    systemList ??= api
+        .list()
+        .then((list) => {
+            const names = new Set(list.map((f) => f.family));
+            const standard = STANDARD_FONTS.filter((f) => names.has(f));
+            const rest = [...names].filter((f) => !(STANDARD_FONTS as readonly string[]).includes(f));
+            return [...standard, ...rest].map((family) => ({ family, system: true }));
+        })
+        .catch(() => []);
+    return systemList;
+}
+
+export function systemFontsAvailable(): boolean {
+    return desktopFonts() !== undefined;
+}
+
+export function isStandardFont(family: string): boolean {
+    return (STANDARD_FONTS as readonly string[]).includes(family);
+}
+
+/** Arial in the desktop app (installed, nothing to download); Roboto from the catalogue elsewhere. */
 export function defaultLaserFont(): LaserFontRef {
+    if (desktopFonts() !== undefined) return { family: "Arial", system: true };
     const roboto = FontCatalog.find((f) => f.family === "Roboto") ?? FontCatalog[0];
     return { family: roboto.family, url: roboto.url };
 }
@@ -67,6 +128,24 @@ function regularFace(entries: LocalFontEntry[], family: string): LocalFontEntry 
 
 /** The font's outlines: from this session's memory, the catalogue's address or the system. */
 export async function loadLaserFont(ref: LaserFontRef): Promise<FontOutline | undefined> {
+    if (ref.system) {
+        const known = cachedOutline(ref.family, SYSTEM_URL);
+        if (known !== undefined) return known;
+        const bytes = await desktopFonts()
+            ?.read(ref.family)
+            .catch(() => undefined);
+        if (bytes !== undefined) {
+            const parsed = await parseFont(bytes, ref.family);
+            if (parsed.isOk) {
+                rememberOutline(ref.family, SYSTEM_URL, parsed.value);
+                return parsed.value;
+            }
+        }
+        // opened where that font is not installed: the browser's own list, then the catalogue
+        return loadLaserFont({ family: ref.family, local: true }).then(
+            (f) => f ?? loadLaserFont({ family: "Roboto" }),
+        );
+    }
     if (ref.local) {
         const known = cachedOutline(ref.family, LOCAL_URL);
         if (known !== undefined) return known;

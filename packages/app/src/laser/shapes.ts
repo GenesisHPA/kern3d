@@ -28,6 +28,8 @@ export interface LaserFontRef {
     /** Where the catalogue fetches it; absent for a local font. */
     url?: string;
     local?: boolean;
+    /** Installed in Windows, read by the desktop app from its font folder. */
+    system?: boolean;
 }
 
 export type LaserShape =

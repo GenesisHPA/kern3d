@@ -13,4 +13,10 @@ contextBridge.exposeInMainWorld("kern3dDesktop", {
         /** Asks Windows for administrator rights and switches; resolves with the new status. */
         install: (to) => ipcRenderer.invoke("usb-driver:install", to),
     },
+    fonts: {
+        /** The installed font families with an upright regular face: [{family}] */
+        list: () => ipcRenderer.invoke("fonts:list"),
+        /** The regular face's file of a listed family, as an ArrayBuffer (undefined if unknown). */
+        read: (family) => ipcRenderer.invoke("fonts:read", family),
+    },
 });

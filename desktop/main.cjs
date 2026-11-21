@@ -204,6 +204,67 @@ function enableUsbDriverSwitch() {
     });
 }
 
+/**
+ * The fonts installed in Windows (the machine's and the user's own), for laser text without a
+ * download or the browser's font-access prompt: one upright regular face per family, read from
+ * the registry. Only files the registry lists can be read back.
+ */
+function enableSystemFonts() {
+    const { ipcMain } = require("electron");
+    const fs = require("node:fs");
+    const fromApp = (event) => isInternal(event.senderFrame?.url ?? "");
+    const STYLE =
+        /\b(bold|italic|oblique|light|semilight|semibold|demibold|thin|extralight|ultralight|medium|heavy)\b/i;
+    let families; // Map family -> file
+    const load = async () => {
+        if (families !== undefined) return families;
+        families = new Map();
+        if (process.platform !== "win32") return families;
+        const keys = [
+            "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts",
+            "HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts",
+        ];
+        const script =
+            "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $o=@(); " +
+            keys
+                .map(
+                    (k) =>
+                        `$p=Get-ItemProperty '${k}' -ErrorAction SilentlyContinue; if($p){$p.PSObject.Properties | ` +
+                        "Where-Object { $_.Name -notlike 'PS*' } | ForEach-Object { $o += ,@($_.Name, [string]$_.Value) }};",
+                )
+                .join(" ") +
+            " ConvertTo-Json -Compress -InputObject $o";
+        const r = await runPowerShell(["-Command", script]);
+        let rows = [];
+        try {
+            rows = JSON.parse(r.stdout.trim() || "[]");
+        } catch {
+            rows = [];
+        }
+        const dir = path.join(process.env.WINDIR ?? "C:\\Windows", "Fonts");
+        for (const [name, value] of rows) {
+            if (typeof name !== "string" || typeof value !== "string") continue;
+            if (!/\.(ttf|otf)$/i.test(value)) continue; // collections (.ttc) are not read
+            const family = name.replace(/\s*\((TrueType|OpenType)\)\s*$/i, "").trim();
+            if (family === "" || family.includes("&") || STYLE.test(family)) continue;
+            const file = path.isAbsolute(value) ? value : path.join(dir, value);
+            if (!families.has(family) && fs.existsSync(file)) families.set(family, file);
+        }
+        return families;
+    };
+    ipcMain.handle("fonts:list", async (event) => {
+        if (!fromApp(event)) return [];
+        return [...(await load()).keys()].sort((a, b) => a.localeCompare(b)).map((family) => ({ family }));
+    });
+    ipcMain.handle("fonts:read", async (event, family) => {
+        if (!fromApp(event) || typeof family !== "string") return undefined;
+        const file = (await load()).get(family);
+        if (file === undefined) return undefined;
+        const bytes = await fs.promises.readFile(file);
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    });
+}
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1440,
@@ -277,6 +338,7 @@ if (!app.requestSingleInstanceLock()) {
         Menu.setApplicationMenu(null);
         serveBundledApp();
         enableUsbDriverSwitch();
+        enableSystemFonts();
         mainWindow = createWindow();
         setupUpdates(mainWindow);
     });

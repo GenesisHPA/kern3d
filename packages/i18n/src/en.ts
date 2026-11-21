@@ -1528,6 +1528,10 @@ export default {
         "laser.shape.toCurves.hint":
             "The object becomes plain outlines: the figure's parameters can no longer be changed",
         "laser.shape.font": "Font",
+        "laser.shape.font.standard": "Standard",
+        "laser.shape.font.installed": "Installed",
+        "laser.shape.font.webGroup": "From the internet",
+        "laser.shape.font.current": "Current",
         "laser.shape.font.web": "web",
         "laser.shape.font.local": "This computer's fonts…",
         "laser.shape.size": "Font size, mm",

@@ -14,7 +14,14 @@ import {
 } from "./laserData";
 import type { PolygonDefaults } from "./laserDraw";
 import style from "./laserEditor.module.css";
-import { catalogFonts, localFontFamilies, localFontsAvailable } from "./laserFonts";
+import {
+    catalogFonts,
+    isStandardFont,
+    localFontFamilies,
+    localFontsAvailable,
+    systemFonts,
+    systemFontsAvailable,
+} from "./laserFonts";
 import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
 import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
 import { ALIGNS, type Align } from "./selection";
@@ -22,6 +29,8 @@ import { defaultQuiet, type LaserFontRef, type LaserShape, TEXT_ALIGNS } from ".
 
 /** The installed fonts, once listed (asking the browser's permission) this session. */
 let localFamilies: LaserFontRef[] | undefined;
+/** Windows' installed fonts as the desktop app lists them, once loaded. */
+let systemFamilies: LaserFontRef[] | undefined;
 const LOCAL_FONTS = "__local";
 
 /** What the job panel needs from the editor it sits in. */
@@ -520,16 +529,45 @@ export class LaserJobPanel {
             const value = area.value;
             timer = setTimeout(() => edit((s) => (s.text = value)), 250);
         };
-        const fonts = [...catalogFonts(), ...(localFamilies ?? [])];
-        if (!fonts.some((f) => f.family === shape.font.family)) fonts.unshift(shape.font);
-        const keyOf = (f: LaserFontRef) => `${f.local ? "local" : "web"}:${f.family}`;
-        const options = fonts.map((f) => ({
-            value: keyOf(f),
-            label: f.local ? f.family : `${f.family} (${t("laser.shape.font.web")})`,
-        }));
-        if (localFamilies === undefined && localFontsAvailable())
-            options.push({ value: LOCAL_FONTS, label: t("laser.shape.font.local") });
-        const fontSelect = select(options, keyOf(shape.font), (v) => {
+        if (systemFamilies === undefined && systemFontsAvailable()) {
+            void systemFonts().then((list) => {
+                systemFamilies = list;
+                this.render();
+            });
+        }
+        const system = systemFamilies ?? [];
+        const groups: { label: string; fonts: LaserFontRef[] }[] = [
+            { label: t("laser.shape.font.standard"), fonts: system.filter((f) => isStandardFont(f.family)) },
+            {
+                label: t("laser.shape.font.installed"),
+                fonts: system.filter((f) => !isStandardFont(f.family)),
+            },
+            { label: t("laser.shape.font.installed"), fonts: localFamilies ?? [] },
+            { label: t("laser.shape.font.webGroup"), fonts: catalogFonts() },
+        ].filter((g) => g.fonts.length > 0);
+        const keyOf = (f: LaserFontRef) => `${f.system ? "system" : f.local ? "local" : "web"}:${f.family}`;
+        const all = groups.flatMap((g) => g.fonts);
+        if (!all.some((f) => keyOf(f) === keyOf(shape.font))) {
+            groups.unshift({ label: t("laser.shape.font.current"), fonts: [shape.font] });
+            all.unshift(shape.font);
+        }
+        const fontSelect = el("select");
+        for (const g of groups) {
+            const group = el("optgroup");
+            group.label = g.label;
+            for (const f of g.fonts) {
+                const option = el("option", { value: keyOf(f), textContent: f.family });
+                // each name in its own face, as font menus show them (installed ones only)
+                if (f.system || f.local) option.style.fontFamily = `"${f.family}"`;
+                option.selected = keyOf(f) === keyOf(shape.font);
+                group.append(option);
+            }
+            fontSelect.append(group);
+        }
+        if (localFamilies === undefined && !systemFontsAvailable() && localFontsAvailable())
+            fontSelect.append(el("option", { value: LOCAL_FONTS, textContent: t("laser.shape.font.local") }));
+        fontSelect.onchange = () => {
+            const v = fontSelect.value;
             if (v === LOCAL_FONTS) {
                 void localFontFamilies().then((list) => {
                     localFamilies = list;
@@ -537,9 +575,9 @@ export class LaserJobPanel {
                 });
                 return;
             }
-            const font = fonts.find((f) => keyOf(f) === v);
+            const font = all.find((f) => keyOf(f) === v);
             if (font !== undefined) edit((s) => (s.font = { ...font }));
-        });
+        };
         return [
             area,
             row("laser.shape.font", fontSelect),
