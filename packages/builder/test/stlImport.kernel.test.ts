@@ -13,7 +13,7 @@ import {
 } from "@chili3d/core/test-utils";
 import { initWasm, OccShapeConverter, runInSandboxKernel, ShapeFactory } from "@chili3d/wasm";
 import { rs } from "@rstest/core";
-import { importStlNode } from "../src/stlImport";
+import { convertInSandbox, importStlNode, STL_SOLID_TRIANGLE_LIMIT } from "../src/stlImport";
 import { stlToMesh } from "../src/stlMesh";
 
 beforeAll(async () => {
@@ -88,6 +88,26 @@ describe("STL import through a sandbox kernel", () => {
         expect((body as EditableShapeNode).shape.value.volume()).toBeCloseTo(1000, 6);
     });
 
+    test("past the triangle limit the part comes in as a mesh at once, without touching a kernel", async () => {
+        const count = STL_SOLID_TRIANGLE_LIMIT + 1;
+        const triangles = Array.from({ length: count }, (_, i) => [i, 0, 0, i + 1, 0, 0, i, 1, 0]);
+        const toasts: unknown[][] = [];
+        const pub = rs.spyOn(PubSub.default, "pub").mockImplementation((...args: unknown[]) => {
+            toasts.push(args);
+        });
+        const sewing = rs.spyOn(shapeFactory, "sewing");
+        try {
+            const imported = await importStlNode(newDocument(), "big.stl", binaryStl(triangles));
+            const [mesh] = children(imported.value);
+            expect(mesh).toBeInstanceOf(MeshNode);
+            expect(toasts).toContainEqual(["showToast", "toast.import.stlTooLarge{0}", count]);
+            expect(sewing).not.toHaveBeenCalled();
+        } finally {
+            pub.mockRestore();
+            sewing.mockRestore();
+        }
+    });
+
     test("bytes that are no STL at all are refused, not turned into an empty mesh", async () => {
         const imported = await importStlNode(newDocument(), "junk.stl", new Uint8Array([1, 2, 3]));
         expect(imported.isOk).toBe(false);
@@ -129,20 +149,23 @@ describe("stlToMesh", () => {
 });
 
 /**
- * The user's files (`KERN3D_STL_FILES`, `;`-separated, not committed) — each takes minutes. The
- * point is the second import: before the sandbox, the first one's trap left every later import
- * failing until the app was restarted.
+ * The user's files (`KERN3D_STL_FILES`, `;`-separated, not committed). Imported, they come in
+ * as meshes at once (past the limit); the full conversion is then forced through the sandbox —
+ * 5 and 8 minutes, measured — and, however it ends, a good STL still imports after it, where
+ * before the first file's trap left every later import failing until the app was restarted.
  */
 const REAL_FILES = (process.env["KERN3D_STL_FILES"] ?? "").split(";").filter((f) => f && existsSync(f));
 
 describe.skipIf(REAL_FILES.length === 0)("the user's STL files", () => {
     test.each(
         REAL_FILES,
-    )("%s imports (as a body or a mesh), and a good STL still imports after it", async (file) => {
+    )("%s: a mesh at once; a forced full conversion leaves the shared kernel working", async (file) => {
         const doc = newDocument();
-        const imported = await importStlNode(doc, path.basename(file), new Uint8Array(readFileSync(file)));
-        expect(imported.isOk).toBe(true);
-        expect(children(imported.value).length).toBeGreaterThan(0);
+        const data = new Uint8Array(readFileSync(file));
+        const imported = await importStlNode(doc, path.basename(file), data);
+        expect(children(imported.value)[0]).toBeInstanceOf(MeshNode);
+        const forced = await convertInSandbox(data);
+        expect(forced.ok || forced.crashed).toBe(true);
         const good = await importStlNode(doc, "good.stl", CUBE);
         const [body] = children(good.value);
         expect((body as EditableShapeNode).shape.value.volume()).toBeCloseTo(1000, 6);

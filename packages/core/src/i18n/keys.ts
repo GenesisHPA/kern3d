@@ -286,6 +286,7 @@ export const I18N_KEYS = [
     "toast.import.stlAsMesh",
     "toast.import.stlKernelCrash",
     "toast.import.stlSplit{0}",
+    "toast.import.stlTooLarge{0}",
     "error.kernel.crashed",
     "error.offsetFace.zero",
     "error.offsetFace.noInput",

@@ -18,17 +18,25 @@ function volumeOf(shape: IShape): number {
     return shape.findSubShapes(ShapeTypes.solid).reduce((v, s) => v + s.volume(), 0);
 }
 
+/** Past this many faces a merge the checker rejects is dropped rather than healed (see `unify`). */
+const HEAL_FACE_LIMIT = 20000;
+
 /**
  * Coplanar triangles merged into faces (OCCT's UnifySameDomain), then healed (ShapeFix): the
  * merge can leave a face whose boundary touches itself at a vertex, which the checker calls
  * unorientable and the booleans trip on. A merge that will not heal into a valid solid is
  * dropped — the triangles stay, valid.
+ *
+ * The heal is skipped past `HEAL_FACE_LIMIT` faces: ShapeFix on a 120 000-face faceted part (a
+ * user's 124 300-triangle STL, whose merge the checker rejects) had not finished after 20 minutes
+ * (with it skipped the whole conversion takes 4), freezing the import. Such a merge is dropped.
  */
 function unify(shape: IShape): IShape {
     const merged = shapeFactory.simplifyShape(shape, true, true, [], 1e-4, (0.1 * Math.PI) / 180);
     if (!merged.isOk || merged.value.isNull()) return shape;
     let result = merged.value;
-    if (!result.checkShape()) {
+    const healable = result.findSubShapes(ShapeTypes.face).length <= HEAL_FACE_LIMIT;
+    if (healable && !result.checkShape()) {
         const healed = result.fixShape(1e-6);
         if (!healed.isNull() && healed !== result) {
             result.dispose();

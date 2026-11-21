@@ -308,6 +308,8 @@ export default {
         "toast.import.stlKernelCrash":
             "The geometry kernel crashed converting this STL; the crash was contained (the rest of the app is unaffected) and the part was imported as a mesh",
         "toast.import.stlSplit{0}": "The STL holds {0} separate parts: each is a body of its own",
+        "toast.import.stlTooLarge{0}":
+            "Large STL ({0} triangles): imported as a mesh — a solid this size cannot be built or shown (view, measure, export only)",
         "error.kernel.crashed":
             "The geometry kernel crashed and its memory may be damaged. Save your work and restart the app.",
         "error.offsetFace.zero": "Offset Face: the distance is 0, so nothing moves",
