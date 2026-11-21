@@ -44,6 +44,15 @@
         {
             "kind": "screenshot",
             "name": "03-toolpath"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const tab = [...document.querySelectorAll('dialog[open] div')].find((x) => (x.textContent === 'Станок' || x.textContent === 'Machine') && x.onclick); if (!tab) throw new Error('no machine tab'); tab.click(); const stop = [...document.querySelectorAll('dialog[open] button')].find((b) => b.textContent === 'СТОП' || b.textContent === 'STOP'); if (!stop) throw new Error('no stop button'); return { serial: 'serial' in navigator, stopDisabledOffline: stop.disabled }; })()",
+            "log": true
+        },
+        {
+            "kind": "screenshot",
+            "name": "04-machine"
         }
     ]
 }

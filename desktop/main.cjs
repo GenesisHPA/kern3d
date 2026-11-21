@@ -5,7 +5,7 @@
 // (kern3d://app) so the projects kept in IndexedDB survive updates, and installs updates
 // published as GitHub Releases.
 
-const { app, BrowserWindow, Menu, dialog, net, protocol, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, net, protocol, session, shell } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
@@ -63,6 +63,59 @@ function confirmCloseWithOpenDocument(win) {
     });
 }
 
+/** A serial port as the picker lists it: its name and, for USB adapters, the vendor/product ids. */
+function portLabel(port) {
+    const ids = port.vendorId ? ` (USB ${port.vendorId}:${port.productId ?? "?"})` : "";
+    return `${port.displayName || port.portName || port.portId}${port.portName && port.displayName ? ` — ${port.portName}` : ""}${ids}`;
+}
+
+/**
+ * Web Serial for the laser workspace (a GRBL engraver on a COM port). Chromium in Electron
+ * has no port chooser of its own: the page's `navigator.serial.requestPort()` arrives here
+ * as `select-serial-port`, answered with the only port there is, or with the one picked in a
+ * small dialog when there are several. Permission is granted to our own origin only.
+ */
+function enableWebSerial(win) {
+    const ses = win.webContents.session ?? session.defaultSession;
+    ses.on("select-serial-port", (event, portList, _webContents, callback) => {
+        event.preventDefault();
+        if (portList.length === 0) {
+            dialog.showMessageBox(win, {
+                type: "warning",
+                title: "Kern3D",
+                message: "Последовательные порты не найдены.",
+                detail: "Подключите гравёр по USB и проверьте, что установлен драйвер (CH340, CP210x, FTDI).",
+            });
+            callback("");
+            return;
+        }
+        if (portList.length === 1) {
+            callback(portList[0].portId);
+            return;
+        }
+        const buttons = [...portList.map(portLabel), "Отмена"];
+        dialog
+            .showMessageBox(win, {
+                type: "question",
+                title: "Kern3D",
+                message: "Выберите порт гравёра",
+                buttons,
+                cancelId: buttons.length - 1,
+                noLink: true,
+            })
+            .then(({ response }) => callback(response < portList.length ? portList[response].portId : ""))
+            .catch(() => callback(""));
+    });
+    ses.setPermissionCheckHandler((_webContents, permission, origin) => {
+        if (permission === "serial") return isInternal(origin) || origin === ORIGIN;
+        return true;
+    });
+    ses.setDevicePermissionHandler((details) => {
+        if (details.deviceType === "serial") return isInternal(details.origin) || details.origin === ORIGIN;
+        return false;
+    });
+}
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1440,
@@ -88,6 +141,7 @@ function createWindow() {
         openExternally(url);
     });
     confirmCloseWithOpenDocument(win);
+    enableWebSerial(win);
     win.loadURL(`${ORIGIN}/index.html`);
     return win;
 }

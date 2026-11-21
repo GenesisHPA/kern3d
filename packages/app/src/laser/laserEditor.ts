@@ -16,6 +16,7 @@ import { bodyOutline, drawingSheet, faceOutline, type ModelView } from "./fromMo
 import { type Affine, apply, invert, type Pt } from "./geometry";
 import {
     defaultOperation,
+    jobBounds,
     type LaserJobData,
     type LaserObject,
     newLaserId,
@@ -25,6 +26,7 @@ import {
 } from "./laserData";
 import style from "./laserEditor.module.css";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
+import { LaserMachine } from "./laserMachine";
 import type { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
@@ -108,6 +110,7 @@ export class LaserEditor {
     protected readonly toolbar: HTMLDivElement;
     private readonly jobPanel: LaserJobPanel;
     protected readonly output: LaserOutput;
+    private readonly machine: LaserMachine;
     private readonly objectElements = new Map<string, SVGGraphicsElement>();
     data: LaserJobData;
     private committed: string;
@@ -157,6 +160,18 @@ export class LaserEditor {
             setStatus: (text) => this.setStatus(text),
             renderPanel: () => this.renderPanel(),
         });
+        this.machine = new LaserMachine({
+            get profile() {
+                return editor.profile;
+            },
+            setProfile: (edit) => this.setProfile(edit),
+            program: async () => {
+                const r = this.output.current ?? (await this.output.generate());
+                if (r === undefined || !r.moves.some((m) => m.power > 0)) return undefined;
+                return { lines: r.lines, seconds: r.stats.seconds };
+            },
+            jobBounds: () => jobBounds(this.data),
+        });
         this.panelTabs = el("div", { className: style.panelTabs });
         this.panelBody = el("div", { className: style.panelBody });
         this.toolbar = this.createToolbar();
@@ -204,6 +219,8 @@ export class LaserEditor {
     }
 
     close() {
+        // the laser off and the port free before the editor goes
+        if (this.machine.connected) void this.machine.disconnect();
         this.node.removePropertyChanged(this.onNodeChanged);
         this.dialog.close();
         this.dialog.remove();
@@ -452,6 +469,7 @@ export class LaserEditor {
                 },
             },
             { id: "output", title: t("laser.panel.output"), render: () => this.output.panel() },
+            { id: "machine", title: t("laser.panel.machine"), render: () => this.machine.element },
         ];
     }
 
