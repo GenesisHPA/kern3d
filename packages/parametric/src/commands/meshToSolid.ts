@@ -1,7 +1,8 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IShape, type IShell, Result, ShapeTypes } from "@chili3d/core";
+import { type IShape, type IShell, type IVertex, Result, ShapeTypes } from "@chili3d/core";
+import { isSliverShell } from "../features/offsetCavity";
 import { recoverCylinders } from "./recoverCylinders";
 
 /** A compound holding one solid and nothing else, as that solid. */
@@ -42,6 +43,76 @@ function unify(shape: IShape): IShape {
     return result;
 }
 
+interface SewnShell {
+    shell: IShell;
+    volume: number;
+}
+
+/**
+ * The closed shells of a sewn mesh as solids — undefined when a shell is open (the mesh stays a
+ * surface) or nothing encloses any volume.
+ *
+ * NOT all of them in one solid, which is what a bare `solid(shells)` makes: every shell after
+ * the first becomes a "cavity" of it whatever it really is. Instead each shell is measured on
+ * its own: a sliver (`isSliverShell`) is dropped; a shell oriented like the largest one is a
+ * separate part and gets a solid of its own; one oriented against it encloses a real void (an
+ * STL's triangles face out of the material, so a void's face into it) and stays a cavity of the
+ * smallest part whose box holds it. Several parts come back as a compound of solids.
+ *
+ * Nothing here meshes the shells (`IShape.boundingBox` does, and meshing a 124 000-triangle
+ * shell traps the kernel): areas are read only off the smaller shells, boxes off the vertices.
+ */
+export function solidsOfShells(shells: readonly IShell[]): IShape | undefined {
+    const measured: SewnShell[] = [];
+    for (const shell of shells) {
+        if (!shell.isClosed()) return undefined;
+        const alone = shapeFactory.solid([shell]);
+        if (!alone.isOk) return undefined;
+        measured.push({ shell, volume: alone.value.volume() });
+        alone.value.dispose();
+    }
+    const largest = measured.reduce((a, b) => (Math.abs(b.volume) > Math.abs(a.volume) ? b : a));
+    if (largest.volume === 0) return undefined;
+    const kept = measured.filter((m) => m === largest || !isSliverShell(m.shell, m.volume));
+    const sign = Math.sign(largest.volume);
+    const parts = kept.filter((m) => Math.sign(m.volume) === sign);
+    const voids = new Map<SewnShell, IShell[]>(parts.map((p) => [p, []]));
+    const cavities = kept.filter((m) => Math.sign(m.volume) !== sign);
+    const boxes = new Map(cavities.length === 0 ? [] : kept.map((m) => [m, vertexBox(m.shell)]));
+    for (const cavity of cavities) {
+        const holder = parts
+            .filter((p) => boxHolds(boxes.get(p)!, boxes.get(cavity)!))
+            .sort((a, b) => Math.abs(a.volume) - Math.abs(b.volume))[0];
+        holder && voids.get(holder)!.push(cavity.shell);
+    }
+    const solids: IShape[] = [];
+    for (const part of parts) {
+        const solid = shapeFactory.solid([part.shell, ...voids.get(part)!]);
+        if (solid.isOk && solid.value.volume() > 0) solids.push(solid.value);
+    }
+    if (solids.length <= 1) return solids[0];
+    const compound = shapeFactory.combine(solids);
+    return compound.isOk ? compound.value : undefined;
+}
+
+type Box = { min: [number, number, number]; max: [number, number, number] };
+
+function vertexBox(shell: IShell): Box {
+    const box: Box = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
+    for (const vertex of shell.findSubShapes(ShapeTypes.vertex) as IVertex[]) {
+        const p = vertex.point();
+        [p.x, p.y, p.z].forEach((v, k) => {
+            box.min[k] = Math.min(box.min[k], v);
+            box.max[k] = Math.max(box.max[k], v);
+        });
+    }
+    return box;
+}
+
+function boxHolds(outer: Box, inner: Box): boolean {
+    return [0, 1, 2].every((k) => outer.min[k] <= inner.min[k] && inner.max[k] <= outer.max[k]);
+}
+
 /** Up to this many faces (after planar merging) cylinders are recovered on import, in a second or two. */
 export const RECOVER_ON_IMPORT_FACES = 4000;
 
@@ -56,13 +127,14 @@ export function meshToSolid(shape: IShape, recover: "auto" | "never" = "auto"): 
     const sewn = shapeFactory.sewing([shape]);
     if (!sewn.isOk) return Result.err(sewn.error);
     let result: IShape = sewn.value;
-    // a closed shell (or several) becomes a solid; an open one stays a surface
+    // closed shells become solids (one per separate part, each with its real voids); an open
+    // one stays a surface
     const shells = result.findSubShapes(ShapeTypes.shell) as IShell[];
     if (shells.length > 0) {
-        const solid = shapeFactory.solid(shells);
-        if (solid.isOk && solid.value.volume() > 0) {
+        const solid = solidsOfShells(shells);
+        if (solid !== undefined) {
             result.dispose();
-            result = solid.value;
+            result = solid;
         }
     }
     // planar triangles merged; the angular tolerance lets near-flat STL noise merge too
