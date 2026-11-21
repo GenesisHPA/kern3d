@@ -119,3 +119,21 @@ export function anyPerpendicular(n: Vec3): Vec3 {
     const ref: Vec3 = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
     return normalize(cross(n, ref));
 }
+
+/**
+ * A triangle soup as a mesh without welding — every triangle its own three vertices. Enough for
+ * anything that reads only positions and triangles (the ray-column measure), and no hash map:
+ * welding a large mesh again on every measure is what ran the heap out.
+ */
+export function soupMesh(soup: Float64Array): TriMesh {
+    const n = Math.floor(soup.length / 9);
+    const triangles = new Uint32Array(n * 3);
+    for (let i = 0; i < triangles.length; i++) triangles[i] = i;
+    return {
+        positions: soup,
+        triangles,
+        normals: new Float64Array(0),
+        areas: new Float64Array(n),
+        size: 0,
+    };
+}

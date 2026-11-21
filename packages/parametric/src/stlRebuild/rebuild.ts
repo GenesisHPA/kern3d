@@ -3,7 +3,8 @@
 
 import { type IDocument, type IShape, ShapeTypes } from "@chili3d/core";
 import { appendExtrude, appendTreatment, type BuiltModel, buildModel } from "./build";
-import { meshVolume, type TriMesh, weldTriangles } from "./mesh";
+import { profileArea } from "./fit2d";
+import { meshVolume, soupMesh, type TriMesh, weldTriangles } from "./mesh";
 import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan";
 import { meshDifference } from "./raycast";
 import { sliceFrames } from "./slices";
@@ -43,6 +44,10 @@ export function setRebuildDebug(hook: ((line: string) => void) | undefined) {
     REBUILD_DEBUG = hook;
 }
 
+/** Longest feature tree an axis may plan, and most pieces of the part it may keep. */
+const MAX_FEATURES = 60;
+const MAX_PIECES = 12;
+
 /** What a corrective feature must take off the difference, as a share of the volume. */
 const MIN_GAIN = 5e-4;
 
@@ -66,7 +71,7 @@ function measure(reference: TriMesh, shape: IShape | undefined): number {
 }
 
 function difference(reference: TriMesh, shape: IShape): { ratio: number; missing: number; extra: number } {
-    const d = meshDifference(reference, weldTriangles(trianglesOf(shape)));
+    const d = meshDifference(reference, soupMesh(trianglesOf(shape)));
     return { ratio: d.aVolume > 0 ? (d.aOnly + d.bOnly) / d.aVolume : 1, missing: d.aOnly, extra: d.bOnly };
 }
 
@@ -104,6 +109,19 @@ export function rebuildPart(
         const treatments: EdgeTreatment[] = [];
         const plans = planExtrusions(mesh, frame, tol, { treatments, meshPieces });
         if (plans.length === 0) return undefined;
+        // a tree this long, or this much of the part as pieces, is no rebuild worth having — and
+        // every piece is re-read on each rebuild of the chain, which is what runs the heap out
+        if (plans.length > MAX_FEATURES || plans.filter((p) => p.fromMesh).length > MAX_PIECES)
+            return undefined;
+        // pieces are the stretches between features; a part that is mostly pieces is not rebuilt
+        const volumeOf = (list: typeof plans) =>
+            list
+                .filter((p) => p.operation !== "cut")
+                .reduce(
+                    (v, p) => v + p.profiles.reduce((a, q) => a + Math.max(0, profileArea(q)), 0) * p.depth,
+                    0,
+                );
+        if (meshPieces && volumeOf(plans.filter((p) => p.fromMesh)) > volumeOf(plans) * 0.5) return undefined;
         const model = buildModel(document, plans, name, tol, reference);
         const shape = bodyShape(model);
         const failed = failedFeature(model);

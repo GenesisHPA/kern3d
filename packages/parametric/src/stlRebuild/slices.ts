@@ -114,6 +114,9 @@ export function sliceFrames(mesh: TriMesh): SliceFrame[] {
     return scored.map(({ axis }) => frameFor(mesh, axis, flats));
 }
 
+/** More cap heights than this along an axis and it is not one to slice along. */
+export const MAX_LEVELS = 200;
+
 /** A closed section loop in the frame's (u, v): counter-clockwise around material. */
 export type Loop2D = [number, number][];
 
@@ -286,6 +289,9 @@ export function loopArea(loop: Loop2D): number {
 export function slabsOf(mesh: TriMesh, frame: SliceFrame): Slab[] {
     const tol = Math.max(mesh.size * 1e-5, 1e-4);
     const hs = levels(mesh, frame.axis, tol);
+    // a part cut across its curves (a disc sliced edge-on) splits into hundreds of slabs: no
+    // feature tree anyone would want, and the sections alone run the heap out — not this axis
+    if (hs.length > MAX_LEVELS) return [];
     const slabs: Slab[] = [];
     const t = mesh.triangles;
     const zs = new Float64Array(mesh.positions.length / 3);
