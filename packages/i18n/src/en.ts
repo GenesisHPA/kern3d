@@ -1123,6 +1123,8 @@ export default {
         "timeline.marker": "Rollback marker: drag it along the history",
         "timeline.body": "Body shown in the timeline",
         "navbar.orbit": "Orbit (drag with the left button, Esc to exit)",
+        "contextMenu.hide": "Hide",
+        "contextMenu.show": "Show",
         "navbar.mouseHint": "Without the tool: hold {0} and drag",
         "navbar.middleButton": "wheel",
         "navbar.pan": "Pan (drag with the left button, Esc to exit)",

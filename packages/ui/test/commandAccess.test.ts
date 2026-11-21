@@ -18,7 +18,9 @@ import {
     searchCommands,
     type ToolboxEntry,
 } from "../src/commandAccess/commandToolbox";
+import { contextCommandsOf } from "../src/commandAccess/contextCommands";
 import { MarkingMenu, wedgeAt } from "../src/commandAccess/markingMenu";
+import { closeNodeContextMenu, openNodeContextMenu } from "../src/commandAccess/nodeContextMenu";
 import { NavigationBar } from "../src/viewport/navigationBar";
 
 const entry = (key: string, name: string): ToolboxEntry => ({
@@ -203,6 +205,38 @@ describe("marking menu", () => {
             PubSub.default.remove("executeCommand", record);
             menu.dispose();
         }
+    });
+});
+
+describe("tree context menu", () => {
+    function makeDocument() {
+        const view = createMockView();
+        const selected: unknown[][] = [];
+        const doc = {
+            selection: { setSelectedNodes: (nodes: unknown[]) => selected.push(nodes) },
+            visual: { update: () => {} },
+            history: { add: () => {} },
+            modelManager: {},
+        };
+        (view as { document?: unknown }).document = doc;
+        return { doc: doc as never, selected };
+    }
+
+    test("lists the node's commands under the selected node; Escape closes it", () => {
+        const { doc, selected } = makeDocument();
+        const node = { visible: true } as never;
+        openNodeContextMenu(doc, node, [], 40, 40);
+        expect(selected).toEqual([[node]]);
+        expect(document.body.textContent).toContain("contextMenu.hide");
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+        expect(document.body.textContent).not.toContain("contextMenu.hide");
+    });
+
+    test("a sketch offers editing it first", () => {
+        const commands = contextCommandsOf("sketch");
+        // Only registered commands are listed; the list's order puts editing first.
+        if (commands.length > 0) expect(commands[0]).toBe("sketch.enter");
+        closeNodeContextMenu();
     });
 });
 

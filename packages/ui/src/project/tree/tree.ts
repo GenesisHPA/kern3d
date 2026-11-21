@@ -15,6 +15,9 @@ import {
     ShapeTypes,
     Transaction,
 } from "@chili3d/core";
+import { contextCommandsOf } from "../../commandAccess/contextCommands";
+import { openNodeContextMenu } from "../../commandAccess/nodeContextMenu";
+import { browserCategory } from "../browser/browserView";
 import style from "./tree.module.css";
 import { TreeItem } from "./treeItem";
 import { TreeGroup } from "./treeItemGroup";
@@ -183,6 +186,7 @@ export class Tree extends HTMLElement {
         item.addEventListener("drop", this.onDrop);
         item.addEventListener("click", this.onClick);
         item.addEventListener("dblclick", this.onDoubleClick);
+        item.addEventListener("contextmenu", this.onContextMenu);
     }
 
     private removeEvents(item: HTMLElement) {
@@ -193,6 +197,7 @@ export class Tree extends HTMLElement {
         item.removeEventListener("drop", this.onDrop);
         item.removeEventListener("click", this.onClick);
         item.removeEventListener("dblclick", this.onDoubleClick);
+        item.removeEventListener("contextmenu", this.onContextMenu);
     }
 
     private getTreeItem(item: HTMLElement | null): TreeItem | undefined {
@@ -223,6 +228,23 @@ export class Tree extends HTMLElement {
         if (node === undefined) return;
         event.stopPropagation();
         PubSub.default.pub("nodeDoubleClicked", node);
+    };
+
+    /** Right-click: the node's context menu (selects it first), while no command holds the tree. */
+    private readonly onContextMenu = (event: MouseEvent) => {
+        const node = this.getTreeItem(event.target as HTMLElement)?.node;
+        if (node === undefined) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!this.canSelect()) return;
+        openNodeContextMenu(
+            this.document,
+            node,
+            contextCommandsOf(browserCategory(node)),
+            event.clientX,
+            event.clientY,
+        );
+        this.handleLastClickItem(node);
     };
 
     private handleShiftClick(item: INode) {

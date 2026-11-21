@@ -959,6 +959,8 @@ export default {
         "timeline.marker": "Маркер отката: перетащите по истории",
         "timeline.body": "Тело на шкале истории",
         "navbar.orbit": "Орбита (тянуть левой кнопкой, Esc — выход)",
+        "contextMenu.hide": "Скрыть",
+        "contextMenu.show": "Показать",
         "navbar.mouseHint": "Без инструмента: {0} — зажать и тянуть",
         "navbar.middleButton": "колесо",
         "navbar.pan": "Панорама (тянуть левой кнопкой, Esc — выход)",

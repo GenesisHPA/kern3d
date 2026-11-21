@@ -14,6 +14,7 @@ import { createIcon, div, span } from "@chili3d/element";
 import { browserCategory } from "../project/browser/browserView";
 import { menuRow } from "../toolbar/toolbarGroup";
 import style from "./commandAccess.module.css";
+import { contextCommandsOf } from "./contextCommands";
 
 /** The eight wedges, clockwise from the top; an unregistered command leaves its wedge empty. */
 const DESIGN_WEDGES: readonly CommandKeys[] = [
@@ -37,23 +38,6 @@ const SKETCH_WEDGES: readonly CommandKeys[] = [
     "edit.undo",
     "special.last",
 ];
-
-/** The context list under the wedges: what applies to the object that was clicked. */
-const CONTEXT_COMMANDS: Record<string, readonly CommandKeys[]> = {
-    body: [
-        "feature.fillet",
-        "feature.chamfer",
-        "feature.shell",
-        "modify.moveCopy",
-        "modify.align",
-        "modify.paintBucket",
-        "inspect.massProperties",
-        "modify.deleteNode",
-    ],
-    sketch: ["sketch.enter", "feature.extrude", "feature.revolve", "modify.deleteNode"],
-    construction: ["sketch.create", "modify.deleteNode"],
-    none: ["sketch.create", "file.import", "inspect.section", "edit.redo"],
-};
 
 /** Repeat is the command service's own key, not a registered command; it is always there. */
 function isRunnable(command: CommandKeys): boolean {
@@ -212,10 +196,7 @@ export class MarkingMenu {
     }
 
     private contextList(node: INode | undefined, x: number, y: number) {
-        const category = node === undefined ? "none" : browserCategory(node);
-        const commands = (CONTEXT_COMMANDS[category] ?? CONTEXT_COMMANDS["body"]).filter(
-            (c) => CommandStore.getComandData(c) !== undefined,
-        );
+        const commands = contextCommandsOf(node === undefined ? "none" : browserCategory(node));
         const list = div({ className: style.contextList });
         list.style.left = `${x}px`;
         list.style.top = `${y + WEDGE_RADIUS + 30}px`;

@@ -25,6 +25,8 @@ import {
     XYZ,
 } from "@chili3d/core";
 import { div, span, svg } from "@chili3d/element";
+import { contextCommandsOf } from "../../commandAccess/contextCommands";
+import { openNodeContextMenu } from "../../commandAccess/nodeContextMenu";
 import { glyph } from "../../glyphs";
 import { TreeModel } from "../tree/treeModel";
 import style from "./browserView.module.css";
@@ -189,6 +191,7 @@ export class BrowserView extends HTMLElement {
         }
         this.addEventListener("click", this.onClick);
         this.addEventListener("dblclick", this.onDoubleClick);
+        this.addEventListener("contextmenu", this.onContextMenu);
         this.reconcile();
     }
 
@@ -364,6 +367,22 @@ export class BrowserView extends HTMLElement {
         if (node === undefined || !this.canSelect()) return;
         event.stopPropagation();
         this.document.selection.setSelectedNodes([node], event.ctrlKey);
+    };
+
+    /** Right-click: the node's context menu (selects it first). */
+    private readonly onContextMenu = (event: MouseEvent) => {
+        const node = this.nodeAt(event);
+        if (node === undefined) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!this.canSelect()) return;
+        openNodeContextMenu(
+            this.document,
+            node,
+            contextCommandsOf(browserCategory(node)),
+            event.clientX,
+            event.clientY,
+        );
     };
 
     private readonly onDoubleClick = (event: MouseEvent) => {

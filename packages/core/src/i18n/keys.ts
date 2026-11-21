@@ -1067,6 +1067,8 @@ export const I18N_KEYS = [
     "timeline.body",
     "navbar.orbit",
     "navbar.mouseHint",
+    "contextMenu.hide",
+    "contextMenu.show",
     "navbar.middleButton",
     "navbar.pan",
     "navbar.zoom",
