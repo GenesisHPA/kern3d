@@ -699,7 +699,11 @@ export class LaserMachine {
         }
         if (!markConfirmed) {
             const minutes = Math.max(1, Math.round(program.seconds / 60));
-            if (!window.confirm(t("laser.machine.confirmStart", program.gcode.length, minutes))) return;
+            const question =
+                this.host.profile.controller === "jcz"
+                    ? t("laser.machine.confirmStart.galvo", minutes)
+                    : t("laser.machine.confirmStart", program.gcode.length, minutes);
+            if (!window.confirm(question)) return;
             markConfirmed = true;
         }
         this.lastError.textContent = "";

@@ -112,6 +112,13 @@ export class LaserOutput {
     summary(): string {
         const r = this.result;
         if (r === undefined) return "";
+        if (this.host.profile.controller === "jcz")
+            return t(
+                "laser.summary.galvo",
+                formatDuration(r.stats.seconds),
+                (r.stats.burnLength / 1000).toFixed(2),
+                (r.stats.travelLength / 1000).toFixed(2),
+            );
         return t(
             "laser.summary",
             formatDuration(r.stats.seconds),
@@ -182,6 +189,21 @@ export class LaserOutput {
             this.showPreview = v;
             this.drawPreview();
         });
+        if (p.controller === "jcz") {
+            // a galvo board takes the job itself: no G-code, no GRBL settings — the preview and the time
+            return el(
+                "div",
+                {},
+                heading("laser.output.galvo"),
+                el(
+                    "div",
+                    { className: style.buttons },
+                    button("laser.output.calculate", () => void this.generate()),
+                ),
+                row("laser.preview", preview),
+                ...info,
+            );
+        }
         return el(
             "div",
             {},

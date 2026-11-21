@@ -14,6 +14,7 @@ import {
     translation,
 } from "./geometry";
 import type { BedOrigin, MachineProfile } from "./machineProfile";
+import { type LaserShape, parseShape } from "./shapes";
 
 /**
  * A laser job as the document keeps it: the objects on the bed and how each is burnt. The
@@ -97,6 +98,8 @@ export interface LaserVectorObject extends LaserObjectBase {
     paths: LaserPath[];
     sourceWidth: number;
     sourceHeight: number;
+    /** Drawn with a tool: the figure the outlines are made from, again on every change. */
+    shape?: LaserShape;
 }
 
 export interface LaserImageObject extends LaserObjectBase {
@@ -286,9 +289,15 @@ function parseObject(raw: any): LaserObject | undefined {
             sourceWidth: finite(raw.sourceWidth, base.width),
             sourceHeight: finite(raw.sourceHeight, base.height),
             op: op.mode === "image" ? { ...op, mode: "line" } : op,
+            ...shapeField(raw.shape),
         };
     }
     return undefined;
+}
+
+function shapeField(raw: unknown): { shape?: LaserShape } {
+    const shape = parseShape(raw);
+    return shape === undefined ? {} : { shape };
 }
 
 /** A job from its stored JSON; anything unreadable becomes an empty job, unknown fields defaults. */

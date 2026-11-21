@@ -3,6 +3,7 @@
 
 import {
     AsyncController,
+    type FontOutline,
     type IDocument,
     PubSub,
     readFileAsync,
@@ -15,7 +16,7 @@ import {
 import { DrawingNode } from "../drawing/drawingNode";
 import { framePaths } from "./framePaths";
 import { bodyOutline, drawingSheet, faceOutline, type ModelView } from "./fromModel";
-import { type Affine, apply, type Bounds, invert, type Pt } from "./geometry";
+import { type Affine, apply, type Bounds, invert, type LaserPath, type Pt } from "./geometry";
 import {
     defaultOperation,
     type LaserJobData,
@@ -26,13 +27,29 @@ import {
     placement,
     withOrigin,
 } from "./laserData";
+import {
+    constrainAngle,
+    DRAW_TOOLS,
+    type Draft,
+    type DrawnFigure,
+    type DrawTool,
+    draftPaths,
+    finishBox,
+    finishPolyline,
+    type PolygonDefaults,
+    snapToGrid,
+    TOOL_KEYS,
+} from "./laserDraw";
 import style from "./laserEditor.module.css";
+import { defaultLaserFont, loadLaserFont } from "./laserFonts";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
 import { LaserMachine } from "./laserMachine";
 import { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
 import { bedRect, loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
+import { bakeSize, regenerate, shapeObject } from "./shapeObject";
+import type { LaserShape } from "./shapes";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
 
@@ -45,6 +62,19 @@ function svgElement<K extends keyof SVGElementTagNameMap>(
     const e = document.createElementNS(SVG_NS, tag);
     for (const [k, v] of Object.entries(attributes)) e.setAttribute(k, String(v));
     return e;
+}
+
+/** SVG path data of outlines. */
+function pathData(paths: readonly LaserPath[]): string {
+    let d = "";
+    for (const path of paths) {
+        const pts = path.points;
+        if (pts.length === 0) continue;
+        d += `M${pts[0].x.toFixed(3)} ${pts[0].y.toFixed(3)}`;
+        for (let k = 1; k < pts.length; k++) d += `L${pts[k].x.toFixed(3)} ${pts[k].y.toFixed(3)}`;
+        if (path.closed) d += "Z";
+    }
+    return d;
 }
 
 function matrixAttribute(m: Affine): string {
@@ -129,6 +159,18 @@ export class LaserEditor {
     private viewBox: ViewBox = { x: 0, y: 0, w: 400, h: 400 };
     private drag: Drag | undefined;
     private fitted = false;
+    /** The drawing tool, kept after a figure when its button was double-clicked. */
+    private tool: DrawTool = "select";
+    private keepTool = false;
+    private draft: Draft | undefined;
+    /** Drawn points land on the millimetre grid (Alt held: not). */
+    private snap = true;
+    readonly polygonDefaults: PolygonDefaults = { sides: 6, star: 0 };
+    private readonly draftGroup: SVGGElement;
+    private readonly toolButtons = new Map<DrawTool, HTMLButtonElement>();
+    private readonly snapButton: HTMLButtonElement;
+    /** G-code only: hidden for a galvo (JCZ) board, which takes the job itself. */
+    private readonly gcodeButtons: HTMLButtonElement[] = [];
 
     private constructor(readonly node: LaserNode) {
         this.tab = {
@@ -150,7 +192,15 @@ export class LaserEditor {
         this.objectsGroup = svgElement("g");
         this.previewGroup = svgElement("g", { "pointer-events": "none" });
         this.overlayGroup = svgElement("g");
-        this.world.append(this.bedGroup, this.objectsGroup, this.previewGroup, this.overlayGroup);
+        this.draftGroup = svgElement("g", { "pointer-events": "none" });
+        this.world.append(
+            this.bedGroup,
+            this.objectsGroup,
+            this.previewGroup,
+            this.overlayGroup,
+            this.draftGroup,
+        );
+        this.snapButton = button("laser.draw.snap", () => this.toggleSnap(), "laser.draw.snap.hint");
         this.svg.append(this.world);
         this.statusText = el("span");
         this.statusPosition = el("span");
@@ -216,6 +266,7 @@ export class LaserEditor {
         this.svg.addEventListener("pointerdown", this.onPointerDown);
         this.svg.addEventListener("pointermove", this.onPointerMove);
         this.svg.addEventListener("pointerup", this.onPointerUp);
+        this.svg.addEventListener("dblclick", this.onDoubleClick);
         this.svg.addEventListener("wheel", this.onWheel, { passive: false });
         this.svg.addEventListener("contextmenu", (e) => e.preventDefault());
         this.node.onPropertyChanged(this.onNodeChanged);
@@ -250,8 +301,10 @@ export class LaserEditor {
 
     private readonly onCancel = (e: Event) => {
         e.preventDefault();
-        // Esc stops the red pointer first, then clears the selection
+        // Esc stops the red pointer first, then drops a figure being drawn, then the tool
         if (this.machine.framing) this.machine.stopFraming();
+        else if (this.draft !== undefined) this.cancelDraft();
+        else if (this.tool !== "select") this.setTool("select");
         else this.select(undefined);
     };
 
@@ -474,8 +527,20 @@ export class LaserEditor {
                 const o = this.selected();
                 if (o === undefined) return;
                 edit(o);
+                if (o.kind === "vector") bakeSize(o);
                 this.commit();
                 this.render();
+            },
+            editShape: (edit) => void this.editShape(edit),
+            convertToCurves: () => {
+                const o = this.selected();
+                if (o?.kind !== "vector" || o.shape === undefined) return;
+                o.shape = undefined;
+                this.commit();
+                this.render();
+            },
+            get polygonDefaults() {
+                return editor.polygonDefaults;
             },
             move: (id, delta) => this.move(id, delta),
             setProfile: (edit) => this.setProfile(edit),
@@ -500,7 +565,12 @@ export class LaserEditor {
                     return this.jobPanel.element;
                 },
             },
-            { id: "output", title: t("laser.panel.output"), render: () => this.output.panel() },
+            {
+                id: "output",
+                // a galvo board is sent the job itself: the tab is the preview and the time, no G-code
+                title: t(this.profile.controller === "jcz" ? "laser.panel.preview" : "laser.panel.output"),
+                render: () => this.output.panel(),
+            },
             { id: "machine", title: t("laser.panel.machine"), render: () => this.machine.element },
         ];
     }
@@ -534,6 +604,10 @@ export class LaserEditor {
 
     protected toolbarItems(): HTMLElement[] {
         return [
+            ...this.toolButtonsList(),
+            this.snapButton,
+            this.separator(),
+            // importers: SVG and pictures; an EzCAD .ezd import belongs beside them
             button("laser.import.svg", () => void this.importSvgFile()),
             button("laser.import.image", () => void this.importImageFile()),
             this.separator(),
@@ -542,11 +616,18 @@ export class LaserEditor {
             this.separator(),
             button("laser.fit", () => this.fit()),
             this.separator(),
-            button("laser.generate", () => void this.output.generate()),
-            button("laser.save", () => void this.output.save()),
+            ...this.gcodeOnly(
+                button("laser.generate", () => void this.output.generate()),
+                button("laser.save", () => void this.output.save()),
+            ),
             this.separator(),
             ...this.machine.toolbarControls(),
         ];
+    }
+
+    private gcodeOnly(...buttons: HTMLButtonElement[]): HTMLButtonElement[] {
+        this.gcodeButtons.push(...buttons);
+        return buttons;
     }
 
     /** The document's laser jobs, to switch between them; shown only when there are several. */
@@ -588,6 +669,8 @@ export class LaserEditor {
 
     render() {
         this.updateJobPicker();
+        const gcode = this.profile.controller !== "jcz";
+        for (const b of this.gcodeButtons) b.style.display = gcode ? "" : "none";
         this.world.setAttribute("transform", "matrix(1 0 0 -1 0 0)");
         this.renderBed();
         this.renderObjects();
@@ -700,14 +783,7 @@ export class LaserEditor {
     }
 
     private vectorElement(o: Extract<LaserObject, { kind: "vector" }>): SVGGraphicsElement {
-        let d = "";
-        for (const path of o.paths) {
-            const pts = path.points;
-            if (pts.length === 0) continue;
-            d += `M${pts[0].x.toFixed(3)} ${pts[0].y.toFixed(3)}`;
-            for (let k = 1; k < pts.length; k++) d += `L${pts[k].x.toFixed(3)} ${pts[k].y.toFixed(3)}`;
-            if (path.closed) d += "Z";
-        }
+        const d = pathData(o.paths);
         const fill = o.op.mode === "fill";
         const e = svgElement("path", {
             d,
@@ -825,6 +901,207 @@ export class LaserEditor {
         this.statusText.textContent = text;
     }
 
+    // ---- drawing tools ----------------------------------------------------------------------
+
+    private toolButtonsList(): HTMLButtonElement[] {
+        const out: HTMLButtonElement[] = [];
+        for (const tool of DRAW_TOOLS) {
+            const b = button(`laser.tool.${tool}`, () => this.setTool(tool), `laser.tool.${tool}.hint`);
+            // a double click keeps the tool for figure after figure (EzCAD returns to select)
+            b.ondblclick = () => this.setTool(tool, tool !== "select");
+            this.toolButtons.set(tool, b);
+            out.push(b);
+        }
+        this.showTool();
+        return out;
+    }
+
+    setTool(tool: DrawTool, keep = false) {
+        this.cancelDraft();
+        this.tool = tool;
+        this.keepTool = keep;
+        this.svg.style.cursor = tool === "select" ? "" : tool === "text" ? "text" : "crosshair";
+        this.showTool();
+        this.setStatus(
+            tool === "select"
+                ? this.output.summary() || t("laser.prompt.select")
+                : t(`laser.tool.${tool}.prompt`),
+        );
+    }
+
+    private showTool() {
+        for (const [tool, b] of this.toolButtons) b.classList.toggle(style.active, tool === this.tool);
+        this.snapButton.classList.toggle(style.active, this.snap);
+    }
+
+    private toggleSnap() {
+        this.snap = !this.snap;
+        this.showTool();
+    }
+
+    private cancelDraft() {
+        this.draft = undefined;
+        this.draftGroup.replaceChildren();
+    }
+
+    /** A drawn point: on the grid unless Alt is held or the grid is off. */
+    private drawPoint(e: PointerEvent | MouseEvent): Pt {
+        const p = this.bedPoint(e);
+        return this.snap && !e.altKey ? snapToGrid(p) : p;
+    }
+
+    private renderDraft() {
+        this.draftGroup.replaceChildren();
+        const draft = this.draft;
+        if (draft === undefined) return;
+        const paths = draftPaths(draft, this.polygonDefaults);
+        this.draftGroup.append(
+            svgElement("path", {
+                d: pathData(paths),
+                fill: "none",
+                stroke: "#1677ff",
+                "stroke-width": 1.2,
+                "stroke-dasharray": "4 3",
+                "vector-effect": "non-scaling-stroke",
+            }),
+        );
+        if (draft.kind === "polyline") {
+            const px = this.pixel();
+            for (const [i, p] of draft.points.entries()) {
+                this.draftGroup.append(
+                    svgElement("circle", {
+                        cx: p.x,
+                        cy: p.y,
+                        r: (i === 0 ? 4 : 2.5) * px,
+                        fill: i === 0 ? "#fff" : "#1677ff",
+                        stroke: "#1677ff",
+                        "stroke-width": 1,
+                        "vector-effect": "non-scaling-stroke",
+                    }),
+                );
+            }
+        }
+    }
+
+    /** The drawn figure as a new object, selected; the tool back to select unless it was kept. */
+    private addFigure(figure: DrawnFigure | undefined, font?: FontOutline) {
+        this.cancelDraft();
+        if (figure === undefined) return;
+        const o = shapeObject(figure.shape, t(`laser.shape.${figure.shape.type}`), figure.at, font);
+        if (o === undefined) return;
+        this.add(o);
+        if (!this.keepTool) this.setTool("select");
+    }
+
+    private finishPolylineDraft(closed: boolean) {
+        const draft = this.draft;
+        if (draft?.kind !== "polyline") return;
+        this.addFigure(finishPolyline(draft.points, closed));
+    }
+
+    /** A click with the text tool: a word to change in the panel, typed straight away. */
+    private async placeText(at: Pt) {
+        const font = defaultLaserFont();
+        const shape: LaserShape = {
+            type: "text",
+            text: t("laser.draw.textDefault"),
+            font,
+            size: 10,
+            letterSpacing: 0,
+            lineSpacing: 1.2,
+            align: "left",
+            arcRadius: 0,
+        };
+        this.setStatus(t("laser.draw.fontLoading"));
+        const outline = await loadLaserFont(font);
+        if (outline === undefined) {
+            PubSub.default.pub("showToast", "laser.draw.fontFailed");
+            this.setTool("select");
+            return;
+        }
+        this.addFigure({ shape, at: { corner: at } }, outline);
+        this.showPanel("job");
+        this.jobPanel.focusText();
+    }
+
+    /** A parameter of the selected figure changed: its outlines again, a text with its font. */
+    private async editShape(edit: (shape: LaserShape) => void) {
+        const o = this.selected();
+        if (o?.kind !== "vector" || o.shape === undefined) return;
+        edit(o.shape);
+        let font: FontOutline | undefined;
+        if (o.shape.type === "text") {
+            font = await loadLaserFont(o.shape.font);
+            if (font === undefined) {
+                PubSub.default.pub("showToast", "laser.draw.fontFailed");
+                this.render();
+                return;
+            }
+        }
+        regenerate(o, font);
+        this.commit();
+        this.render();
+    }
+
+    private drawPointerDown(e: PointerEvent) {
+        const p = this.drawPoint(e);
+        if (this.tool === "text") {
+            void this.placeText(p);
+            return;
+        }
+        if (this.tool === "line") {
+            const draft = this.draft?.kind === "polyline" ? this.draft : undefined;
+            if (draft === undefined) {
+                this.draft = { kind: "polyline", points: [p], hover: undefined };
+            } else {
+                const first = draft.points[0];
+                const last = draft.points[draft.points.length - 1];
+                const reach = 6 * this.pixel();
+                // back on the first point: a closed outline
+                if (draft.points.length >= 3 && Math.hypot(p.x - first.x, p.y - first.y) <= reach) {
+                    this.finishPolylineDraft(true);
+                    return;
+                }
+                const q = e.shiftKey ? constrainAngle(last, p) : p;
+                // the second click of a double click lands on the same point
+                if (Math.hypot(q.x - last.x, q.y - last.y) > 2 * this.pixel()) draft.points.push(q);
+            }
+            this.renderDraft();
+            return;
+        }
+        if (this.tool === "rect" || this.tool === "ellipse" || this.tool === "polygon") {
+            this.draft = { kind: "box", tool: this.tool, start: p, end: p, square: e.shiftKey };
+            this.renderDraft();
+        }
+    }
+
+    private drawPointerMove(e: PointerEvent) {
+        const draft = this.draft;
+        if (draft === undefined) return;
+        const p = this.drawPoint(e);
+        if (draft.kind === "polyline") {
+            const last = draft.points[draft.points.length - 1];
+            draft.hover = e.shiftKey ? constrainAngle(last, p) : p;
+        } else {
+            draft.end = p;
+            draft.square = e.shiftKey;
+        }
+        this.renderDraft();
+    }
+
+    private drawPointerUp() {
+        const draft = this.draft;
+        if (draft?.kind !== "box") return;
+        this.addFigure(finishBox(draft, this.polygonDefaults, 3 * this.pixel()));
+    }
+
+    private readonly onDoubleClick = (e: MouseEvent) => {
+        if (this.tool === "line" && this.draft?.kind === "polyline") {
+            e.preventDefault();
+            this.finishPolylineDraft(false);
+        }
+    };
+
     // ---- pointer ----------------------------------------------------------------------------
 
     /** The pointer in bed millimetres. */
@@ -864,6 +1141,10 @@ export class LaserEditor {
             return;
         }
         if (e.button !== 0) return;
+        if (this.tool !== "select") {
+            this.drawPointerDown(e);
+            return;
+        }
         const p = this.bedPoint(e);
         const current = this.selected();
         const handle = current === undefined ? undefined : this.hitHandle(current, p);
@@ -892,7 +1173,10 @@ export class LaserEditor {
         const p = this.bedPoint(e);
         this.statusPosition.textContent = `X ${p.x.toFixed(1)}  Y ${p.y.toFixed(1)}`;
         const drag = this.drag;
-        if (drag === undefined) return;
+        if (drag === undefined) {
+            if (this.tool !== "select") this.drawPointerMove(e);
+            return;
+        }
         if (drag.kind === "pan") {
             const k = this.pixel();
             this.setViewBox({
@@ -927,8 +1211,15 @@ export class LaserEditor {
         if (this.svg.hasPointerCapture(e.pointerId)) this.svg.releasePointerCapture(e.pointerId);
         const drag = this.drag;
         this.drag = undefined;
+        if (drag === undefined && this.tool !== "select") {
+            this.drawPointerUp();
+            return;
+        }
         if (drag === undefined || drag.kind === "pan") return;
         if (drag.kind === "move" && !drag.moved) return;
+        const o = this.data.objects.find((x) => x.id === drag.id);
+        // a rectangle or ellipse takes its new size as its own: round corners stay round
+        if (drag.kind === "scale" && o?.kind === "vector") bakeSize(o);
         this.commit();
         this.render();
     };
@@ -971,6 +1262,12 @@ export class LaserEditor {
         } else if ((e.ctrlKey || e.metaKey) && key === "y") {
             e.preventDefault();
             this.node.document.history.redo();
+        } else if (key === "enter" && this.draft?.kind === "polyline") {
+            e.preventDefault();
+            this.finishPolylineDraft(false);
+        } else if (!e.ctrlKey && !e.metaKey && !e.altKey && TOOL_KEYS[key] !== undefined) {
+            e.preventDefault();
+            this.setTool(TOOL_KEYS[key]);
         } else if (key === "delete") {
             e.preventDefault();
             this.deleteSelected();

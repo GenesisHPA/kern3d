@@ -364,3 +364,18 @@
         opacity: 0.7;
     }
 }
+
+/* the words of a laser text, typed in the object panel */
+.textArea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 52px;
+    margin: 4px 0;
+    padding: 4px;
+    resize: vertical;
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-family: inherit;
+}

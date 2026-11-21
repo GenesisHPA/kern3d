@@ -10,9 +10,16 @@ import {
     RASTER_MODES,
     type RasterSettings,
 } from "./laserData";
+import type { PolygonDefaults } from "./laserDraw";
 import style from "./laserEditor.module.css";
+import { catalogFonts, localFontFamilies, localFontsAvailable } from "./laserFonts";
 import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
 import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
+import { type LaserFontRef, type LaserShape, TEXT_ALIGNS } from "./shapes";
+
+/** The installed fonts, once listed (asking the browser's permission) this session. */
+let localFamilies: LaserFontRef[] | undefined;
+const LOCAL_FONTS = "__local";
 
 /** What the job panel needs from the editor it sits in. */
 export interface LaserJobPanelHost {
@@ -28,6 +35,12 @@ export interface LaserJobPanelHost {
     modelSources(): { id: string; label: string; kind: "body" | "drawing" }[];
     addFromModel(sourceId: string, view: ModelView): void;
     pickFace(): void;
+    /** Changes the selected figure's parameters; its outlines are made again (one undo step). */
+    editShape(edit: (shape: LaserShape) => void): void;
+    /** The selected figure becomes plain outlines. */
+    convertToCurves(): void;
+    /** The sides and star share the polygon tool draws with next. */
+    readonly polygonDefaults: PolygonDefaults;
 }
 
 export const MODE_COLORS: Record<LaserOperation["mode"], string> = {
@@ -52,13 +65,24 @@ export class LaserJobPanel {
         const focused = document.activeElement;
         const keepFocus = focused instanceof HTMLElement && this.element.contains(focused);
         const path = keepFocus ? focusPath(this.element, focused) : undefined;
+        const caret =
+            focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement
+                ? [focused.selectionStart, focused.selectionEnd]
+                : undefined;
         this.element.replaceChildren(
             ...this.bedSection(),
             ...this.objectsSection(),
             ...this.modelSection(),
             ...this.objectSection(),
         );
-        if (path !== undefined) restoreFocus(this.element, path);
+        if (path !== undefined) restoreFocus(this.element, path, caret);
+    }
+
+    /** The text field of the selected text, focused with its words selected (to type over). */
+    focusText() {
+        const area = this.element.querySelector<HTMLTextAreaElement>("textarea[data-shape-text]");
+        area?.focus();
+        area?.select();
     }
 
     private bedSection(): HTMLElement[] {
@@ -231,7 +255,155 @@ export class LaserJobPanel {
                 "laser.hidden",
                 checkbox(o.hidden === true, (v) => edit((x) => (x.hidden = v ? true : undefined))),
             ),
+            ...this.shapeSection(o),
             ...this.operationSection(o),
+        ];
+    }
+
+    /** The drawn figure's own parameters, applied as they are typed; «В кривые» drops them. */
+    private shapeSection(o: LaserObject): HTMLElement[] {
+        if (o.kind !== "vector") return [];
+        const shape = o.shape;
+        if (shape === undefined) return [];
+        const rows: HTMLElement[] = [heading(`laser.shape.${shape.type}`)];
+        if (shape.type === "polyline") {
+            const edit = this.editAs(shape);
+            rows.push(
+                row(
+                    "laser.shape.closed",
+                    checkbox(shape.closed, (v) => edit((s) => (s.closed = v && s.points.length >= 3))),
+                ),
+            );
+        } else if (shape.type === "rect") {
+            const edit = this.editAs(shape);
+            rows.push(
+                row(
+                    "laser.shape.radius",
+                    numberField(shape.radius, (v) => edit((s) => (s.radius = v)), { min: 0 }),
+                ),
+            );
+        } else if (shape.type === "polygon") {
+            const edit = this.editAs(shape);
+            rows.push(
+                row(
+                    "laser.shape.sides",
+                    numberField(
+                        shape.sides,
+                        (v) =>
+                            edit((s) => {
+                                s.sides = Math.round(v);
+                                this.host.polygonDefaults.sides = s.sides;
+                            }),
+                        { min: 3, max: 200, step: 1 },
+                    ),
+                ),
+                row(
+                    "laser.shape.star",
+                    numberField(
+                        shape.star * 100,
+                        (v) =>
+                            edit((s) => {
+                                s.star = v / 100;
+                                this.host.polygonDefaults.star = s.star;
+                            }),
+                        { min: 0, max: 99, step: 1 },
+                    ),
+                ),
+            );
+        } else if (shape.type === "text") {
+            rows.push(...this.textRows(shape, this.editAs(shape)));
+        }
+        rows.push(
+            el(
+                "div",
+                { className: style.buttons },
+                button(
+                    "laser.shape.toCurves",
+                    () => this.host.convertToCurves(),
+                    "laser.shape.toCurves.hint",
+                ),
+            ),
+        );
+        return rows;
+    }
+
+    /** An edit of the figure as it is now, typed by its kind (it is that kind still when applied). */
+    private editAs<S extends LaserShape>(current: S): (f: (s: S) => void) => void {
+        return (f) =>
+            this.host.editShape((s) => {
+                if (s.type === current.type) f(s as S);
+            });
+    }
+
+    private textRows(
+        shape: Extract<LaserShape, { type: "text" }>,
+        edit: (f: (s: Extract<LaserShape, { type: "text" }>) => void) => void,
+    ): HTMLElement[] {
+        const area = el("textarea", { rows: 3 });
+        area.setAttribute("data-shape-text", "");
+        area.value = shape.text;
+        area.className = style.textArea;
+        // as it is typed, a moment after the last key
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        area.oninput = () => {
+            if (timer !== undefined) clearTimeout(timer);
+            const value = area.value;
+            timer = setTimeout(() => edit((s) => (s.text = value)), 250);
+        };
+        const fonts = [...catalogFonts(), ...(localFamilies ?? [])];
+        if (!fonts.some((f) => f.family === shape.font.family)) fonts.unshift(shape.font);
+        const keyOf = (f: LaserFontRef) => `${f.local ? "local" : "web"}:${f.family}`;
+        const options = fonts.map((f) => ({
+            value: keyOf(f),
+            label: f.local ? f.family : `${f.family} (${t("laser.shape.font.web")})`,
+        }));
+        if (localFamilies === undefined && localFontsAvailable())
+            options.push({ value: LOCAL_FONTS, label: t("laser.shape.font.local") });
+        const fontSelect = select(options, keyOf(shape.font), (v) => {
+            if (v === LOCAL_FONTS) {
+                void localFontFamilies().then((list) => {
+                    localFamilies = list;
+                    this.render();
+                });
+                return;
+            }
+            const font = fonts.find((f) => keyOf(f) === v);
+            if (font !== undefined) edit((s) => (s.font = { ...font }));
+        });
+        return [
+            area,
+            row("laser.shape.font", fontSelect),
+            row(
+                "laser.shape.size",
+                numberField(shape.size, (v) => edit((s) => (s.size = v)), { min: 0.1 }),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.shape.letterSpacing",
+                    numberField(shape.letterSpacing, (v) => edit((s) => (s.letterSpacing = v))),
+                ),
+                row(
+                    "laser.shape.lineSpacing",
+                    numberField(shape.lineSpacing, (v) => edit((s) => (s.lineSpacing = v)), {
+                        min: 0.1,
+                        step: 0.1,
+                    }),
+                ),
+            ),
+            row(
+                "laser.shape.align",
+                select(
+                    TEXT_ALIGNS.map((a) => ({ value: a, label: t(`laser.shape.align.${a}`) })),
+                    shape.align,
+                    (v) => edit((s) => (s.align = v)),
+                ),
+            ),
+            row(
+                "laser.shape.arc",
+                numberField(shape.arcRadius, (v) => edit((s) => (s.arcRadius = v))),
+            ),
         ];
     }
 
@@ -368,8 +540,17 @@ function focusPath(root: HTMLElement, target: HTMLElement): number[] {
     return path;
 }
 
-function restoreFocus(root: HTMLElement, path: number[]) {
+function restoreFocus(root: HTMLElement, path: number[], caret?: (number | null)[]) {
     let node: Element | undefined = root;
     for (const i of path) node = node?.children[i];
-    if (node instanceof HTMLElement) node.focus();
+    if (!(node instanceof HTMLElement)) return;
+    node.focus();
+    // the caret where it was: a rebuilt text field would otherwise put it at the start
+    if (caret !== undefined && (node instanceof HTMLTextAreaElement || node instanceof HTMLInputElement)) {
+        try {
+            node.setSelectionRange(caret[0], caret[1]);
+        } catch {
+            // a number field has no caret to set
+        }
+    }
 }
