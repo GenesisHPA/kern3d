@@ -266,6 +266,16 @@ export class LaserJobPanel {
         if (o === undefined) return [];
         const edit = this.host.editSelected.bind(this.host);
         const aspect = o.height > 0 ? o.width / o.height : 1;
+        // X / Y are the drawing's centre (0, 0 = on the origin), as EzCAD shows them; a new
+        // width or height grows the object about that centre, which stays where it is
+        const resize = (x: LaserObject, width: number, height: number) => {
+            const cx = x.x + x.width / 2;
+            const cy = x.y + x.height / 2;
+            x.width = width;
+            x.height = height;
+            x.x = cx - width / 2;
+            x.y = cy - height / 2;
+        };
         return [
             heading("laser.object"),
             row(
@@ -277,11 +287,11 @@ export class LaserJobPanel {
                 { className: style.pair },
                 row(
                     "laser.x",
-                    numberField(o.x, (v) => edit((x) => (x.x = v))),
+                    numberField(o.x + o.width / 2, (v) => edit((x) => (x.x = v - x.width / 2))),
                 ),
                 row(
                     "laser.y",
-                    numberField(o.y, (v) => edit((x) => (x.y = v))),
+                    numberField(o.y + o.height / 2, (v) => edit((x) => (x.y = v - x.height / 2))),
                 ),
             ),
             el(
@@ -291,11 +301,7 @@ export class LaserJobPanel {
                     "laser.width",
                     numberField(
                         o.width,
-                        (v) =>
-                            edit((x) => {
-                                x.width = v;
-                                if (x.lockAspect) x.height = v / aspect;
-                            }),
+                        (v) => edit((x) => resize(x, v, x.lockAspect ? v / aspect : x.height)),
                         { min: 0.01 },
                     ),
                 ),
@@ -303,11 +309,7 @@ export class LaserJobPanel {
                     "laser.height",
                     numberField(
                         o.height,
-                        (v) =>
-                            edit((x) => {
-                                x.height = v;
-                                if (x.lockAspect) x.width = v * aspect;
-                            }),
+                        (v) => edit((x) => resize(x, x.lockAspect ? v * aspect : x.width, v)),
                         { min: 0.01 },
                     ),
                 ),
