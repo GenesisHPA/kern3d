@@ -246,6 +246,7 @@ export class JczDriver implements LaserDriver {
     async disconnect(): Promise<void> {
         if (this.transport === undefined) return;
         try {
+            await this.stopping;
             if (this.framingActive || this.state === "running" || this.state === "paused") await this.abort();
             this.portBits = 0;
             await this.send([Cmd.WritePort, 0]);
@@ -432,11 +433,16 @@ export class JczDriver implements LaserDriver {
         this.emit({ type: "framing", active: false });
     }
 
+    /** A stop of the light still settling the board, which a disconnect must wait for. */
+    private stopping: Promise<void> | undefined;
+
     stopFraming() {
         if (!this.framingActive) return;
-        void this.stopFramingNow().catch((error) =>
-            this.log(String((error as Error)?.message ?? error), "err"),
-        );
+        this.stopping = this.stopFramingNow()
+            .catch((error) => this.log(String((error as Error)?.message ?? error), "err"))
+            .finally(() => {
+                this.stopping = undefined;
+            });
     }
 
     // ---- manual ---------------------------------------------------------------------------

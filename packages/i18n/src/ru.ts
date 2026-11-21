@@ -1223,6 +1223,14 @@ export default {
         "laser.machine.controller": "Контроллер",
         "laser.machine.controller.grbl": "GRBL (последовательный порт)",
         "laser.machine.controller.jcz": "JCZ / EzCAD (волоконный, USB)",
+        "laser.jcz.connected": "Плата JCZ: серийный {0}, версия {1}",
+        "laser.jcz.noZero":
+            "У гальво-головы ноль — центр поля; сдвиг задаётся смещением поля в настройках платы",
+        "laser.jcz.state.busy": "Выполняет",
+        "laser.jcz.state.light": "Красный луч",
+        "laser.jcz.state.paused": "Пауза",
+        "laser.jcz.state.ready": "Готова",
+        "laser.warn.outsideField": "Часть задания за пределами поля линзы: она обрезана по краю поля",
         "laser.machine.noUsb":
             "Этот браузер не умеет работать с USB-устройствами (WebUSB). Используйте Chrome или Edge либо программу Kern3D для компьютера.",
         "laser.machine.jcz.driverHint":

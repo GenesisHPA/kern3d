@@ -1387,6 +1387,15 @@ export default {
         "laser.machine.controller": "Controller",
         "laser.machine.controller.grbl": "GRBL (serial port)",
         "laser.machine.controller.jcz": "JCZ / EzCAD (fiber, USB)",
+        "laser.jcz.connected": "JCZ board: serial {0}, version {1}",
+        "laser.jcz.noZero":
+            "A galvo head has its zero at the field centre; shift it with the field offset in the board settings",
+        "laser.jcz.state.busy": "Running",
+        "laser.jcz.state.light": "Red pointer",
+        "laser.jcz.state.paused": "Paused",
+        "laser.jcz.state.ready": "Ready",
+        "laser.warn.outsideField":
+            "Part of the job is outside the lens field: it is clipped at the field edge",
         "laser.machine.noUsb":
             "This browser cannot talk to USB devices (WebUSB). Use Chrome or Edge, or the Kern3D desktop app.",
         "laser.machine.jcz.driverHint":
