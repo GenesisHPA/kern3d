@@ -124,30 +124,6 @@ export function trianglesOf(shape: IShape): Float64Array {
     return out;
 }
 
-/** Unit normal per vertex: the area-weighted mean of its triangles' normals. */
-function vertexNormals(mesh: TriMesh): Float64Array {
-    const n = new Float64Array(mesh.positions.length);
-    const t = mesh.triangles;
-    for (let k = 0; k < mesh.areas.length; k++) {
-        const a = mesh.areas[k];
-        for (let j = 0; j < 3; j++) {
-            const v = t[3 * k + j];
-            n[3 * v] += mesh.normals[3 * k] * a;
-            n[3 * v + 1] += mesh.normals[3 * k + 1] * a;
-            n[3 * v + 2] += mesh.normals[3 * k + 2] * a;
-        }
-    }
-    for (let i = 0; i < n.length; i += 3) {
-        const l = Math.hypot(n[i], n[i + 1], n[i + 2]);
-        if (l > 0) {
-            n[i] /= l;
-            n[i + 1] /= l;
-            n[i + 2] /= l;
-        }
-    }
-    return n;
-}
-
 /** How closely the rebuilt surface passes the STL's vertices (which lie on the part's true surface). */
 export interface SurfaceFit {
     /** Share of the sampled vertices the rebuilt surface misses by more than `eps`. */
@@ -164,16 +140,24 @@ export interface SurfaceFit {
  * volume difference this reads zero for a rebuild with true arcs where the STL had facets.
  */
 export function surfaceFit(mesh: TriMesh, shape: IShape, eps: number, samples = 3000): SurfaceFit {
-    const normals = vertexNormals(mesh);
-    const count = mesh.positions.length / 3;
-    const stride = Math.max(1, Math.floor(count / samples));
+    // triangle centres, by area: a centre lies on a flat face of the part exactly, and on a
+    // curved one within the facet's sagitta — far less than `eps` for any sensible STL
+    const total = mesh.areas.reduce((a, b) => a + b, 0);
+    const step = total / samples;
+    let carry = 0;
     let off = 0;
     let sampled = 0;
     const misses: Vec3[] = [];
-    for (let i = 0; i < count; i += stride) {
-        const p = vertex(mesh, i);
-        const n: Vec3 = [normals[3 * i], normals[3 * i + 1], normals[3 * i + 2]];
-        if (n[0] === 0 && n[1] === 0 && n[2] === 0) continue;
+    const t = mesh.triangles;
+    for (let k = 0; k < mesh.areas.length; k++) {
+        carry += mesh.areas[k];
+        if (carry < step) continue;
+        carry -= step;
+        const a = vertex(mesh, t[3 * k]);
+        const b = vertex(mesh, t[3 * k + 1]);
+        const c = vertex(mesh, t[3 * k + 2]);
+        const p: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+        const n: Vec3 = [mesh.normals[3 * k], mesh.normals[3 * k + 1], mesh.normals[3 * k + 2]];
         sampled++;
         const out = { x: p[0] + n[0] * eps, y: p[1] + n[1] * eps, z: p[2] + n[2] * eps };
         const inn = { x: p[0] - n[0] * eps, y: p[1] - n[1] * eps, z: p[2] - n[2] * eps };

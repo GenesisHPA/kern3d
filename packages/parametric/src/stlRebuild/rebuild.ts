@@ -22,7 +22,7 @@ export interface RebuildReport {
     readonly error?: string;
     /** Milliseconds: planning, building, the first comparison, the corrections. */
     readonly timings?: { plan: number; build: number; compare: number; correct: number };
-    /** Share of the STL's vertices the rebuilt surface misses by more than the fit tolerance ×4. */
+    /** Share of the STL surface (sampled by area) the rebuilt surface misses by more than 0.05 mm. */
     readonly surfaceOff?: number;
 }
 
@@ -186,7 +186,7 @@ export function rebuildPart(
     const timings = { plan: t1 - t0, build: t2 - t1, compare: t3 - t2, correct: Date.now() - t3 };
     const finalShape = bodyShape(model);
     const surfaceOff =
-        finalShape === undefined ? 1 : surfaceFit(mesh, finalShape, Math.max(tol * 4, 0.02)).off;
+        finalShape === undefined ? 1 : surfaceFit(mesh, finalShape, Math.max(tol * 4, 0.05)).off;
     return {
         model,
         ratio,

@@ -16,7 +16,7 @@ import { type EdgeTreatment, planExtrusions, setPlanDebug } from "../src/stlRebu
 import { meshDifference } from "../src/stlRebuild/raycast";
 import { rebuildPart } from "../src/stlRebuild/rebuild";
 import { loopArea, slabsOf, sliceFrames } from "../src/stlRebuild/slices";
-import { deviation, solidVolume, trianglesOf } from "../src/stlRebuild/verify";
+import { deviation, solidVolume, surfaceFit, trianglesOf } from "../src/stlRebuild/verify";
 import "../src/features";
 import "./sketch/setup";
 
@@ -310,6 +310,16 @@ describe.skipIf(debugFile === undefined)("STL debug", () => {
             );
             dbg(
                 `DEBUG ray ref-vs-built ${vsBuilt.aOnly.toFixed(1)}/${vsBuilt.bOnly.toFixed(1)}; stl-vs-built ${stlBuilt.aOnly.toFixed(1)}/${stlBuilt.bOnly.toFixed(1)}; built meshVol ${meshVolume(builtMesh).toFixed(1)}`,
+            );
+        }
+        for (const eps of [0.01, 0.05, 0.2]) {
+            const r = surfaceFit(mesh, reference, eps);
+            const b = surfaceFit(mesh, built, eps);
+            dbg(
+                `DEBUG surfaceFit eps ${eps}: reference ${(r.off * 100).toFixed(1)}% built ${(b.off * 100).toFixed(1)}% of ${b.sampled}; misses ${b.misses
+                    .slice(0, 6)
+                    .map((p) => p.map((x) => x.toFixed(2)).join(","))
+                    .join(" | ")}`,
             );
         }
         const dev = deviation(reference, built);
