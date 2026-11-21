@@ -32,7 +32,6 @@ import {
 } from "./laserData";
 import {
     constrainAngle,
-    DRAW_TOOLS,
     type Draft,
     type DrawnFigure,
     type DrawTool,
@@ -45,6 +44,7 @@ import {
 } from "./laserDraw";
 import style from "./laserEditor.module.css";
 import { defaultLaserFont, loadLaserFont } from "./laserFonts";
+import { toolIcon } from "./laserIcons";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
 import { LaserMachine } from "./laserMachine";
 import { LaserNode } from "./laserNode";
@@ -247,7 +247,12 @@ export class LaserEditor {
             this.overlayGroup,
             this.draftGroup,
         );
-        this.snapButton = button("laser.draw.snap", () => this.toggleSnap(), "laser.draw.snap.hint");
+        this.snapButton = this.paletteButton(
+            toolIcon("snap"),
+            "laser.draw.snap",
+            "laser.draw.snap.hint",
+            () => this.toggleSnap(),
+        );
         this.svg.append(this.world);
         this.statusText = el("span");
         this.statusPosition = el("span");
@@ -296,6 +301,7 @@ export class LaserEditor {
             el(
                 "div",
                 { className: style.body },
+                this.createPalette(),
                 this.svg,
                 el("div", { className: style.panel }, this.panelTabs, this.panelBody),
             ),
@@ -738,9 +744,6 @@ export class LaserEditor {
 
     protected toolbarItems(): HTMLElement[] {
         return [
-            ...this.toolButtonsList(),
-            this.snapButton,
-            this.separator(),
             button("laser.import.svg", () => void this.importSvgFile()),
             button("laser.import.image", () => void this.importImageFile()),
             button("laser.import.ezd", () => void this.importEzdFile(), "laser.import.ezd.hint"),
@@ -1092,17 +1095,46 @@ export class LaserEditor {
 
     // ---- drawing tools ----------------------------------------------------------------------
 
-    private toolButtonsList(): HTMLButtonElement[] {
-        const out: HTMLButtonElement[] = [];
-        for (const tool of DRAW_TOOLS) {
-            const b = button(`laser.tool.${tool}`, () => this.setTool(tool), `laser.tool.${tool}.hint`);
-            // a double click keeps the tool for figure after figure (EzCAD returns to select)
-            b.ondblclick = () => this.setTool(tool, tool !== "select");
-            this.toolButtons.set(tool, b);
-            out.push(b);
-        }
+    /** An icon button of the palette; its name and hint (with the key) are the tooltip. */
+    private paletteButton(icon: string, label: string, hint: string, action: () => void): HTMLButtonElement {
+        const b = el("button", { className: style.paletteButton, onclick: action });
+        b.innerHTML = icon;
+        b.title = `${t(label)}
+${t(hint)}`;
+        b.setAttribute("aria-label", t(label));
+        return b;
+    }
+
+    /**
+     * The tools in a column on the left, as graphics editors have them: selection, lines and
+     * curves, figures, text and codes, then the grid snap at the bottom.
+     */
+    private createPalette(): HTMLElement {
+        const groups: DrawTool[][] = [
+            ["select", "nodes"],
+            ["line", "curve", "pencil"],
+            ["rect", "ellipse", "polygon"],
+            ["text", "barcode"],
+        ];
+        const palette = el("div", { className: style.palette });
+        groups.forEach((group, i) => {
+            if (i > 0) palette.append(el("div", { className: style.paletteSeparator }));
+            for (const tool of group) {
+                const b = this.paletteButton(
+                    toolIcon(tool),
+                    `laser.tool.${tool}`,
+                    `laser.tool.${tool}.hint`,
+                    () => this.setTool(tool),
+                );
+                // a double click keeps the tool for figure after figure (EzCAD returns to select)
+                b.ondblclick = () => this.setTool(tool, tool !== "select");
+                this.toolButtons.set(tool, b);
+                palette.append(b);
+            }
+        });
+        palette.append(el("div", { className: style.paletteSpacer }), this.snapButton);
         this.showTool();
-        return out;
+        return palette;
     }
 
     setTool(tool: DrawTool, keep = false) {
