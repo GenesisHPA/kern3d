@@ -825,7 +825,7 @@ export class LaserEditor {
 
     /**
      * The bed in job coordinates: white, a 10 mm grid (50 mm darker) running from the origin,
-     * figures every 50 mm along the bottom and left edges, and the origin's red X/Y arrows — in
+     * figures every 50 mm along the bottom and left edges, and the origin's blue X/Y arrows — in
      * the middle of the bed for a centre origin, at its lower-left corner for a corner one.
      */
     private renderBed() {
@@ -858,7 +858,7 @@ export class LaserEditor {
         minor.setAttribute("d", dMinor);
         major.setAttribute("d", dMajor);
         const arrow = Math.min(30, w / 4, h / 4);
-        const axes = line("#e03131", 2);
+        const axes = line("#1971c2", 2);
         axes.setAttribute(
             "d",
             `M0 0H${arrow}M0 0V${arrow}M${arrow * 0.8} ${arrow * 0.08}L${arrow} 0L${arrow * 0.8} ${-arrow * 0.08}M${arrow * 0.08} ${arrow * 0.8}L0 ${arrow}L${-arrow * 0.08} ${arrow * 0.8}`,
