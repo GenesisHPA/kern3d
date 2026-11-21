@@ -3,6 +3,7 @@
 
 import {
     AsyncController,
+    download,
     type FontOutline,
     type IDocument,
     PubSub,
@@ -15,6 +16,7 @@ import {
     workspaceTabs,
 } from "@chili3d/core";
 import { DrawingNode } from "../drawing/drawingNode";
+import { exportEzd } from "./ezdExport";
 import { importEzd } from "./ezdImport";
 import { framePaths } from "./framePaths";
 import { bodyOutline, drawingSheet, faceOutline, type ModelView } from "./fromModel";
@@ -529,6 +531,24 @@ export class LaserEditor {
         }
     }
 
+    /**
+     * The job as an EzCAD 2 project (.ezd), named after the job, for any controller: outlines as
+     * curves, fills as hatches, each operation a pen; what was left out in one word per kind.
+     */
+    private exportEzdFile() {
+        const out = exportEzd(this.data, this.profile);
+        if (out.written === 0) {
+            PubSub.default.pub("showToast", "toast.laser.nothingToEngrave");
+            return;
+        }
+        const name = `${this.node.name.replace(/[\\/:*?"<>|]/g, "_") || "laser"}.ezd`;
+        download([out.bytes], name);
+        const notes = ezdWarnings(out.warnings);
+        const summary = t("laser.ezd.saved", out.written, name);
+        this.setStatus(notes === "" ? summary : `${summary}. ${notes}`);
+        if (notes !== "") PubSub.default.pub("showToast", "laser.ezd.warnings" as never, notes);
+    }
+
     private async importImageFile() {
         const files = await readFileAsync(
             "image/png,image/jpeg,image/bmp,.bmp,.png,.jpg,.jpeg",
@@ -764,6 +784,7 @@ export class LaserEditor {
                 button("laser.generate", () => void this.output.generate()),
                 button("laser.save", () => void this.output.save()),
             ),
+            button("laser.export.ezd", () => this.exportEzdFile(), "laser.export.ezd.hint"),
             this.separator(),
             ...this.machine.toolbarControls(),
         ];
@@ -2028,7 +2049,7 @@ export function scaledPlacement(origin: LaserObject, corner: number, p: Pt) {
     return { x: center.x - w / 2, y: center.y - h / 2, width: w, height: h };
 }
 
-/** The importer's warning codes, each kind once with how many times it came up. */
+/** The importer's and exporter's warning codes, each kind once with how many times it came up. */
 const EZD_WARNINGS = [
     "hatch-auto-rotate-ignored",
     "hatch-extra-patterns-ignored",
@@ -2047,6 +2068,10 @@ const EZD_WARNINGS = [
     "unknown-object-type",
     "unreadable-object",
     "unreadable-section",
+    "image-skipped",
+    "hidden-object-skipped",
+    "too-many-pens",
+    "pulse-width-not-written",
 ];
 
 export function ezdWarnings(warnings: readonly string[]): string {
