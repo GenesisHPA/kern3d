@@ -89,47 +89,76 @@ export function rebuildPart(
     const tol = options.tol ?? defaultTolerance(mesh);
     const t0 = Date.now();
     const frames = sliceFrames(mesh);
-    const treatments: EdgeTreatment[] = [];
-    const plans = planExtrusions(mesh, frames[0], tol, { treatments });
+    // measured against the triangles the part was read from: the kernel's display mesh of the
+    // reference solid can lose faces, and a lost face reads as a missing slab of material
+    const referenceMesh = mesh;
+    const goal = options.goal ?? 0.002;
+    /** One axis tried whole: planned, built, its edges rounded, measured. */
+    const attempt = (frame: (typeof frames)[number]) => {
+        const treatments: EdgeTreatment[] = [];
+        const plans = planExtrusions(mesh, frame, tol, { treatments });
+        if (plans.length === 0) return undefined;
+        const model = buildModel(document, plans, name, tol);
+        const shape = bodyShape(model);
+        const failed = failedFeature(model);
+        if (failed !== undefined || shape === undefined)
+            return { model, ratio: 1, rounded: 0, plans, error: failed ?? "no shape" };
+        // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
+        let ratio = measure(referenceMesh, shape);
+        let rounded = 0;
+        for (const treatment of treatments) {
+            const before = model.body.features;
+            if (!appendTreatment(model, treatment, tol)) continue;
+            const next = measure(referenceMesh, bodyShape(model));
+            if (next <= ratio + 1e-5) {
+                ratio = next;
+                rounded++;
+            } else {
+                model.body.setFeaturesEmitShapeChanged(before);
+            }
+        }
+        return { model, ratio, rounded, plans, error: undefined as string | undefined };
+    };
+    const discard = (model: BuiltModel) => {
+        for (const n of [model.body, ...model.sketches]) n.parent?.remove(n);
+    };
+    // the best-scoring axis first; the next ones only when it leaves the part off — the score
+    // counts flat faces, and a leaning arm or a side boss can make another axis the right one
+    let best = attempt(frames[0]);
+    for (const frame of frames.slice(1, 3)) {
+        if (best !== undefined && best.error === undefined && best.ratio <= goal) break;
+        const next = attempt(frame);
+        if (next === undefined) continue;
+        if (
+            best === undefined ||
+            (next.error === undefined && (best.error !== undefined || next.ratio < best.ratio))
+        ) {
+            if (best !== undefined) discard(best.model);
+            best = next;
+        } else {
+            discard(next.model);
+        }
+    }
     const t1 = Date.now();
-    if (plans.length === 0)
+    const t2 = t1;
+    if (best === undefined)
         return { ratio: 1, firstRatio: 1, features: 0, corrections: 0, error: "no sections" };
-    const model = buildModel(document, plans, name, tol);
-    const failed = failedFeature(model);
-    const shape = bodyShape(model);
-    const t2 = Date.now();
-    if (failed !== undefined || shape === undefined) {
+    const { model, rounded } = best;
+    if (best.error !== undefined) {
         return {
             model,
             ratio: 1,
             firstRatio: 1,
-            features: plans.length,
+            features: best.plans.length,
             corrections: 0,
-            error: failed ?? "no shape",
+            error: best.error,
         };
     }
-    // measured against the triangles the part was read from: the kernel's display mesh of the
-    // reference solid can lose faces, and a lost face reads as a missing slab of material
-    const referenceMesh = mesh;
-    // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
-    let firstRatio = measure(referenceMesh, shape);
-    let rounded = 0;
-    for (const treatment of treatments) {
-        const before = model.body.features;
-        if (!appendTreatment(model, treatment, tol)) continue;
-        const next = measure(referenceMesh, bodyShape(model));
-        if (next <= firstRatio + 1e-5) {
-            firstRatio = next;
-            rounded++;
-        } else {
-            model.body.setFeaturesEmitShapeChanged(before);
-        }
-    }
+    const firstRatio = best.ratio;
     const t3 = Date.now();
     const deadline = t3 + (options.budgetMs ?? 60_000);
     let ratio = firstRatio;
     let corrections = 0;
-    const goal = options.goal ?? 0.002;
     const refVolume = solidVolume(reference);
     for (let pass = 0; pass < (options.passes ?? 2) && ratio > goal && Date.now() < deadline; pass++) {
         const current = bodyShape(model);

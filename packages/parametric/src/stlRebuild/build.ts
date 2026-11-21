@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { EMPTY_SCOPE, type IDocument, type IEdge, Plane, ShapeTypes, XYZ } from "@chili3d/core";
-import { captureEdgeRef } from "../features/edgeRef";
+import { captureEdgeRef, type EdgeRef } from "../features/edgeRef";
 import type { ExtrudeFeatureData, FeatureData } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
 import { ConstraintKind, type SketchData, type SketchPointRef } from "../sketch/sketchModel";
@@ -148,13 +148,15 @@ export function appendExtrude(
     document.modelManager.addNode(sketch);
     sketch.visible = false;
     model.sketches.push(sketch);
+    const direction = plan.lean === undefined ? undefined : leanDirection(model, document, plan);
     model.body.setFeaturesEmitShapeChanged([
         ...model.body.features,
         {
             id: `rebuild-${model.sketches.length}`,
             type: "extrude",
             sketchId: sketch.id,
-            depth: Number.parseFloat(plan.depth.toFixed(6)),
+            depth: Number.parseFloat((direction?.depth ?? plan.depth).toFixed(6)),
+            ...(direction ? { direction: direction.ref } : {}),
             ...(plan.draft ? { draftAngle: Number.parseFloat(plan.draft.toFixed(4)) } : {}),
             ...(model.body.features.length > 0 ? { operation: plan.operation ?? "fuse" } : {}),
         },
@@ -236,4 +238,60 @@ export function appendTreatment(model: BuiltModel, treatment: EdgeTreatment, tol
     if (model.body.shape.isOk && model.body.featureItems().at(-1)?.error === undefined) return true;
     model.body.setFeaturesEmitShapeChanged(before);
     return false;
+}
+
+function cross3(a: Vec3, b: Vec3): Vec3 {
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+
+/**
+ * An oblique extrude's direction: a hidden sketch holding one line from the profile's base
+ * along the lean to its top. The extrude's `direction` names that line and sweeps along it,
+ * `depth` being its length.
+ */
+function leanDirection(
+    model: BuiltModel,
+    document: IDocument,
+    plan: PlannedExtrude,
+): { ref: { nodeId: string; edge: EdgeRef }; depth: number } | undefined {
+    const { axis, xvec, yvec } = plan.frame;
+    const [du, dv] = plan.lean ?? [0, 0];
+    const shift: Vec3 = [
+        xvec[0] * du + yvec[0] * dv,
+        xvec[1] * du + yvec[1] * dv,
+        xvec[2] * du + yvec[2] * dv,
+    ];
+    const run: Vec3 = [
+        axis[0] * plan.depth + shift[0],
+        axis[1] * plan.depth + shift[1],
+        axis[2] * plan.depth + shift[2],
+    ];
+    const length = Math.hypot(run[0], run[1], run[2]);
+    const along = Math.hypot(shift[0], shift[1], shift[2]);
+    if (!(length > 0) || !(along > 0)) return undefined;
+    const origin = scale(axis, plan.base);
+    const lean: Vec3 = [shift[0] / along, shift[1] / along, shift[2] / along];
+    // the line's own plane holds the axis and the lean
+    const plane = new Plane({ origin: xyz(origin), normal: xyz(cross3(axis, lean)), xvec: xyz(lean) });
+    const end = new XYZ({ x: origin[0] + run[0], y: origin[1] + run[1], z: origin[2] + run[2] });
+    const d = end.sub(plane.origin);
+    const solver = new SketchSolver(plane, undefined, EMPTY_SCOPE);
+    let data: SketchData;
+    try {
+        solver.addLine(0, 0, d.dot(plane.xvec), d.dot(plane.yvec));
+        data = solver.toData();
+    } finally {
+        solver.dispose();
+    }
+    const sketch = new SketchNode({ document, plane, data });
+    sketch.name = `Направление ${model.sketches.length}`;
+    document.modelManager.addNode(sketch);
+    sketch.visible = false;
+    model.sketches.push(sketch);
+    const edge: EdgeRef = {
+        kind: "line",
+        start: { x: origin[0], y: origin[1], z: origin[2] },
+        end: { x: end.x, y: end.y, z: end.z },
+    };
+    return { ref: { nodeId: sketch.id, edge }, depth: length };
 }

@@ -97,12 +97,32 @@ describe("STL rebuilt as features (real kernel)", () => {
             return Math.abs(a.z - 12) < 1e-6 && Math.abs(b.z - 12) < 1e-6 ? [i] : [];
         });
         const rounded = shapeFactory.fillet(block, top, 3).value;
-        if (process.env["KERN3D_STL_DUMP"]) writeFileSync(process.env["KERN3D_STL_DUMP"], stlBytes(rounded));
+        if (process.env["KERN3D_STL_DUMP_ROUNDED"])
+            writeFileSync(process.env["KERN3D_STL_DUMP_ROUNDED"], stlBytes(rounded));
         const report = rebuild(rounded);
         expect(report.error).toBeUndefined();
         expect(report.rounded).toBeGreaterThanOrEqual(1);
         expect(report.model!.body.features.some((f) => f.type === "fillet")).toBe(true);
         expect(report.ratio).toBeLessThan(0.01);
+    });
+
+    test("a leaning arm on a plate is one oblique extrude along a direction line", () => {
+        const plate = box(0, 0, 0, 60, 40, 5);
+        const foot = shapeFactory.face([
+            shapeFactory.wire([
+                shapeFactory.line(at(10, 10, 5), at(25, 10, 5)).value,
+                shapeFactory.line(at(25, 10, 5), at(25, 20, 5)).value,
+                shapeFactory.line(at(25, 20, 5), at(10, 20, 5)).value,
+                shapeFactory.line(at(10, 20, 5), at(10, 10, 5)).value,
+            ]).value,
+        ]).value;
+        const arm = shapeFactory.prism(foot, new XYZ({ x: 8, y: 6, z: 20 })).value;
+        const part = fuse(plate, arm);
+        if (process.env["KERN3D_STL_DUMP"]) writeFileSync(process.env["KERN3D_STL_DUMP"], stlBytes(part));
+        const report = rebuild(part);
+        expect(report.error).toBeUndefined();
+        expect(report.model!.sketches.some((x) => x.name.startsWith("Направление"))).toBe(true);
+        expect(report.ratio).toBeLessThan(0.005);
     });
 
     test("a hole square to the main axis is cut by the correction pass along its own axis", () => {
@@ -196,7 +216,16 @@ describe.skipIf(debugFile === undefined)("STL debug", () => {
         const stl = fromStl(new Uint8Array(readFileSync(debugFile!)));
         const mesh = weldTriangles(trianglesOf(stl));
         const frames = sliceFrames(mesh);
-        const frame = frames[0];
+        dbg(
+            `DEBUG frames ${frames
+                .slice(0, 5)
+                .map((f) => f.axis.map((x) => x.toFixed(2)).join(","))
+                .join(" | ")}`,
+        );
+        const want = process.env["KERN3D_STL_AXIS"];
+        const frame = want
+            ? (frames.find((f) => f.axis.map((x) => Math.round(x)).join(",") === want) ?? frames[0])
+            : frames[0];
         dbg(
             "DEBUG frame",
             JSON.stringify(frame),

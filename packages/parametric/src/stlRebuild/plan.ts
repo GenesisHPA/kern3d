@@ -19,6 +19,8 @@ export interface PlannedExtrude {
     readonly draft?: number;
     /** A tapered extrude's straight stand-in (its mid-height section), for when the kernel will not taper it. */
     readonly straight?: readonly Profile2D[];
+    /** An oblique extrude: the profiles' shift (u, v) over the whole depth. */
+    readonly lean?: readonly [number, number];
 }
 
 interface FittedSlab {
@@ -29,6 +31,7 @@ interface FittedSlab {
     /** Set on a tapered slab: its profiles are its bottom section. */
     readonly draft?: number;
     readonly straight?: Profile2D[];
+    readonly lean?: [number, number];
 }
 
 /** Whether (u, v) is inside the material of a slab's loops (even-odd over all of them). */
@@ -85,14 +88,24 @@ function perimeter(loop: Loop2D): number {
     return p;
 }
 
+/** The loop's centre of area (a mean of its points would lean toward wherever it is finely cut). */
 function centroid(loop: Loop2D): [number, number] {
+    let a = 0;
     let x = 0;
     let y = 0;
-    for (const p of loop) {
-        x += p[0];
-        y += p[1];
+    for (let i = 0; i < loop.length; i++) {
+        const [x1, y1] = loop[i];
+        const [x2, y2] = loop[(i + 1) % loop.length];
+        const c = x1 * y2 - x2 * y1;
+        a += c;
+        x += (x1 + x2) * c;
+        y += (y1 + y2) * c;
     }
-    return [x / loop.length, y / loop.length];
+    if (Math.abs(a) < 1e-12) {
+        const n = loop.length;
+        return [loop.reduce((t, p) => t + p[0], 0) / n, loop.reduce((t, p) => t + p[1], 0) / n];
+    }
+    return [x / (3 * a), y / (3 * a)];
 }
 
 /** Below this share of slanted side a slab is taken as straight-walled. */
@@ -151,6 +164,14 @@ function taperOf(
                 }
             }
             if (best === undefined) return undefined;
+            // a loop sliding sideways is an oblique sweep, not a taper (whose loops stay centred)
+            const bc = centroid(best);
+            if (
+                Math.hypot(bc[0] - c[0], bc[1] - c[1]) >
+                Math.max(tol * 4, span * 0.01) + Math.abs(a0 - loopArea(best)) / Math.max(p0, 1e-9)
+            ) {
+                return undefined;
+            }
             const dz = section.z - sections[0].z;
             // inward offset of the material: positive when the material shrinks upward
             const offset = (a0 - loopArea(best)) / ((p0 + perimeter(best)) / 2);
@@ -166,6 +187,67 @@ function taperOf(
         result.push({ loop, draft: Math.abs(draft) < 0.05 ? 0 : draft });
     }
     return result;
+}
+
+/**
+ * A slab whose sections keep their shape and slide sideways with height (a leaning arm, an
+ * oblique boss): every loop's area the same through the slab and its centre moving along one
+ * straight line, all loops by the same shift. The shift over the whole slab, or undefined.
+ */
+function obliqueOf(
+    mesh: TriMesh,
+    frame: SliceFrame,
+    bottom: number,
+    top: number,
+    tol: number,
+): [number, number] | undefined {
+    const span = top - bottom;
+    const sections = SAMPLES.map((f) =>
+        sectionAt(mesh, frame, bottom + f * span, span * 0.01).filter(
+            (l) => Math.abs(loopArea(l)) > tol * tol,
+        ),
+    );
+    const base = sections[0];
+    if (base.length === 0 || sections.some((x) => x.length !== base.length)) return undefined;
+    const slack = Math.max(tol * 4, span * 0.01);
+    let shift: [number, number] | undefined;
+    for (const loop of base) {
+        const c0 = centroid(loop);
+        const a0 = loopArea(loop);
+        const centres: [number, number][] = [];
+        for (const section of sections.slice(1)) {
+            // the same loop higher up: same sense, area within 2 %, nearest centre
+            const match = section
+                .filter(
+                    (l) =>
+                        Math.sign(loopArea(l)) === Math.sign(a0) &&
+                        Math.abs(loopArea(l) - a0) <= Math.abs(a0) * 0.02,
+                )
+                .map((l) => ({ c: centroid(l) }))
+                .sort(
+                    (a, b) =>
+                        Math.hypot(a.c[0] - c0[0], a.c[1] - c0[1]) -
+                        Math.hypot(b.c[0] - c0[0], b.c[1] - c0[1]),
+                )[0];
+            if (match === undefined) return undefined;
+            centres.push(match.c);
+        }
+        const f1 = SAMPLES[SAMPLES.length - 1] - SAMPLES[0];
+        const last = centres[centres.length - 1];
+        const total: [number, number] = [(last[0] - c0[0]) / f1, (last[1] - c0[1]) / f1];
+        for (let k = 0; k < centres.length; k++) {
+            const f = SAMPLES[k + 1] - SAMPLES[0];
+            if (
+                Math.hypot(centres[k][0] - c0[0] - total[0] * f, centres[k][1] - c0[1] - total[1] * f) > slack
+            )
+                return undefined;
+        }
+        if (shift === undefined) shift = total;
+        else if (Math.hypot(shift[0] - total[0], shift[1] - total[1]) > slack) return undefined;
+    }
+    if (shift === undefined || Math.hypot(shift[0], shift[1]) < Math.max(tol * 4, span * 0.005))
+        return undefined;
+    return shift;
 }
 
 /**
@@ -235,6 +317,24 @@ export function planExtrusions(
     for (const s of source) {
         if (s.loops.length === 0) continue;
         const tapered = s.slanted >= SLANTED ? taperedSlabs(mesh, frame, s, tol) : undefined;
+        const lean =
+            s.slanted >= SLANTED && tapered === undefined
+                ? obliqueOf(mesh, frame, s.bottom, s.top, tol)
+                : undefined;
+        DEBUG_HOOK?.(
+            `slab ${s.bottom.toFixed(2)}..${s.top.toFixed(2)} slanted ${s.slanted.toFixed(2)} tapered ${tapered !== undefined} lean ${lean?.map((x) => x.toFixed(2))}`,
+        );
+        if (lean !== undefined) {
+            // its bottom section, swept along the lean
+            const low = sectionAt(
+                mesh,
+                frame,
+                s.bottom + (s.top - s.bottom) * 0.002,
+                (s.top - s.bottom) * 0.01,
+            ).filter((l) => Math.abs(loopArea(l)) > tol * tol);
+            slabs.push({ bottom: s.bottom, top: s.top, loops: low, profiles: fit(low), lean });
+            continue;
+        }
         if (tapered === undefined) {
             slabs.push({ bottom: s.bottom, top: s.top, loops: s.loops, profiles: fit(s.loops) });
             continue;
@@ -277,7 +377,7 @@ export function planExtrusions(
     if (options.holes !== false) {
         // round holes: a clockwise circle, followed through the neighbouring straight slabs it runs on in
         for (let i = 0; i < slabs.length; i++) {
-            if (slabs[i].draft !== undefined) continue;
+            if (slabs[i].draft !== undefined || slabs[i].lean !== undefined) continue;
             for (const hole of [...slabs[i].profiles]) {
                 if (hole.kind !== "circle" || hole.ccw) continue;
                 const key = profileKey(hole, q);
@@ -285,6 +385,7 @@ export function planExtrusions(
                 while (
                     j + 1 < slabs.length &&
                     slabs[j + 1].draft === undefined &&
+                    slabs[j + 1].lean === undefined &&
                     Math.abs(slabs[j + 1].bottom - slabs[j].top) <= q
                 ) {
                     const next = slabs[j + 1].profiles.find((p) => profileKey(p, q) === key);
@@ -323,6 +424,8 @@ export function planExtrusions(
             last &&
             last.draft === undefined &&
             s.draft === undefined &&
+            last.lean === undefined &&
+            s.lean === undefined &&
             Math.abs(last.top - s.bottom) <= q &&
             slabKey(last, q) === slabKey(s, q)
         ) {
@@ -342,6 +445,7 @@ export function planExtrusions(
             role: options.role ?? "body",
             ...(options.operation ? { operation: options.operation } : {}),
             ...(s.draft !== undefined ? { draft: s.draft, straight: s.straight } : {}),
+            ...(s.lean !== undefined ? { lean: s.lean } : {}),
         });
     }
     if (options.operation === undefined) {
