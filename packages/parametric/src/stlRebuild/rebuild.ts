@@ -121,7 +121,8 @@ export function rebuildPart(
                     (v, p) => v + p.profiles.reduce((a, q) => a + Math.max(0, profileArea(q)), 0) * p.depth,
                     0,
                 );
-        if (meshPieces && volumeOf(plans.filter((p) => p.fromMesh)) > volumeOf(plans) * 0.5) return undefined;
+        if (meshPieces && volumeOf(plans.filter((p) => p.fromMesh)) > volumeOf(plans) * 0.75)
+            return undefined;
         const model = buildModel(document, plans, name, tol, reference);
         const shape = bodyShape(model);
         const failed = failedFeature(model);
@@ -254,7 +255,13 @@ export function rebuildPart(
             REBUILD_DEBUG?.(
                 `pieces on axis ${frame.axis.map((x) => x.toFixed(2))}: ${alt === undefined ? "none" : `${(alt.ratio * 100).toFixed(3)}% surface ${(altSurface * 100).toFixed(1)}% ${alt.error ?? ""}`}`,
             );
-            if (alt !== undefined && alt.error === undefined && altSurface < surface - 0.01) {
+            // closer on the surface, and not further off in volume
+            if (
+                alt !== undefined &&
+                alt.error === undefined &&
+                altSurface < surface - 0.01 &&
+                alt.ratio <= ratio * 1.2 + 0.001
+            ) {
                 discard(model);
                 model = alt.model;
                 rounded = alt.rounded;
