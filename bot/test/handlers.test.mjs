@@ -109,6 +109,15 @@ describe("commands", () => {
         assert.match(sent[0].text, /резьб/i);
     });
 
+    it("/help shows /here and /stop only to those who can use them", async () => {
+        const member = await replyFor(context("member").ctx, msg("/help"));
+        assert.doesNotMatch(member.text, /\/here|\/stop/);
+        const admin = await replyFor(context("administrator").ctx, msg("/help"));
+        assert.match(admin.text, /\/here — присылать в эту группу/);
+        const personal = await replyFor(context("member").ctx, msg("/help", { chat: priv }));
+        assert.match(personal.text, /\/here — присылать мне/);
+    });
+
     it("/changes shows the newest released section or a given version", async () => {
         const { ctx } = context();
         assert.match(await replyFor(ctx, msg("/changes")), /<b>Kern3D \d+\.\d+\.\d+<\/b>/);

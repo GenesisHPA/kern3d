@@ -101,6 +101,6 @@ export function createTelegram(token, options = {}) {
         answerCallbackQuery: (id, text) =>
             call("answerCallbackQuery", { callback_query_id: id, ...(text ? { text } : {}) }),
         getChatMember: (chatId, userId) => call("getChatMember", { chat_id: chatId, user_id: userId }),
-        setMyCommands: (commands) => call("setMyCommands", { commands }),
+        setMyCommands: (commands, scope) => call("setMyCommands", { commands, ...(scope ? { scope } : {}) }),
     };
 }

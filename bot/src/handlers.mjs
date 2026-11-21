@@ -11,6 +11,10 @@ export const COMMANDS = [
     ["changes", "Что нового (можно указать версию)"],
     ["faq", "Частые вопросы"],
     ["search", "Поиск по документации"],
+];
+
+/** Only for those who can use them: anyone in private, admins in groups (the command menu's scopes). */
+export const SUBSCRIPTION_COMMANDS = [
     ["here", "Присылать сюда новости о релизах"],
     ["stop", "Не присылать новости о релизах"],
 ];
@@ -95,7 +99,11 @@ export function questionText(message, me) {
         .trim();
 }
 
-function helpText(me) {
+/**
+ * `where`: "private" (anyone subscribes themselves), "admin" (a group admin: the group's
+ * subscription) or "member" (a group member: no subscription lines — they could not use them).
+ */
+function helpText(me, where = "private") {
     const name = me?.username ? `@${me.username}` : "бота";
     return [
         "<b>Бот Kern3D</b> — подсказки по программе, ссылки на скачивание и новости о релизах.",
@@ -105,8 +113,11 @@ function helpText(me) {
         "/changes — что нового; <code>/changes 0.9.5</code> — изменения версии",
         "/faq — частые вопросы; <code>/faq 3</code> — один ответ",
         "/search <i>текст</i> — поиск по документации",
-        "/here — присылать сюда новости о релизах (в группе — только админы)",
-        "/stop — отписаться от новостей",
+        ...(where === "private"
+            ? ["/here — присылать мне новости о релизах", "/stop — не присылать новости"]
+            : where === "admin"
+              ? ["/here — присылать в эту группу новости о релизах", "/stop — не присылать новости в группу"]
+              : []),
         "",
         "В личке просто напишите вопрос, например: <i>как вращать модель</i>.",
         `В группе бот отвечает, если упомянуть ${escapeHtml(name)}, ответить на его сообщение или начать сообщение со знака «?».`,
@@ -208,6 +219,12 @@ async function subscribe(ctx, message, on) {
     return had ? "Подписка отключена: новостей о релизах больше не будет." : "Подписки и не было.";
 }
 
+/** Who is asking for help: in private anyone; in a group an admin or a member. */
+async function audience(ctx, message) {
+    if (!isGroup(message.chat)) return "private";
+    return (await canManageSubscription(ctx, message)) ? "admin" : "member";
+}
+
 /** Builds the reply HTML for a message, or null when the bot should stay silent. */
 export async function replyFor(ctx, message) {
     const text = message.text ?? "";
@@ -220,7 +237,7 @@ export async function replyFor(ctx, message) {
             case "help":
                 return withQuestions(
                     ctx,
-                    `${helpText(ctx.me)}
+                    `${helpText(ctx.me, await audience(ctx, message))}
 
 <b>О чём спросить:</b>`,
                 );

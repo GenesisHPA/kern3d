@@ -1,5 +1,5 @@
 // Kern3D Telegram bot: long polling (no open ports), release announcements, FAQ search.
-import { COMMANDS, handleUpdate } from "./handlers.mjs";
+import { COMMANDS, handleUpdate, SUBSCRIPTION_COMMANDS } from "./handlers.mjs";
 import { createKnowledge } from "./knowledge.mjs";
 import { checkRelease } from "./releases.mjs";
 import { loadState, saveState } from "./state.mjs";
@@ -117,8 +117,16 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 const me = await tg.getMe();
 log(`started as @${me.username}, data in ${dataDir}, ${state.chats.length} subscribed chat(s)`);
 await kb.load();
-tg.setMyCommands(COMMANDS.map(([command, description]) => ({ command, description }))).catch((e) =>
-    log(`[bot] setMyCommands: ${e.message}`),
-);
+// the menu: everyone sees the help commands; /here and /stop only in private chats and for group admins
+const menu = (list) => list.map(([command, description]) => ({ command, description }));
+const all = [...COMMANDS, ...SUBSCRIPTION_COMMANDS];
+for (const [list, scope] of [
+    [COMMANDS, { type: "default" }],
+    [all, { type: "all_private_chats" }],
+    [COMMANDS, { type: "all_group_chats" }],
+    [all, { type: "all_chat_administrators" }],
+]) {
+    tg.setMyCommands(menu(list), scope).catch((e) => log(`[bot] setMyCommands: ${e.message}`));
+}
 releaseLoop();
 await updateLoop(me);
