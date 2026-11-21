@@ -68,6 +68,10 @@ export interface LaserOperation {
     /** Fill: hatch direction, degrees from +x. */
     fillAngle: number;
     raster: RasterSettings;
+    /** Galvo (JCZ): pulse frequency, kHz. */
+    frequency: number;
+    /** Galvo (JCZ): the pen whose delays and pulse width are used; empty = the first pen. */
+    pen: string;
 }
 
 interface LaserObjectBase {
@@ -141,6 +145,8 @@ export function defaultOperation(mode: LaserMode): LaserOperation {
         fillInterval: 0.1,
         fillAngle: 0,
         raster: defaultRaster(),
+        frequency: 30,
+        pen: "",
     };
 }
 
@@ -230,6 +236,8 @@ function parseOperation(raw: Partial<LaserOperation> | undefined, mode: LaserMod
         air: raw?.air === true,
         fillInterval: finite(raw?.fillInterval, base.fillInterval),
         fillAngle: finite(raw?.fillAngle, base.fillAngle),
+        frequency: finite(raw?.frequency, base.frequency),
+        pen: typeof raw?.pen === "string" ? raw.pen : "",
         raster: {
             mode: oneOf(r.mode, RASTER_MODES, raster.mode),
             dither: oneOf(r.dither, DITHER_KINDS, raster.dither),

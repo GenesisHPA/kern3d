@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { Bounds } from "./geometry";
+import { defaultJczSettings, type JczSettings, normalizeJczSettings } from "./jczSettings";
 
 /**
  * Where X0 Y0 is on the bed: its centre (the galvo / EzCAD convention, coordinates run
@@ -55,6 +56,8 @@ export interface MachineProfile {
     pointerOn: string;
     /** …and off after it. */
     pointerOff: string;
+    /** The JCZ (EzCAD) galvo board's own settings. */
+    jcz: JczSettings;
 }
 
 export function defaultMachineProfile(): MachineProfile {
@@ -75,6 +78,7 @@ export function defaultMachineProfile(): MachineProfile {
         frameMode: "box",
         pointerOn: "",
         pointerOff: "",
+        jcz: defaultJczSettings(),
     };
 }
 
@@ -95,7 +99,9 @@ export function normalizeProfile(raw: Partial<MachineProfile> | undefined): Mach
     const out = { ...base };
     for (const key of Object.keys(base) as (keyof MachineProfile)[]) {
         const value = raw[key];
-        if (key === "origin") {
+        if (key === "jcz") {
+            out.jcz = normalizeJczSettings(value as Partial<JczSettings> | undefined);
+        } else if (key === "origin") {
             if (BED_ORIGINS.includes(value as BedOrigin)) out.origin = value as BedOrigin;
         } else if (key === "frameMode") {
             if (FRAME_MODES.includes(value as FrameMode)) out.frameMode = value as FrameMode;
