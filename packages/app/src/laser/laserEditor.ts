@@ -12,11 +12,11 @@ import {
     workspaceTabs,
 } from "@chili3d/core";
 import { DrawingNode } from "../drawing/drawingNode";
+import { framePaths } from "./framePaths";
 import { bodyOutline, drawingSheet, faceOutline, type ModelView } from "./fromModel";
 import { type Affine, apply, type Bounds, invert, type Pt } from "./geometry";
 import {
     defaultOperation,
-    jobBounds,
     type LaserJobData,
     type LaserObject,
     newLaserId,
@@ -170,9 +170,16 @@ export class LaserEditor {
             program: async () => {
                 const r = this.output.current ?? (await this.output.generate());
                 if (r === undefined || !r.moves.some((m) => m.power > 0)) return undefined;
-                return { lines: r.lines, seconds: r.stats.seconds };
+                return {
+                    job: this.data,
+                    profile: this.profile,
+                    images: r.images,
+                    gcode: r.lines,
+                    seconds: r.stats.seconds,
+                };
             },
-            jobBounds: () => jobBounds(this.data),
+            framePaths: (mode) => framePaths(this.data, mode),
+            showMachinePanel: () => this.showPanel("machine"),
         });
         this.panelTabs = el("div", { className: style.panelTabs });
         this.panelBody = el("div", { className: style.panelBody });
@@ -232,7 +239,9 @@ export class LaserEditor {
 
     private readonly onCancel = (e: Event) => {
         e.preventDefault();
-        this.select(undefined);
+        // Esc stops the red pointer first, then clears the selection
+        if (this.machine.framing) this.machine.stopFraming();
+        else this.select(undefined);
     };
 
     private readonly onNodeChanged = (property: string | number | symbol) => {
@@ -523,6 +532,8 @@ export class LaserEditor {
             this.separator(),
             button("laser.generate", () => void this.output.generate()),
             button("laser.save", () => void this.output.save()),
+            this.separator(),
+            ...this.machine.toolbarControls(),
         ];
     }
 
@@ -904,10 +915,17 @@ export class LaserEditor {
     private readonly onKeyDown = (e: KeyboardEvent) => {
         // the app's own hotkeys listen on window: nothing typed here may reach them
         e.stopPropagation();
+        if (typeof e.key !== "string") return;
+        // EzCAD's keys, here only while the laser editor has the focus (F1 is the browser's help)
+        if (e.key === "F1" || e.key === "F2") {
+            e.preventDefault();
+            if (e.key === "F1") this.machine.toggleFraming("red");
+            else void this.machine.mark();
+            return;
+        }
         const target = e.target as HTMLElement;
         if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")
             return;
-        if (typeof e.key !== "string") return;
         const key = e.key.toLowerCase();
         if ((e.ctrlKey || e.metaKey) && key === "z") {
             e.preventDefault();

@@ -31,6 +31,8 @@ export interface LaserOutputHost {
 export interface GeneratedJob extends GcodeResult {
     moves: Move[];
     stats: ToolpathStats;
+    /** The pictures' pixels it was made from, by object id. */
+    images: ReadonlyMap<string, GrayImage>;
 }
 
 /** A picture's pixels as lightness, read through a canvas (scaled down past `MAX_IMAGE_SIDE`). */
@@ -96,7 +98,7 @@ export class LaserOutput {
             const profile = this.host.profile;
             const gcode = generateGcode(this.host.data, profile, images);
             const moves = parseToolpath(gcode.lines, profile.rapid);
-            this.result = { ...gcode, moves, stats: toolpathStats(moves, profile) };
+            this.result = { ...gcode, moves, stats: toolpathStats(moves, profile), images };
             for (const warning of gcode.warnings) PubSub.default.pub("showToast", warning as never);
             this.drawPreview();
             this.host.setStatus(this.summary());

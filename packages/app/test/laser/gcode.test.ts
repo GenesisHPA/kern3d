@@ -1,7 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { fmt, frameGcode, generateGcode } from "../../src/laser/gcode";
+import { framePaths, simplify } from "../../src/laser/framePaths";
+import { fmt, frameEndGcode, framePassGcode, frameSetupGcode, generateGcode } from "../../src/laser/gcode";
 import {
     defaultOperation,
     type LaserImageObject,
@@ -282,26 +283,91 @@ describe("time estimate", () => {
     });
 });
 
-describe("frame", () => {
-    test("laser off: M5 and the box traced", () => {
-        const lines = frameGcode({ minX: 1, minY: 2, maxX: 11, maxY: 12 }, profile);
-        expect(lines).toEqual([
-            "G21",
-            "G90",
-            "M5",
+describe("red pointer", () => {
+    const box = [
+        [
+            { x: 1, y: 2 },
+            { x: 11, y: 2 },
+            { x: 11, y: 12 },
+            { x: 1, y: 12 },
+            { x: 1, y: 2 },
+        ],
+    ];
+
+    test("laser off: M5 before, one round of the box, M5 after", () => {
+        expect(frameSetupGcode(profile)).toEqual(["G21", "G90", "M5"]);
+        expect(framePassGcode(box, profile)).toEqual([
             "G0 X1 Y2",
-            "G1 X11 Y2 F3000",
-            "G1 X11 Y12 F3000",
-            "G1 X1 Y12 F3000",
-            "G1 X1 Y2 F3000",
+            "G1 X11 S0 F3000",
+            "G1 Y12",
+            "G1 X1",
+            "G1 Y2",
         ]);
+        expect(frameEndGcode(profile)).toEqual(["M5"]);
     });
 
-    test("low power: M3 at the frame power, off at the end", () => {
-        const lines = frameGcode({ minX: 0, minY: 0, maxX: 5, maxY: 5 }, { ...profile, framePower: 1 });
-        expect(lines).toContain("M3 S0");
-        expect(lines).toContain("G1 X5 S10 F3000");
-        expect(lines[lines.length - 1]).toBe("M5");
+    test("pilot power and the pointer's own M-codes", () => {
+        const p = { ...profile, framePower: 1, pointerOn: "M7", pointerOff: "M9" };
+        expect(frameSetupGcode(p)).toEqual(["G21", "G90", "M7", "M3 S0"]);
+        expect(framePassGcode(box, p)[1]).toBe("G1 X11 S10 F3000");
+        expect(frameEndGcode(p)).toEqual(["M5", "M9"]);
+    });
+
+    test("«Контур» is the job's box, «Обводка» the outer outlines without holes", () => {
+        const square = { ...squareObject(), x: 10, y: 20 };
+        const holed = {
+            ...square,
+            paths: [
+                ...square.paths,
+                {
+                    closed: true,
+                    points: [
+                        { x: 3, y: 3 },
+                        { x: 7, y: 3 },
+                        { x: 7, y: 7 },
+                    ],
+                },
+            ],
+        };
+        const job: LaserJobData = { version: 1, origin: "corner", objects: [holed] };
+        const [frame] = framePaths(job, "box");
+        expect(frame[0]).toEqual({ x: 10, y: 20 });
+        expect(frame[2]).toEqual({ x: 20, y: 30 });
+        const outline = framePaths(job, "outline");
+        expect(outline).toHaveLength(1);
+        expect(outline[0]).toHaveLength(5);
+    });
+
+    test("«Контур гравировки» follows every path, holes too, a picture as its box", () => {
+        const square = { ...squareObject() };
+        const holed = {
+            ...square,
+            paths: [
+                ...square.paths,
+                {
+                    closed: true,
+                    points: [
+                        { x: 3, y: 3 },
+                        { x: 7, y: 3 },
+                        { x: 7, y: 7 },
+                    ],
+                },
+            ],
+        };
+        const picture = imageObject(5, 5, 2, 2);
+        picture.x = 50;
+        const paths = framePaths({ version: 1, origin: "corner", objects: [holed, picture] }, "toolpath");
+        expect(paths).toHaveLength(3);
+        // the triangle hole is traced as it is
+        expect(paths.some((p) => p.length === 4)).toBe(true);
+    });
+
+    test("a long curve is simplified to the tolerance", () => {
+        const arc = Array.from({ length: 200 }, (_, i) => ({ x: Math.cos(i / 100), y: Math.sin(i / 100) }));
+        const fewer = simplify(arc, 0.2);
+        expect(fewer.length).toBeLessThan(10);
+        expect(fewer[0]).toEqual(arc[0]);
+        expect(fewer[fewer.length - 1]).toEqual(arc[arc.length - 1]);
     });
 });
 

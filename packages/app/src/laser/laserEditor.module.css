@@ -322,3 +322,33 @@
 .status > span:first-child {
     flex: 1 1 auto;
 }
+
+/* EzCAD-style machine controls in the top bar */
+.toolbar button.big {
+    padding: 5px 14px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.toolbar button.big.active {
+    background-color: #e03131 !important;
+    border-color: #c92a2a !important;
+    color: #fff !important;
+    animation: laserBlink 1s ease-in-out infinite;
+}
+
+.toolbar button.mark {
+    background-color: #2f9e44;
+    border-color: #2b8a3e;
+    color: #fff;
+}
+
+.toolbar button.mark:hover {
+    background-color: #37b24d;
+}
+
+@keyframes laserBlink {
+    50% {
+        opacity: 0.7;
+    }
+}

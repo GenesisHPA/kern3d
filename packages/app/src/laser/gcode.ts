@@ -221,35 +221,39 @@ export function generateGcode(
     return { lines: w.lines, warnings };
 }
 
+/** The pilot beam's S: `framePower` % of full power, 0 when framing runs with the laser off. */
+export function frameS(profile: MachineProfile): number {
+    return (Math.max(0, Math.min(100, profile.framePower)) / 100) * profile.maxS;
+}
+
 /**
- * Tracing the job's box so the work can be lined up under the head: laser off (M5 and G0) when
- * `framePower` is 0, otherwise a faint constant-power line (M3) at `frameSpeed`.
+ * Before the red pointer loops: millimetres, absolute, the machine's pointer M-code if it has
+ * one, and the laser off (M5) — or M3 S0 when a faint pilot beam is wanted.
  */
-export function frameGcode(bounds: Bounds, profile: MachineProfile): string[] {
-    if (isEmpty(bounds)) return [];
-    const corners: Pt[] = [
-        { x: bounds.minX, y: bounds.minY },
-        { x: bounds.maxX, y: bounds.minY },
-        { x: bounds.maxX, y: bounds.maxY },
-        { x: bounds.minX, y: bounds.maxY },
-        { x: bounds.minX, y: bounds.minY },
-    ];
+export function frameSetupGcode(profile: MachineProfile): string[] {
+    const lines = ["G21", "G90"];
+    if (profile.pointerOn !== "") lines.push(profile.pointerOn);
+    lines.push(frameS(profile) > 0 ? "M3 S0" : "M5");
+    return lines;
+}
+
+/**
+ * One round of the pointer along `paths` (closed polylines): a rapid to each start, then the
+ * outline at `frameSpeed` — at the pilot power, or with the laser off.
+ */
+export function framePassGcode(paths: readonly Pt[][], profile: MachineProfile): string[] {
     const w = new GcodeWriter();
-    w.raw("G21");
-    w.raw("G90");
-    const s = (Math.max(0, Math.min(100, profile.framePower)) / 100) * profile.maxS;
-    if (s <= 0) {
-        w.raw("M5");
-        w.rapid(corners[0]);
-        for (const c of corners.slice(1)) {
-            const words = `X${fmt(c.x)} Y${fmt(c.y)}`;
-            w.raw(`G1 ${words} F${fmt(profile.frameSpeed)}`);
-        }
-        return w.lines;
+    w.clamp = bedRect(profile);
+    const s = frameS(profile);
+    for (const path of paths) {
+        if (path.length < 2) continue;
+        w.rapid(path[0]);
+        for (const p of path.slice(1)) w.cut(p, s, profile.frameSpeed);
     }
-    w.rapid(corners[0]);
-    w.raw("M3 S0");
-    for (const c of corners.slice(1)) w.cut(c, s, profile.frameSpeed);
-    w.raw("M5");
     return w.lines;
+}
+
+/** After the loop: laser off and the pointer's off code. */
+export function frameEndGcode(profile: MachineProfile): string[] {
+    return profile.pointerOff === "" ? ["M5"] : ["M5", profile.pointerOff];
 }

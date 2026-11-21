@@ -11,11 +11,23 @@ export const BED_ORIGINS = ["center", "corner"] as const;
 export type BedOrigin = (typeof BED_ORIGINS)[number];
 
 /**
+ * What the red pointer traces to show where the job lands: its bounding box («Контур»), or the
+ * outer outlines of its objects, simplified («Обводка»).
+ */
+export const FRAME_MODES = ["box", "outline"] as const;
+export type FrameMode = (typeof FRAME_MODES)[number];
+
+/** The controller board: GRBL over a serial port, or a JCZ / EzCAD galvo board over USB. */
+export const LASER_CONTROLLERS = ["grbl", "jcz"] as const;
+export type LaserController = (typeof LASER_CONTROLLERS)[number];
+
+/**
  * The engraver this workstation drives: its bed, GRBL's power scale and motion limits, and the
  * serial speed. It belongs to the machine, not to a job, so it is kept in the browser's storage
  * rather than in the document.
  */
 export interface MachineProfile {
+    controller: LaserController;
     /** Where X0 Y0 is on the bed. */
     origin: BedOrigin;
     /** Work area, mm. */
@@ -34,14 +46,20 @@ export interface MachineProfile {
     baud: number;
     /** Send the head back to X0 Y0 at the end of a job. */
     returnHome: boolean;
-    /** Framing: % of power while tracing the job's box; 0 = laser off. */
+    /** Framing (the red pointer): % of power while tracing; 0 = laser off, the head only moves. */
     framePower: number;
     /** Framing speed, mm/min. */
     frameSpeed: number;
+    frameMode: FrameMode;
+    /** M-code that switches a red pointer on before framing (empty: the machine has none). */
+    pointerOn: string;
+    /** …and off after it. */
+    pointerOff: string;
 }
 
 export function defaultMachineProfile(): MachineProfile {
     return {
+        controller: "grbl",
         origin: "center",
         bedWidth: 400,
         bedHeight: 400,
@@ -54,6 +72,9 @@ export function defaultMachineProfile(): MachineProfile {
         returnHome: true,
         framePower: 0,
         frameSpeed: 3000,
+        frameMode: "box",
+        pointerOn: "",
+        pointerOff: "",
     };
 }
 
@@ -76,6 +97,13 @@ export function normalizeProfile(raw: Partial<MachineProfile> | undefined): Mach
         const value = raw[key];
         if (key === "origin") {
             if (BED_ORIGINS.includes(value as BedOrigin)) out.origin = value as BedOrigin;
+        } else if (key === "frameMode") {
+            if (FRAME_MODES.includes(value as FrameMode)) out.frameMode = value as FrameMode;
+        } else if (key === "controller") {
+            if (LASER_CONTROLLERS.includes(value as LaserController))
+                out.controller = value as LaserController;
+        } else if (typeof base[key] === "string") {
+            if (typeof value === "string") (out as any)[key] = value.trim();
         } else if (typeof base[key] === "boolean") {
             if (typeof value === "boolean") (out as any)[key] = value;
         } else if (typeof value === "number" && Number.isFinite(value) && value >= 0) {

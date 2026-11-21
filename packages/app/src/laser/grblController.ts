@@ -102,6 +102,8 @@ export function cleanLine(line: string): string {
 interface Pending {
     text: string;
     job: boolean;
+    /** Not echoed to the console (a framing loop's lines). */
+    quiet?: boolean;
 }
 
 export interface GrblControllerOptions {
@@ -152,6 +154,11 @@ export class GrblController {
     }
 
     /** Bytes GRBL holds that it has not answered. */
+    /** Lines sent or waiting that GRBL has not answered yet. */
+    get pending(): number {
+        return this.queue.length + this.inflight.length;
+    }
+
     get bufferUsed(): number {
         return this.used;
     }
@@ -174,11 +181,11 @@ export class GrblController {
     }
 
     /** A command typed by the user or sent by a button; refused (false) while a job runs. */
-    send(line: string): boolean {
+    send(line: string, quiet = false): boolean {
         if (this.jobActive) return false;
         const text = line.trim();
         if (text === "") return false;
-        this.queue.push({ text, job: false });
+        this.queue.push({ text, job: false, quiet });
         this.pump();
         return true;
     }
@@ -193,7 +200,7 @@ export class GrblController {
             this.queue.shift();
             this.inflight.push(next);
             this.used += size;
-            if (!next.job) this.emit({ type: "out", text: next.text });
+            if (!next.job && !next.quiet) this.emit({ type: "out", text: next.text });
             void this.write(`${next.text}\n`);
         }
     }

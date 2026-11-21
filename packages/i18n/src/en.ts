@@ -1313,12 +1313,8 @@ export default {
         "laser.machine.setZero": "Set zero here",
         "laser.machine.setZero.hint":
             "The job's X0 Y0 becomes the head's present position (G10 L20 P1 X0 Y0)",
-        "laser.machine.frame": "Frame",
-        "laser.machine.frame.hint":
-            "Traces the job's outer box with the laser off (or at the frame power) to line up the work",
-        "laser.machine.framePower": "Frame power, % (0 — laser off)",
+        "laser.machine.framePower": "Pilot beam power, % (0 — laser off)",
         "laser.machine.job": "Job",
-        "laser.machine.start": "Start",
         "laser.machine.pause": "Pause",
         "laser.machine.resume": "Resume",
         "laser.machine.stop": "STOP",
@@ -1330,7 +1326,6 @@ export default {
         "laser.machine.confirmStart":
             "Start the job on the machine? {0} lines, about {1} min. Put on laser safety glasses and keep the stop at hand.",
         "laser.machine.done": "The laser job is finished",
-        "laser.machine.alarmToast": "GRBL alarm {0}: see the machine tab",
         "laser.job.none": "—",
         "laser.job.running": "running",
         "laser.job.paused": "paused",
@@ -1389,5 +1384,25 @@ export default {
         "laser.origin": "Origin",
         "laser.origin.center": "Bed centre",
         "laser.origin.corner": "Lower-left corner",
+        "laser.machine.controller": "Controller",
+        "laser.machine.controller.grbl": "GRBL (serial port)",
+        "laser.machine.controller.jcz": "JCZ (EzCAD) — coming soon",
+        "laser.machine.pointer": "Red pointer",
+        "laser.machine.red": "Red (F1)",
+        "laser.machine.red.hint":
+            "Loops the job's boundary with the red pointer (or the laser at pilot power) until pressed again or Esc",
+        "laser.machine.toolpath": "Engraving outline",
+        "laser.machine.toolpath.hint":
+            "Loops along the job's actual paths (pictures as their box) with the red pointer or pilot power, until pressed again or Esc",
+        "laser.machine.mark": "Mark (F2)",
+        "laser.machine.mark.hint": "Starts engraving the job (asks once per session)",
+        "laser.machine.frameMode": "Red traces",
+        "laser.machine.frameMode.box": "Bounding box",
+        "laser.machine.frameMode.outline": "Outer outlines",
+        "laser.machine.frameSpeed": "Pointer speed, mm/min",
+        "laser.machine.pointerOn": "Pointer on M-code",
+        "laser.machine.pointerOff": "Pointer off M-code",
+        "laser.machine.connectFirst": "Connect the machine first («Станок» tab)",
+        "laser.machine.alertToast": "{0}",
     },
 } satisfies Locale;
