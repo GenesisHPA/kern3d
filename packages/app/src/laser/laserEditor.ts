@@ -23,6 +23,7 @@ import {
     defaultOperation,
     type LaserJobData,
     type LaserObject,
+    type LaserVectorObject,
     newLaserId,
     objectCorners,
     objectMatrix,
@@ -51,6 +52,19 @@ import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
 import { bedRect, loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
 import {
+    breakAt,
+    deleteNode,
+    flattenSubPaths,
+    hitSegment,
+    insertNode,
+    joinAt,
+    moveHandle,
+    moveNode,
+    smoothStroke,
+    subPathsFromOutlines,
+    toggleSmooth,
+} from "./pathShape";
+import {
     type Align,
     alignObjects,
     boundsOf,
@@ -62,7 +76,7 @@ import {
     rotateAll,
     scaleAll,
 } from "./selection";
-import { bakeSize, regenerate, shapeObject } from "./shapeObject";
+import { bakeSize, convertToPath, pathObject, rebuildPath, regenerate, shapeObject } from "./shapeObject";
 import { defaultQuiet, type LaserShape, needsFont } from "./shapes";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
@@ -647,13 +661,21 @@ export class LaserEditor {
             convertToCurves: () => {
                 const o = this.selected();
                 if (o?.kind !== "vector" || o.shape === undefined) return;
-                o.shape = undefined;
+                if (!convertToPath(o)) o.shape = undefined;
                 this.commit();
                 this.render();
             },
             get polygonDefaults() {
                 return editor.polygonDefaults;
             },
+            get nodeMode() {
+                return editor.nodeMode;
+            },
+            get nodeSelected() {
+                return editor.nodeSelected;
+            },
+            nodeAction: (action) => this.nodeAction(action),
+            editNodes: () => this.setTool("nodes"),
             move: (id, delta) => this.move(id, delta),
             setProfile: (edit) => this.setProfile(edit),
             modelSources: () => this.modelSources(),
@@ -935,6 +957,10 @@ export class LaserEditor {
 
     private renderOverlay() {
         this.overlayGroup.replaceChildren();
+        if (this.tool === "nodes") {
+            this.renderNodes();
+            return;
+        }
         const group = this.groupBox();
         if (group !== undefined) {
             for (const each of this.selectedObjects()) {
@@ -1081,6 +1107,9 @@ export class LaserEditor {
 
     setTool(tool: DrawTool, keep = false) {
         this.cancelDraft();
+        if (tool === "nodes" && !this.enterNodes()) tool = "select";
+        this.nodeSel = undefined;
+        this.nodeDrag = undefined;
         this.tool = tool;
         this.keepTool = keep;
         this.svg.style.cursor =
@@ -1091,6 +1120,216 @@ export class LaserEditor {
                 ? this.output.summary() || t("laser.prompt.select")
                 : t(`laser.tool.${tool}.prompt`),
         );
+        this.renderOverlay();
+        this.renderPanel();
+    }
+
+    // ---- node editing ---------------------------------------------------------------------------
+
+    private nodeSel: { sub: number; node: number } | undefined;
+    private nodeDrag: { kind: "node" | "in" | "out"; sub: number; node: number; moved: boolean } | undefined;
+
+    get nodeMode(): boolean {
+        return this.tool === "nodes";
+    }
+
+    get nodeSelected(): boolean {
+        return this.nodeSel !== undefined;
+    }
+
+    private nodeTarget(): LaserVectorObject | undefined {
+        const o = this.selected();
+        return o?.kind === "vector" && o.shape?.type === "path" ? o : undefined;
+    }
+
+    /**
+     * The selected object opened node by node: a polyline or plain outlines become a path of
+     * corner nodes (the outlines unchanged); a rectangle, ellipse, polygon, text or barcode
+     * must be converted to curves first — said, not done behind the user's back.
+     */
+    private enterNodes(): boolean {
+        const o = this.selected();
+        if (o?.kind !== "vector") {
+            PubSub.default.pub("showToast", "laser.nodes.selectOne");
+            return false;
+        }
+        const shape = o.shape;
+        if (shape !== undefined && shape.type !== "path" && shape.type !== "polyline") {
+            PubSub.default.pub("showToast", "laser.nodes.convertFirst");
+            return false;
+        }
+        if (shape?.type === "polyline")
+            o.shape = {
+                type: "path",
+                subpaths: [{ closed: shape.closed, nodes: shape.points.map((q) => ({ x: q.x, y: q.y })) }],
+            };
+        else if (shape === undefined) {
+            const subpaths = subPathsFromOutlines(o.paths);
+            if (subpaths.length === 0) return false;
+            o.shape = { type: "path", subpaths };
+        }
+        return true;
+    }
+
+    private renderNodes() {
+        const o = this.nodeTarget();
+        if (o?.shape?.type !== "path") return;
+        const m = objectMatrix(o);
+        const px = this.pixel();
+        const sel = this.nodeSel;
+        const attrs = { stroke: "#1677ff", "stroke-width": 1, "vector-effect": "non-scaling-stroke" };
+        o.shape.subpaths.forEach((sub, si) => {
+            const count = sub.nodes.length;
+            sub.nodes.forEach((n, ni) => {
+                const at = apply(m, n);
+                const selected = sel?.sub === si && sel.node === ni;
+                const near =
+                    sel?.sub === si &&
+                    (selected ||
+                        Math.abs(sel.node - ni) === 1 ||
+                        (sub.closed && Math.abs(sel.node - ni) === count - 1));
+                if (near) {
+                    for (const h of [n.in, n.out]) {
+                        if (h === undefined) continue;
+                        const hp = apply(m, h);
+                        this.overlayGroup.append(
+                            svgElement("line", { x1: at.x, y1: at.y, x2: hp.x, y2: hp.y, ...attrs }),
+                            svgElement("circle", { cx: hp.x, cy: hp.y, r: 3 * px, fill: "#fff", ...attrs }),
+                        );
+                    }
+                }
+                const size = (selected ? 5 : 4) * px;
+                const fill = selected ? "#1677ff" : "#fff";
+                this.overlayGroup.append(
+                    n.smooth
+                        ? svgElement("circle", { cx: at.x, cy: at.y, r: size, fill, ...attrs })
+                        : svgElement("rect", {
+                              x: at.x - size,
+                              y: at.y - size,
+                              width: 2 * size,
+                              height: 2 * size,
+                              fill,
+                              ...attrs,
+                          }),
+                );
+            });
+        });
+    }
+
+    private nodesPointerDown(e: PointerEvent) {
+        const p = this.bedPoint(e);
+        const o = this.nodeTarget();
+        const reach = 6 * this.pixel();
+        if (o?.shape?.type === "path") {
+            const m = objectMatrix(o);
+            const subs = o.shape.subpaths;
+            const sel = this.nodeSel;
+            if (sel !== undefined) {
+                const n = subs[sel.sub]?.nodes[sel.node];
+                for (const which of ["in", "out"] as const) {
+                    const h = n?.[which];
+                    if (h === undefined) continue;
+                    const hp = apply(m, h);
+                    if (Math.hypot(hp.x - p.x, hp.y - p.y) <= reach) {
+                        this.nodeDrag = { kind: which, sub: sel.sub, node: sel.node, moved: false };
+                        return;
+                    }
+                }
+            }
+            for (let si = 0; si < subs.length; si++)
+                for (let ni = 0; ni < subs[si].nodes.length; ni++) {
+                    const at = apply(m, subs[si].nodes[ni]);
+                    if (Math.hypot(at.x - p.x, at.y - p.y) <= reach) {
+                        this.nodeSel = { sub: si, node: ni };
+                        this.nodeDrag = { kind: "node", sub: si, node: ni, moved: false };
+                        this.renderOverlay();
+                        this.renderPanel();
+                        return;
+                    }
+                }
+            // a click on the outline puts a node there
+            const q = apply(invert(m), p);
+            const scale = Math.max(1e-9, Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])));
+            const hit = hitSegment(subs, q, reach / scale);
+            if (hit !== undefined) {
+                const ni = insertNode(subs[hit.sub], hit.segment, hit.t);
+                this.nodeSel = { sub: hit.sub, node: ni };
+                this.nodeDrag = { kind: "node", sub: hit.sub, node: ni, moved: true };
+                o.paths = flattenSubPaths(subs);
+                this.renderObjects();
+                this.renderOverlay();
+                this.renderPanel();
+                return;
+            }
+        }
+        const other = this.hitObject(p);
+        if (other !== undefined && other.id !== o?.id) {
+            this.selection = other.id;
+            if (!this.enterNodes()) this.setTool("select");
+            this.nodeSel = undefined;
+            this.render();
+            return;
+        }
+        this.nodeSel = undefined;
+        this.renderOverlay();
+        this.renderPanel();
+    }
+
+    private nodesPointerMove(e: PointerEvent) {
+        const drag = this.nodeDrag;
+        const o = this.nodeTarget();
+        if (drag === undefined || o?.shape?.type !== "path" || (e.buttons & 1) === 0) return;
+        const n = o.shape.subpaths[drag.sub]?.nodes[drag.node];
+        if (n === undefined) return;
+        const q = apply(invert(objectMatrix(o)), this.drawPoint(e));
+        if (drag.kind === "node") moveNode(n, q.x, q.y);
+        else moveHandle(n, drag.kind, q, e.altKey);
+        drag.moved = true;
+        o.paths = flattenSubPaths(o.shape.subpaths);
+        this.renderObjects();
+        this.renderOverlay();
+    }
+
+    private nodesPointerUp() {
+        const drag = this.nodeDrag;
+        this.nodeDrag = undefined;
+        const o = this.nodeTarget();
+        if (drag?.moved !== true || o === undefined) return;
+        rebuildPath(o);
+        this.commit();
+        this.render();
+    }
+
+    /** The node buttons of the panel and the Delete key, on the selected node. */
+    nodeAction(action: "smooth" | "break" | "join" | "close" | "delete") {
+        const o = this.nodeTarget();
+        const sel = this.nodeSel;
+        if (o?.shape?.type !== "path") return;
+        const subs = o.shape.subpaths;
+        if (action === "close") {
+            const sub = subs[sel?.sub ?? 0];
+            if (sub === undefined || sub.nodes.length < 3) return;
+            sub.closed = !sub.closed;
+        } else {
+            if (sel === undefined || subs[sel.sub]?.nodes[sel.node] === undefined) {
+                PubSub.default.pub("showToast", "laser.nodes.pickNode");
+                return;
+            }
+            if (action === "delete") {
+                const total = subs.reduce((a, x) => a + x.nodes.length, 0);
+                if (total <= 2) return;
+                deleteNode(subs, sel.sub, sel.node);
+                this.nodeSel = undefined;
+            } else if (action === "smooth") toggleSmooth(subs[sel.sub], sel.node);
+            else if (action === "break") breakAt(subs, sel.sub, sel.node);
+            else if (!joinAt(subs, sel.sub, sel.node)) {
+                PubSub.default.pub("showToast", "laser.nodes.joinEnds");
+                return;
+            } else this.nodeSel = undefined;
+        }
+        rebuildPath(o);
+        this.commit();
+        this.render();
     }
 
     private showTool() {
@@ -1240,8 +1479,69 @@ export class LaserEditor {
         this.render();
     }
 
+    /** The pen's path as a new object; the first click closes it, a double click or Enter ends it. */
+    private finishCurve(closed: boolean) {
+        const draft = this.draft;
+        if (draft?.kind !== "curve") return;
+        this.cancelDraft();
+        if (draft.nodes.length < 2) return;
+        this.addDrawn(
+            pathObject(
+                [{ nodes: draft.nodes, closed: closed && draft.nodes.length >= 2 }],
+                t("laser.shape.path"),
+            ),
+        );
+    }
+
+    /** The pencil's stroke: simplified to what the eye sees, smoothed into Bézier nodes. */
+    private finishPencil() {
+        const draft = this.draft;
+        if (draft?.kind !== "pencil") return;
+        this.cancelDraft();
+        const pts = draft.points;
+        if (pts.length < 2) return;
+        const px = this.pixel();
+        const first = pts[0];
+        const last = pts[pts.length - 1];
+        const closed = pts.length > 4 && Math.hypot(last.x - first.x, last.y - first.y) <= 8 * px;
+        const sub = smoothStroke(pts, Math.max(0.05, 1.5 * px), closed);
+        this.addDrawn(pathObject([sub], t("laser.shape.path")));
+    }
+
+    private addDrawn(o: LaserObject | undefined) {
+        if (o === undefined) return;
+        this.add(o);
+        if (!this.keepTool) this.setTool("select");
+    }
+
     private drawPointerDown(e: PointerEvent) {
+        if (this.tool === "nodes") {
+            this.nodesPointerDown(e);
+            return;
+        }
+        if (this.tool === "pencil") {
+            this.draft = { kind: "pencil", points: [this.bedPoint(e)] };
+            return;
+        }
         const p = this.drawPoint(e);
+        if (this.tool === "curve") {
+            const draft = this.draft?.kind === "curve" ? this.draft : undefined;
+            if (draft === undefined) {
+                this.draft = { kind: "curve", nodes: [{ x: p.x, y: p.y }], dragging: true, hover: undefined };
+            } else {
+                const first = draft.nodes[0];
+                const last = draft.nodes[draft.nodes.length - 1];
+                const px = this.pixel();
+                if (draft.nodes.length >= 2 && Math.hypot(p.x - first.x, p.y - first.y) <= 6 * px) {
+                    this.finishCurve(true);
+                    return;
+                }
+                if (Math.hypot(p.x - last.x, p.y - last.y) > 2 * px) draft.nodes.push({ x: p.x, y: p.y });
+                draft.dragging = true;
+            }
+            this.renderDraft();
+            return;
+        }
         if (this.tool === "text") {
             void this.placeText(p);
             return;
@@ -1277,9 +1577,34 @@ export class LaserEditor {
     }
 
     private drawPointerMove(e: PointerEvent) {
+        if (this.tool === "nodes") {
+            this.nodesPointerMove(e);
+            return;
+        }
         const draft = this.draft;
         if (draft === undefined) return;
+        if (draft.kind === "pencil") {
+            const q = this.bedPoint(e);
+            const last = draft.points[draft.points.length - 1];
+            if ((e.buttons & 1) !== 0 && Math.hypot(q.x - last.x, q.y - last.y) > 0.5 * this.pixel())
+                draft.points.push(q);
+            this.renderDraft();
+            return;
+        }
         const p = this.drawPoint(e);
+        if (draft.kind === "curve") {
+            const n = draft.nodes[draft.nodes.length - 1];
+            if (draft.dragging && (e.buttons & 1) !== 0) {
+                // a drag pulls the handles out: a smooth node; Alt leaves the incoming one (a cusp)
+                if (Math.hypot(p.x - n.x, p.y - n.y) > 2 * this.pixel()) {
+                    n.out = { ...p };
+                    if (!e.altKey) n.in = { x: 2 * n.x - p.x, y: 2 * n.y - p.y };
+                    n.smooth = !e.altKey;
+                }
+            } else draft.hover = p;
+            this.renderDraft();
+            return;
+        }
         if (draft.kind === "polyline") {
             const last = draft.points[draft.points.length - 1];
             draft.hover = e.shiftKey ? constrainAngle(last, p) : p;
@@ -1291,7 +1616,19 @@ export class LaserEditor {
     }
 
     private drawPointerUp() {
+        if (this.tool === "nodes") {
+            this.nodesPointerUp();
+            return;
+        }
         const draft = this.draft;
+        if (draft?.kind === "curve") {
+            draft.dragging = false;
+            return;
+        }
+        if (draft?.kind === "pencil") {
+            this.finishPencil();
+            return;
+        }
         if (draft?.kind !== "box") return;
         this.addFigure(finishBox(draft, this.polygonDefaults, 3 * this.pixel()));
     }
@@ -1300,7 +1637,19 @@ export class LaserEditor {
         if (this.tool === "line" && this.draft?.kind === "polyline") {
             e.preventDefault();
             this.finishPolylineDraft(false);
-        }
+        } else if (this.tool === "curve" && this.draft?.kind === "curve") {
+            e.preventDefault();
+            this.finishCurve(false);
+        } else if (this.tool === "select") {
+            // a double click on an object opens its nodes (EzCAD: edit the curve)
+            const hit = this.hitObject(this.bedPoint(e));
+            if (hit?.kind === "vector") {
+                this.selection = hit.id;
+                this.setTool("nodes");
+                this.render();
+            }
+        } else if (this.tool === "nodes" && this.hitObject(this.bedPoint(e)) === undefined)
+            this.setTool("select");
     };
 
     // ---- pointer ----------------------------------------------------------------------------
@@ -1581,6 +1930,12 @@ export class LaserEditor {
         } else if (key === "enter" && this.draft?.kind === "polyline") {
             e.preventDefault();
             this.finishPolylineDraft(false);
+        } else if (key === "enter" && this.draft?.kind === "curve") {
+            e.preventDefault();
+            this.finishCurve(false);
+        } else if ((key === "delete" || key === "backspace") && this.tool === "nodes") {
+            e.preventDefault();
+            this.nodeAction("delete");
         } else if (!e.ctrlKey && !e.metaKey && !e.altKey && TOOL_KEYS[key] !== undefined) {
             e.preventDefault();
             this.setTool(TOOL_KEYS[key]);

@@ -6,6 +6,7 @@ import { BARCODE_FORMATS, type BarcodeSpec, barcodeGeometry } from "./barcodeSha
 import { QR_LEVELS } from "./barcodes";
 import { arcSegments, ellipsePath, flattenCubic, flattenQuadratic } from "./flatten";
 import { type LaserPath, type Pt, pathsBounds } from "./geometry";
+import { flattenSubPaths, parseSubPaths, type SubPath } from "./pathShape";
 
 /**
  * The parametric figures the laser editor draws (as EzCAD and LightBurn do): a polyline, a
@@ -50,7 +51,9 @@ export type LaserShape =
            * positive over its top (reading clockwise), negative along its bottom. */
           arcRadius: number;
       }
-    | ({ type: "barcode" } & BarcodeSpec);
+    | ({ type: "barcode" } & BarcodeSpec)
+    /** Bézier nodes: drawn with the pen or the pencil, or any outline opened for node editing. */
+    | { type: "path"; subpaths: SubPath[] };
 
 export type LaserShapeType = LaserShape["type"];
 
@@ -107,6 +110,8 @@ function rawPaths(shape: LaserShape, font: FontOutline | undefined): LaserPath[]
             return font === undefined ? [] : textPaths(shape, font);
         case "barcode":
             return [];
+        case "path":
+            return flattenSubPaths(shape.subpaths);
     }
 }
 
@@ -331,6 +336,10 @@ export function parseShape(raw: any): LaserShape | undefined {
                 radius: Math.max(num(raw.radius, 10), MIN_SIZE),
                 star: Math.max(0, Math.min(0.99, num(raw.star, 0))),
             };
+        case "path": {
+            const subpaths = parseSubPaths(raw.subpaths);
+            return subpaths === undefined ? undefined : { type: "path", subpaths };
+        }
         case "barcode": {
             const format = BARCODE_FORMATS.includes(raw.format) ? raw.format : "qr";
             return {

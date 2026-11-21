@@ -49,6 +49,11 @@ export interface LaserJobPanelHost {
     convertToCurves(): void;
     /** The sides and star share the polygon tool draws with next. */
     readonly polygonDefaults: PolygonDefaults;
+    /** The node tool is on, and a node is picked. */
+    readonly nodeMode: boolean;
+    readonly nodeSelected: boolean;
+    nodeAction(action: "smooth" | "break" | "join" | "close" | "delete"): void;
+    editNodes(): void;
 }
 
 export const MODE_COLORS: Record<LaserOperation["mode"], string> = {
@@ -316,10 +321,39 @@ export class LaserJobPanel {
     }
 
     /** The drawn figure's own parameters, applied as they are typed; «В кривые» drops them. */
+    private nodesSection(): HTMLElement[] {
+        const picked = this.host.nodeSelected;
+        const b = (key: string, action: Parameters<LaserJobPanelHost["nodeAction"]>[0], needsNode = true) => {
+            const x = button(key, () => this.host.nodeAction(action), `${key}.hint`);
+            x.disabled = needsNode && !picked;
+            return x;
+        };
+        return [
+            heading("laser.nodes"),
+            el("div", { className: style.muted, textContent: t("laser.nodes.help") }),
+            el(
+                "div",
+                { className: style.buttons },
+                b("laser.nodes.smooth", "smooth"),
+                b("laser.nodes.break", "break"),
+                b("laser.nodes.join", "join"),
+                b("laser.nodes.close", "close", false),
+                b("laser.nodes.delete", "delete"),
+            ),
+        ];
+    }
+
     private shapeSection(o: LaserObject): HTMLElement[] {
         if (o.kind !== "vector") return [];
+        if (this.host.nodeMode) return this.nodesSection();
         const shape = o.shape;
-        if (shape === undefined) return [];
+        const editNodes = el(
+            "div",
+            { className: style.buttons },
+            button("laser.nodes.edit", () => this.host.editNodes(), "laser.nodes.edit.hint"),
+        );
+        if (shape === undefined) return [editNodes];
+        if (shape.type === "path") return [heading("laser.shape.path"), editNodes];
         const rows: HTMLElement[] = [heading(`laser.shape.${shape.type}`)];
         if (shape.type === "polyline") {
             const edit = this.editAs(shape);

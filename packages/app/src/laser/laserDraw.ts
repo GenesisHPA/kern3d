@@ -3,6 +3,7 @@
 
 import { ellipsePath } from "./flatten";
 import type { LaserPath, Pt } from "./geometry";
+import { flattenSubPaths, type PathNode } from "./pathShape";
 import { type LaserShape, polygon, roundedRect } from "./shapes";
 
 /**
@@ -12,13 +13,27 @@ import { type LaserShape, polygon, roundedRect } from "./shapes";
  * figure and where it goes.
  */
 
-export const DRAW_TOOLS = ["select", "line", "rect", "ellipse", "polygon", "text", "barcode"] as const;
+export const DRAW_TOOLS = [
+    "select",
+    "nodes",
+    "line",
+    "curve",
+    "pencil",
+    "rect",
+    "ellipse",
+    "polygon",
+    "text",
+    "barcode",
+] as const;
 export type DrawTool = (typeof DRAW_TOOLS)[number];
 
 /** EzCAD-like single keys for the tools. */
 export const TOOL_KEYS: Record<string, DrawTool> = {
     v: "select",
+    n: "nodes",
     l: "line",
+    c: "curve",
+    f: "pencil",
     r: "rect",
     e: "ellipse",
     p: "polygon",
@@ -28,7 +43,11 @@ export const TOOL_KEYS: Record<string, DrawTool> = {
 
 export type Draft =
     | { kind: "box"; tool: "rect" | "ellipse" | "polygon"; start: Pt; end: Pt; square: boolean }
-    | { kind: "polyline"; points: Pt[]; hover: Pt | undefined };
+    | { kind: "polyline"; points: Pt[]; hover: Pt | undefined }
+    /** The pen: nodes so far, the last one's handle being dragged out while the button is down. */
+    | { kind: "curve"; nodes: PathNode[]; dragging: boolean; hover: Pt | undefined }
+    /** The pencil: the stroke as the pointer went. */
+    | { kind: "pencil"; points: Pt[] };
 
 export interface PolygonDefaults {
     sides: number;
@@ -80,6 +99,18 @@ function moved(path: LaserPath, dx: number, dy: number, turn = 0): LaserPath {
 
 /** The rubber band in bed millimetres. */
 export function draftPaths(draft: Draft, poly: PolygonDefaults): LaserPath[] {
+    if (draft.kind === "pencil")
+        return draft.points.length < 2 ? [] : [{ points: draft.points, closed: false }];
+    if (draft.kind === "curve") {
+        const nodes =
+            draft.hover === undefined || draft.dragging ? draft.nodes : [...draft.nodes, { ...draft.hover }];
+        const out = flattenSubPaths([{ nodes, closed: false }], 0.05);
+        // the last node's handles, as the pen pulls them
+        const last = draft.nodes[draft.nodes.length - 1];
+        if (last?.in !== undefined && last.out !== undefined)
+            out.push({ points: [last.in, { x: last.x, y: last.y }, last.out], closed: false });
+        return out;
+    }
     if (draft.kind === "polyline") {
         const points = draft.hover === undefined ? draft.points : [...draft.points, draft.hover];
         return points.length < 2 ? [] : [{ points, closed: false }];
