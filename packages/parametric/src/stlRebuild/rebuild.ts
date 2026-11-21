@@ -2,12 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 import { type IDocument, type IShape, ShapeTypes } from "@chili3d/core";
-import { appendExtrude, type BuiltModel, buildModel } from "./build";
+import { appendExtrude, appendTreatment, type BuiltModel, buildModel } from "./build";
 import { meshVolume, type TriMesh, weldTriangles } from "./mesh";
-import { type PlannedExtrude, planExtrusions } from "./plan";
+import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan";
 import { meshDifference } from "./raycast";
 import { sliceFrames } from "./slices";
-import { deviation, solidVolume, trianglesOf } from "./verify";
+import { deviation, solidVolume, surfaceFit, trianglesOf } from "./verify";
 
 export interface RebuildReport {
     readonly model?: BuiltModel;
@@ -17,9 +17,13 @@ export interface RebuildReport {
     readonly firstRatio: number;
     readonly features: number;
     readonly corrections: number;
+    /** Rounds and chamfers put on edges. */
+    readonly rounded?: number;
     readonly error?: string;
     /** Milliseconds: planning, building, the first comparison, the corrections. */
     readonly timings?: { plan: number; build: number; compare: number; correct: number };
+    /** Share of the STL's vertices the rebuilt surface misses by more than the fit tolerance ×4. */
+    readonly surfaceOff?: number;
 }
 
 export interface RebuildOptions {
@@ -85,7 +89,8 @@ export function rebuildPart(
     const tol = options.tol ?? defaultTolerance(mesh);
     const t0 = Date.now();
     const frames = sliceFrames(mesh);
-    const plans = planExtrusions(mesh, frames[0], tol);
+    const treatments: EdgeTreatment[] = [];
+    const plans = planExtrusions(mesh, frames[0], tol, { treatments });
     const t1 = Date.now();
     if (plans.length === 0)
         return { ratio: 1, firstRatio: 1, features: 0, corrections: 0, error: "no sections" };
@@ -106,7 +111,20 @@ export function rebuildPart(
     // measured against the triangles the part was read from: the kernel's display mesh of the
     // reference solid can lose faces, and a lost face reads as a missing slab of material
     const referenceMesh = mesh;
-    const firstRatio = measure(referenceMesh, shape);
+    // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
+    let firstRatio = measure(referenceMesh, shape);
+    let rounded = 0;
+    for (const treatment of treatments) {
+        const before = model.body.features;
+        if (!appendTreatment(model, treatment, tol)) continue;
+        const next = measure(referenceMesh, bodyShape(model));
+        if (next <= firstRatio + 1e-5) {
+            firstRatio = next;
+            rounded++;
+        } else {
+            model.body.setFeaturesEmitShapeChanged(before);
+        }
+    }
     const t3 = Date.now();
     const deadline = t3 + (options.budgetMs ?? 60_000);
     let ratio = firstRatio;
@@ -166,5 +184,17 @@ export function rebuildPart(
         if (!improved) break;
     }
     const timings = { plan: t1 - t0, build: t2 - t1, compare: t3 - t2, correct: Date.now() - t3 };
-    return { model, ratio, firstRatio, features: model.body.features.length, corrections, timings };
+    const finalShape = bodyShape(model);
+    const surfaceOff =
+        finalShape === undefined ? 1 : surfaceFit(mesh, finalShape, Math.max(tol * 4, 0.02)).off;
+    return {
+        model,
+        ratio,
+        firstRatio,
+        features: model.body.features.length,
+        corrections,
+        rounded,
+        timings,
+        surfaceOff,
+    };
 }

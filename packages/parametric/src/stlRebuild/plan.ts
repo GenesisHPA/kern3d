@@ -182,7 +182,9 @@ function taperedSlabs(
 ): { bottom: number; top: number; loops: TaperedLoop[] }[] | undefined {
     const loops = taperOf(mesh, frame, slab.bottom, slab.top, tol);
     if (loops !== undefined) return [{ bottom: slab.bottom, top: slab.top, loops }];
-    if (depth >= 1) return undefined;
+    // a round is not cut into cones (it would take four features and still be off): a slab whose
+    // taper is not linear stays straight here, and an edge round is recognised as one instead
+    if (depth >= 0) return undefined;
     const parts: { bottom: number; top: number; loops: TaperedLoop[] }[] = [];
     const n = 4;
     const span = slab.top - slab.bottom;
@@ -214,7 +216,13 @@ export function planExtrusions(
     mesh: TriMesh,
     frame: SliceFrame,
     tol: number,
-    options: { holes?: boolean; operation?: "fuse" | "cut"; role?: PlannedExtrude["role"] } = {},
+    options: {
+        holes?: boolean;
+        operation?: "fuse" | "cut";
+        role?: PlannedExtrude["role"];
+        /** When given, rounded and chamfered edges are recognised: their slabs go, the edges are collected here. */
+        treatments?: EdgeTreatment[];
+    } = {},
 ): PlannedExtrude[] {
     const q = Math.max(tol * 5, 1e-4);
     const fit = (loops: Loop2D[]) =>
@@ -222,7 +230,9 @@ export function planExtrusions(
     const slabs: FittedSlab[] = [];
     /** Tapered holes and islands that do not lean with their slab: extruded on their own. */
     const separate: PlannedExtrude[] = [];
-    for (const s of slabsOf(mesh, frame)) {
+    const raw = slabsOf(mesh, frame);
+    const source = options.treatments ? absorbEdgeBands(mesh, frame, raw, tol, options.treatments) : raw;
+    for (const s of source) {
         if (s.loops.length === 0) continue;
         const tapered = s.slanted >= SLANTED ? taperedSlabs(mesh, frame, s, tol) : undefined;
         if (tapered === undefined) {
@@ -365,6 +375,149 @@ export function planExtrusions(
             : { ...p, operation: options.operation, role: options.role ?? p.role },
     );
     return [...plans, ...apart, ...holeCuts];
+}
+
+/** Diagnostics for the corpus test (unset in the app). */
+export let DEBUG_HOOK: ((line: string) => void) | undefined;
+export function setPlanDebug(hook: ((line: string) => void) | undefined) {
+    DEBUG_HOOK = hook;
+}
+
+/** A rounded or chamfered edge of the rebuilt part: where it runs and how big it is. */
+export interface EdgeTreatment {
+    readonly frame: SliceFrame;
+    /** Height of the edge along the frame's axis. */
+    readonly height: number;
+    /** The loops (in the frame's u, v) the edge runs along. */
+    readonly loops: readonly Loop2D[];
+    /** The stretches of the loops that are rounded (the rest of the edge stays sharp). */
+    readonly moved: readonly { a: [number, number]; b: [number, number] }[];
+    readonly kind: "fillet" | "chamfer";
+    /** Radius, or the chamfer's distance. */
+    readonly size: number;
+}
+
+function segmentDistance2(
+    p: readonly [number, number],
+    a: readonly [number, number],
+    b: readonly [number, number],
+): number {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+
+/** Distance from a point to the nearest segment of any of the loops. */
+export function distanceToLoops(p: readonly [number, number], loops: readonly Loop2D[]): number {
+    let best = Number.POSITIVE_INFINITY;
+    for (const loop of loops) {
+        for (let i = 0; i < loop.length; i++)
+            best = Math.min(best, segmentDistance2(p, loop[i], loop[(i + 1) % loop.length]));
+    }
+    return best;
+}
+
+function areaOf(loops: readonly Loop2D[]): number {
+    return loops.reduce((a, l) => a + loopArea(l), 0);
+}
+
+function perimeterOf(loops: readonly Loop2D[]): number {
+    return loops.reduce((a, l) => a + perimeter(l), 0);
+}
+
+/**
+ * Slabs that are an edge's round or chamfer folded into the straight slab beside them: the band
+ * whose bottom section is the slab below's goes into that slab (its top edge rounds off), one
+ * whose top section is the slab above's into that one (its bottom edge, or the fillet at its
+ * foot). The edge that is left sharp is recorded with the band's size, to be rounded or
+ * chamfered as a feature of its own. A band that is neither — or whose two sizes disagree, not a
+ * round or an equal chamfer — stays a slab.
+ */
+function absorbEdgeBands(
+    mesh: TriMesh,
+    frame: SliceFrame,
+    raw: readonly Slab[],
+    tol: number,
+    out: EdgeTreatment[],
+): Slab[] {
+    const slabs: Slab[] = raw.map((x) => ({ ...x }));
+    const q = Math.max(tol * 5, 1e-4);
+    for (let i = 0; i < slabs.length; i++) {
+        const band = slabs[i];
+        if (band.slanted < SLANTED || band.loops.length === 0) continue;
+        const span = band.top - band.bottom;
+        const near = (z: number) =>
+            sectionAt(mesh, frame, z, span * 0.01).filter((l) => Math.abs(loopArea(l)) > tol * tol);
+        const low = near(band.bottom + span * 0.002);
+        const high = near(band.top - span * 0.002);
+        const aLow = areaOf(low);
+        const aHigh = areaOf(high);
+        const linear = taperOf(mesh, frame, band.bottom, band.top, tol) !== undefined;
+        const below =
+            i > 0 && Math.abs(slabs[i - 1].top - band.bottom) <= q && slabs[i - 1].slanted < SLANTED
+                ? slabs[i - 1]
+                : undefined;
+        const above =
+            i + 1 < slabs.length &&
+            Math.abs(slabs[i + 1].bottom - band.top) <= q &&
+            slabs[i + 1].slanted < SLANTED
+                ? slabs[i + 1]
+                : undefined;
+        const same = (a: number, b: number) => Math.abs(a - b) <= Math.abs(b) * 0.02 + tol * 10;
+        let host: Slab | undefined;
+        let height = 0;
+        if (below && same(aLow, areaOf(below.loops)) && below.loops.length === low.length) {
+            host = below;
+            height = band.top;
+        } else if (above && same(aHigh, areaOf(above.loops)) && above.loops.length === high.length) {
+            host = above;
+            height = band.bottom;
+        }
+        DEBUG_HOOK?.(
+            `band ${band.bottom.toFixed(3)}..${band.top.toFixed(3)} host ${host === undefined ? "none" : host === below ? "below" : "above"} aLow ${aLow.toFixed(1)} aHigh ${aHigh.toFixed(1)} below ${below ? areaOf(below.loops).toFixed(1) : "-"} above ${above ? areaOf(above.loops).toFixed(1) : "-"} loops ${low.length}/${high.length} linear ${linear}`,
+        );
+        if (host === undefined) continue;
+        // how far each point of the section beside the host moved across the band: a rounded
+        // stretch of the edge by the round's size, a stretch left sharp not at all
+        const nearSide = host === below ? low : high;
+        const farSide = host === below ? high : low;
+        const moved: { a: [number, number]; b: [number, number] }[] = [];
+        const shifts: number[] = [];
+        for (const loop of nearSide) {
+            const d = loop.map((p) => distanceToLoops(p, farSide));
+            for (let k = 0; k < loop.length; k++) {
+                const k2 = (k + 1) % loop.length;
+                if (d[k] > tol * 4 && d[k2] > tol * 4) {
+                    moved.push({ a: loop[k], b: loop[k2] });
+                    shifts.push(d[k], d[k2]);
+                }
+            }
+        }
+        if (moved.length === 0) continue;
+        shifts.sort((a, b) => a - b);
+        // where rounds meet at a corner the shift runs down to nothing: the round's size is where
+        // it is whole, near the top of the shifts
+        const across = shifts[Math.min(shifts.length - 1, Math.floor(shifts.length * 0.9))];
+        DEBUG_HOOK?.(`  moved ${moved.length} across ${across.toFixed(3)} span ${span.toFixed(3)}`);
+        // a round's two legs are its radius; an equal chamfer's, its distance
+        if (Math.abs(across - span) > Math.max(span, across) * 0.25) continue;
+        const kind = linear ? "chamfer" : "fillet";
+        out.push({
+            frame,
+            height,
+            loops: host.loops,
+            moved,
+            kind,
+            size: Number.parseFloat(((span + across) / 2).toFixed(4)),
+        });
+        const index = slabs.indexOf(host);
+        slabs[index] = host === below ? { ...host, top: band.top } : { ...host, bottom: band.bottom };
+        slabs.splice(i, 1);
+        i--;
+    }
+    return slabs;
 }
 
 /** A profile as material (counter-clockwise), whatever sense it was read in. */

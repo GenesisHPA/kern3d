@@ -142,6 +142,26 @@ export function levels(mesh: TriMesh, axis: Vec3, tol: number): number[] {
     for (let k = 0; k < mesh.areas.length; k++) {
         if (isCap(normalOf(mesh, k), axis)) heights.push(dot(vertex(mesh, t[3 * k]), axis));
     }
+    // where straight walls give way to leaning ones (a round's or chamfer's band, a cone): the
+    // ends of every run of heights the leaning triangles cover
+    const runs: [number, number][] = [];
+    for (let k = 0; k < mesh.areas.length; k++) {
+        const n = normalOf(mesh, k);
+        if (isCap(n, axis) || isWall(n, axis)) continue;
+        const z = [0, 1, 2].map((j) => dot(vertex(mesh, t[3 * k + j]), axis));
+        runs.push([Math.min(...z), Math.max(...z)]);
+    }
+    runs.sort((a, b) => a[0] - b[0]);
+    let run: [number, number] | undefined;
+    for (const r of runs) {
+        if (run !== undefined && r[0] <= run[1] + tol) {
+            run[1] = Math.max(run[1], r[1]);
+            continue;
+        }
+        if (run !== undefined) heights.push(run[0], run[1]);
+        run = [r[0], r[1]];
+    }
+    if (run !== undefined) heights.push(run[0], run[1]);
     heights.sort((a, b) => a - b);
     const merged: number[] = [];
     for (const h of heights) {

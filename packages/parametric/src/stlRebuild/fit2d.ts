@@ -147,9 +147,22 @@ export function fitProfile(loop: Loop2D, tol: number): Profile2D | undefined {
     while (k < n) {
         // an arc: interior vertices k+1..j-1 all bends of one sign, at least two of them
         let j = k + 1;
-        if (kindAt(j) === "bend") {
+        const segment = (m: number) => {
+            const p = at(m);
+            const q = at(m + 1);
+            return Math.hypot(q[0] - p[0], q[1] - p[1]);
+        };
+        // a facet run of one circle: its vertices bend the same way and its facets are of a
+        // length — a long straight leaving the arc at a tangent bends by as little, but is
+        // many facets long, and ends the run there
+        const even = (m: number) => {
+            const a = segment(m - 1);
+            const b = segment(m);
+            return Math.max(a, b) <= 3 * Math.min(a, b);
+        };
+        if (kindAt(j) === "bend" && even(j)) {
             const sign = signAt(j);
-            while (j < n && kindAt(j) === "bend" && signAt(j) === sign) j++;
+            while (j < n && kindAt(j) === "bend" && signAt(j) === sign && even(j)) j++;
         }
         const interior = j - k - 1;
         if (interior >= 2) {

@@ -1,18 +1,18 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { appendFileSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type IShape, Plane, ShapeTypes, XYZ } from "@chili3d/core";
+import { type IEdge, type IShape, Plane, ShapeTypes, XYZ } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, OccShapeConverter, ShapeFactory } from "@chili3d/wasm";
 import { OccShape } from "../../wasm/src/shape";
 import { meshToSolid } from "../src/commands/meshToSolid";
-import { buildModel } from "../src/stlRebuild/build";
+import { appendTreatment, buildModel, treatmentEdges } from "../src/stlRebuild/build";
 import { fitProfile, profileArea } from "../src/stlRebuild/fit2d";
 import { meshVolume, weldTriangles } from "../src/stlRebuild/mesh";
-import { planExtrusions } from "../src/stlRebuild/plan";
+import { type EdgeTreatment, planExtrusions, setPlanDebug } from "../src/stlRebuild/plan";
 import { meshDifference } from "../src/stlRebuild/raycast";
 import { rebuildPart } from "../src/stlRebuild/rebuild";
 import { loopArea, slabsOf, sliceFrames } from "../src/stlRebuild/slices";
@@ -89,6 +89,22 @@ describe("STL rebuilt as features (real kernel)", () => {
         expect(report.ratio).toBeLessThan(0.005);
     });
 
+    test("rounded top edges come back as one fillet feature, not as slabs", () => {
+        const block = box(0, 0, 0, 40, 30, 12);
+        const edges = block.findSubShapes(ShapeTypes.edge) as IEdge[];
+        const top = edges.flatMap((e, i) => {
+            const [a, b] = e.ends();
+            return Math.abs(a.z - 12) < 1e-6 && Math.abs(b.z - 12) < 1e-6 ? [i] : [];
+        });
+        const rounded = shapeFactory.fillet(block, top, 3).value;
+        if (process.env["KERN3D_STL_DUMP"]) writeFileSync(process.env["KERN3D_STL_DUMP"], stlBytes(rounded));
+        const report = rebuild(rounded);
+        expect(report.error).toBeUndefined();
+        expect(report.rounded).toBeGreaterThanOrEqual(1);
+        expect(report.model!.body.features.some((f) => f.type === "fillet")).toBe(true);
+        expect(report.ratio).toBeLessThan(0.01);
+    });
+
     test("a hole square to the main axis is cut by the correction pass along its own axis", () => {
         // the vertical holes make z the main axis; the side hole runs along x
         const part = cut(
@@ -151,7 +167,7 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
         const t = report.timings;
         log(
             `REBUILD ${path.basename(file)}: first ${(report.firstRatio * 100).toFixed(2)}% → ${(report.ratio * 100).toFixed(2)}%, ` +
-                `features ${report.features} (corrections ${report.corrections}), ${((Date.now() - started) / 1000).toFixed(1)} s` +
+                `surface off ${((report.surfaceOff ?? 1) * 100).toFixed(1)}%, features ${report.features} (corrections ${report.corrections}, edges ${report.rounded ?? 0}), ${((Date.now() - started) / 1000).toFixed(1)} s` +
                 ` [${counts}]` +
                 (t
                     ? ` (plan ${t.plan} ms, build ${t.build} ms, compare ${t.compare} ms, correct ${t.correct} ms)`
@@ -160,6 +176,11 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
         );
     }, 600_000);
 });
+
+function measureRatio(mesh: ReturnType<typeof weldTriangles>, shape: IShape): number {
+    const d = meshDifference(mesh, weldTriangles(trianglesOf(shape)));
+    return (d.aOnly + d.bOnly) / d.aVolume;
+}
 
 /** KERN3D_STL_DEBUG=<file.stl>: prints the frame and every slab's fitted profiles. */
 const debugFile = process.env["KERN3D_STL_DEBUG"];
@@ -185,6 +206,18 @@ describe.skipIf(debugFile === undefined)("STL debug", () => {
             meshVolume(mesh).toFixed(2),
         );
         const tol = Math.max(0.005, mesh.size * 5e-5);
+        {
+            const mid = slabsOf(mesh, frame).sort((a, b) => b.top - b.bottom - (a.top - a.bottom))[0];
+            const loop = mid.loops[0];
+            dbg(
+                `DEBUG mid loop ${loop.length} points: ${loop.map((p) => `(${p[0].toFixed(3)},${p[1].toFixed(3)})`).join(" ")}`,
+            );
+            const fit = fitProfile(loop, tol);
+            if (fit?.kind === "chain")
+                dbg(
+                    `DEBUG mid fit: ${fit.curves.map((c) => (c.kind === "line" ? `L(${c.a[0].toFixed(2)},${c.a[1].toFixed(2)})` : `A r${c.r.toFixed(3)}`)).join(" ")}`,
+                );
+        }
         for (const slab of slabsOf(mesh, frame)) {
             const profiles = slab.loops.map((l) => ({ area: loopArea(l), fit: fitProfile(l, tol) }));
             dbg(
@@ -197,7 +230,12 @@ describe.skipIf(debugFile === undefined)("STL debug", () => {
                         .join(" "),
             );
         }
-        const plans = planExtrusions(mesh, frame, tol);
+        const treatments: EdgeTreatment[] = [];
+        setPlanDebug((line) => dbg(`DEBUG ${line}`));
+        const plans = planExtrusions(mesh, frame, tol, { treatments });
+        setPlanDebug(undefined);
+        for (const t of treatments)
+            dbg(`DEBUG treatment ${t.kind} size ${t.size} at ${t.height.toFixed(3)} loops ${t.loops.length}`);
         const reference = meshToSolid(stl).value;
         const model = buildModel(document(), plans, "debug", tol);
         model.body.features.forEach((_, i) => {
@@ -215,6 +253,15 @@ describe.skipIf(debugFile === undefined)("STL debug", () => {
                 `DEBUG built feature ${i}: ${model.sketches[i]?.name} depth ${e.depth} draft ${e.draftAngle ?? 0} op ${e.operation ?? "-"} error ${model.body.featureItems()[i]?.error ?? "-"}`,
             );
         });
+        for (const t of treatments) {
+            const idx = treatmentEdges(model, t, tol);
+            const before = measureRatio(mesh, model.body.shape.value);
+            const ok = appendTreatment(model, t, tol);
+            const after = ok ? measureRatio(mesh, model.body.shape.value) : before;
+            dbg(
+                `DEBUG apply ${t.kind} ${t.size} at ${t.height.toFixed(2)}: edges ${idx.length}, ok ${ok}, error ${model.body.featureItems().at(-1)?.error ?? "-"}, ${(before * 100).toFixed(3)}% → ${(after * 100).toFixed(3)}%`,
+            );
+        }
         if (!model.body.shape.isOk) {
             dbg(`DEBUG body shape error: ${model.body.shape.error}`);
             return;
