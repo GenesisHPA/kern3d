@@ -1252,6 +1252,7 @@ export default {
         "laser.mode.fill": "Fill (hatch)",
         "laser.mode.image": "Image (raster)",
         "laser.power": "Power, %",
+        "laser.frequency": "Frequency, kHz",
         "laser.speed": "Speed, mm/min",
         "laser.passes": "Passes",
         "laser.air": "Air assist (M8)",

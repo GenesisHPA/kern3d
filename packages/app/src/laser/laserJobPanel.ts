@@ -633,6 +633,22 @@ export class LaserJobPanel {
                 "laser.power",
                 numberField(op.power, (v) => edit((x) => (x.power = v)), { min: 0, max: 100 }),
             ),
+        ];
+        const jcz = this.host.profile.controller === "jcz" ? this.host.profile.jcz : undefined;
+        if (jcz !== undefined) {
+            // a fiber source's pulse rate, within the range its markcfg allows
+            rows.push(
+                row(
+                    "laser.frequency",
+                    numberField(op.frequency, (v) => edit((x) => (x.frequency = v)), {
+                        min: jcz.minFrequency,
+                        max: jcz.maxFrequency,
+                        digits: 1,
+                    }),
+                ),
+            );
+        }
+        rows.push(
             row(
                 "laser.speed",
                 numberField(op.speed, (v) => edit((x) => (x.speed = v)), { min: 1 }),
@@ -645,7 +661,7 @@ export class LaserJobPanel {
                 "laser.air",
                 checkbox(op.air, (v) => edit((x) => (x.air = v))),
             ),
-        ];
+        );
         if (op.mode === "fill") {
             rows.push(
                 row(

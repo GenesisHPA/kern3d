@@ -1191,6 +1191,7 @@ export const I18N_KEYS = [
     "laser.mode.fill",
     "laser.mode.image",
     "laser.power",
+    "laser.frequency",
     "laser.speed",
     "laser.passes",
     "laser.air",

@@ -1089,6 +1089,7 @@ export default {
         "laser.mode.fill": "Заливка (штриховка)",
         "laser.mode.image": "Изображение (растр)",
         "laser.power": "Мощность, %",
+        "laser.frequency": "Частота, кГц",
         "laser.speed": "Скорость, мм/мин",
         "laser.passes": "Проходы",
         "laser.air": "Обдув (M8)",
