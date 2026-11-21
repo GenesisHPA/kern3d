@@ -11,6 +11,7 @@ import { SketchSolver } from "../sketch/solver";
 import type { Curve2D, Profile2D } from "./fit2d";
 import { dot, scale, type Vec3, weldTriangles } from "./mesh";
 import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan";
+import { planRevolve, type RevolvePlan } from "./revolve";
 import { sliceFrames } from "./slices";
 import { trianglesOf } from "./verify";
 
@@ -260,6 +261,34 @@ export function appendTreatment(model: BuiltModel, treatment: EdgeTreatment, tol
     return false;
 }
 
+/** A revolve plan as a sketch (its half-section) and a full-turn revolve fused into the body. */
+function appendRevolve(model: BuiltModel, document: IDocument, plan: RevolvePlan, tol: number): void {
+    const plane = new Plane({
+        origin: xyz(scale(plan.frame.axis, plan.base)),
+        normal: xyz(plan.frame.axis),
+        xvec: xyz(plan.frame.xvec),
+    });
+    const sketch = new SketchNode({ document, plane, data: sketchDataOf(plane, plan.profiles, tol) });
+    sketch.name = `Вращение ${model.sketches.length + 1}`;
+    document.modelManager.addNode(sketch);
+    sketch.visible = false;
+    model.sketches.push(sketch);
+    model.body.setFeaturesEmitShapeChanged([
+        ...model.body.features,
+        {
+            id: `rebuild-revolve-${model.sketches.length}`,
+            type: "revolve",
+            sketchId: sketch.id,
+            axis: {
+                point: { x: plan.point[0], y: plan.point[1], z: plan.point[2] },
+                direction: { x: plan.direction[0], y: plan.direction[1], z: plan.direction[2] },
+            },
+            angle: 360,
+            ...(model.body.features.length > 0 ? { operation: "fuse" as const } : {}),
+        },
+    ]);
+}
+
 /** What a piece rebuilt with true arcs may read further off than its mesh, as a share of the part. */
 const PIECE_ARC_SLACK = 5e-4;
 
@@ -388,6 +417,8 @@ function appendMeshPiece(
     box.value.dispose();
     if (!piece.isOk) return false;
     const planned = judge === undefined ? undefined : planPiece(piece.value, tol);
+    const revolved =
+        judge === undefined ? undefined : planRevolve(weldTriangles(trianglesOf(piece.value)), tol, [axis]);
     const brep = shapeConverter.convertToBrep(piece.value);
     piece.value.dispose();
     if (!brep.isOk) return false;
@@ -395,14 +426,23 @@ function appendMeshPiece(
     const sketchesBefore = model.sketches.length;
     // the piece as features along its own axis, if that is no further from the part than the
     // mesh piece (a true arc where the STL had facets costs a little volume, never surface)
-    let asFeatures: number | undefined;
-    if (planned !== undefined && judge !== undefined) {
-        for (const p of planned) appendExtrude(model, document, p, tol);
-        if (model.body.shape.isOk && !model.body.featureItems().some((x) => x.error !== undefined))
-            asFeatures = judge(model.body);
+    // each analytic stand-in tried and measured: extrudes along the piece's own axis, a revolve
+    const tries: { append: () => void; score: number }[] = [];
+    const attempt = (append: () => void) => {
+        if (judge === undefined) return;
+        append();
+        const ok = model.body.shape.isOk && !model.body.featureItems().some((x) => x.error !== undefined);
+        if (ok) tries.push({ append, score: judge(model.body) });
         model.body.setFeaturesEmitShapeChanged(before);
         for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
-    }
+    };
+    if (planned !== undefined)
+        attempt(() => {
+            for (const p of planned) appendExtrude(model, document, p, tol);
+        });
+    if (revolved !== undefined) attempt(() => appendRevolve(model, document, revolved, tol));
+    tries.sort((x, y) => x.score - y.score);
+    const asFeatures = tries[0]?.score;
     model.body.setFeaturesEmitShapeChanged([
         ...before,
         {
@@ -415,12 +455,11 @@ function appendMeshPiece(
     const meshOk = model.body.shape.isOk && model.body.featureItems().at(-1)?.error === undefined;
     const asMesh = meshOk && asFeatures !== undefined ? judge?.(model.body) : undefined;
     if (
-        planned !== undefined &&
         asFeatures !== undefined &&
         (!meshOk || asMesh === undefined || asFeatures <= asMesh + PIECE_ARC_SLACK)
     ) {
         model.body.setFeaturesEmitShapeChanged(before);
-        for (const p of planned) appendExtrude(model, document, p, tol);
+        tries[0].append();
         if (model.body.shape.isOk && !model.body.featureItems().some((x) => x.error !== undefined))
             return true;
         model.body.setFeaturesEmitShapeChanged(before);
