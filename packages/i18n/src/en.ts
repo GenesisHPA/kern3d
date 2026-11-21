@@ -1386,5 +1386,8 @@ export default {
         "laser.grbl.alarm.8":
             "Homing fail: the limit switch did not release on pull-off; check $27 or the wiring",
         "laser.grbl.alarm.9": "Homing fail: no limit switch found within the search distance",
+        "laser.origin": "Origin",
+        "laser.origin.center": "Bed centre",
+        "laser.origin.corner": "Lower-left corner",
     },
 } satisfies Locale;

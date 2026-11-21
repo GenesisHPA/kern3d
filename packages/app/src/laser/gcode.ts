@@ -11,8 +11,9 @@ import {
     type LaserVectorObject,
     objectMatrix,
     placement,
+    withOrigin,
 } from "./laserData";
-import type { MachineProfile } from "./machineProfile";
+import { bedRect, type MachineProfile } from "./machineProfile";
 import { orderPaths } from "./pathOrder";
 import { type GrayImage, powerMap, resampleGray } from "./raster";
 
@@ -37,7 +38,7 @@ export class GcodeWriter {
     private s: number | undefined;
     private f: number | undefined;
     /** Keeps the head inside the bed (overscan at an edge would otherwise run past it). */
-    clamp?: { width: number; height: number };
+    clamp?: Bounds;
 
     get position(): Pt {
         return { x: this.x ?? 0, y: this.y ?? 0 };
@@ -48,8 +49,9 @@ export class GcodeWriter {
     }
 
     private axes(p: Pt): string {
-        const x = this.clamp === undefined ? p.x : Math.min(this.clamp.width, Math.max(0, p.x));
-        const y = this.clamp === undefined ? p.y : Math.min(this.clamp.height, Math.max(0, p.y));
+        const c = this.clamp;
+        const x = c === undefined ? p.x : Math.min(c.maxX, Math.max(c.minX, p.x));
+        const y = c === undefined ? p.y : Math.min(c.maxY, Math.max(c.minY, p.y));
         let words = "";
         if (this.x === undefined || fmt(x) !== fmt(this.x)) words += ` X${fmt(x)}`;
         if (this.y === undefined || fmt(y) !== fmt(this.y)) words += ` Y${fmt(y)}`;
@@ -160,10 +162,13 @@ export function rasterLines(o: LaserImageObject, image: GrayImage, w: GcodeWrite
     }
 }
 
-function outsideBed(b: Bounds, profile: MachineProfile): boolean {
+function outsideBed(b: Bounds, bed: Bounds): boolean {
     const eps = 1e-6;
     return (
-        b.minX < -eps || b.minY < -eps || b.maxX > profile.bedWidth + eps || b.maxY > profile.bedHeight + eps
+        b.minX < bed.minX - eps ||
+        b.minY < bed.minY - eps ||
+        b.maxX > bed.maxX + eps ||
+        b.maxY > bed.maxY + eps
     );
 }
 
@@ -174,21 +179,26 @@ function outsideBed(b: Bounds, profile: MachineProfile): boolean {
  * `images` holds the pixels of the image objects by id.
  */
 export function generateGcode(
-    job: LaserJobData,
+    stored: LaserJobData,
     profile: MachineProfile,
     images: ReadonlyMap<string, GrayImage> = new Map(),
 ): GcodeResult {
+    // G-code coordinates are the machine's: a job laid out from the other origin is moved onto it
+    const job = withOrigin(stored, profile);
+    const bed = bedRect(profile);
     const w = new GcodeWriter();
     const warnings: string[] = [];
     const objects = job.objects.filter((o) => !o.hidden);
     const bounds = jobBounds(job);
-    if (!isEmpty(bounds) && outsideBed(bounds, profile)) warnings.push("laser.warn.outsideBed");
+    if (!isEmpty(bounds) && outsideBed(bounds, bed)) warnings.push("laser.warn.outsideBed");
     w.raw("; Kern3D laser job");
-    w.raw(`; bed ${fmt(profile.bedWidth)} x ${fmt(profile.bedHeight)} mm, S max ${fmt(profile.maxS)}`);
+    w.raw(
+        `; bed ${fmt(profile.bedWidth)} x ${fmt(profile.bedHeight)} mm, origin ${profile.origin}, S max ${fmt(profile.maxS)}`,
+    );
     w.raw("G21");
     w.raw("G90");
     w.raw(`${profile.dynamicPower ? "M4" : "M3"} S0`);
-    w.clamp = { width: profile.bedWidth, height: profile.bedHeight };
+    w.clamp = bed;
     for (const o of objects) {
         w.raw(`; ${o.name.replace(/[\r\n;()]/g, " ")}`);
         if (o.op.air) w.raw("M8");

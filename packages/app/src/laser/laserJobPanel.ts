@@ -12,7 +12,7 @@ import {
 } from "./laserData";
 import style from "./laserEditor.module.css";
 import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
-import type { MachineProfile } from "./machineProfile";
+import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
 
 /** What the job panel needs from the editor it sits in. */
 export interface LaserJobPanelHost {
@@ -65,6 +65,14 @@ export class LaserJobPanel {
         const p = this.host.profile;
         return [
             heading("laser.bed"),
+            row(
+                "laser.origin",
+                select(
+                    BED_ORIGINS.map((o) => ({ value: o, label: t(`laser.origin.${o}`) })),
+                    p.origin,
+                    (v) => this.host.setProfile((q) => (q.origin = v)),
+                ),
+            ),
             el(
                 "div",
                 { className: style.pair },

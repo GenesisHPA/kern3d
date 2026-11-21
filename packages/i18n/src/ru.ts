@@ -1222,5 +1222,8 @@ export default {
         "laser.grbl.alarm.8":
             "Ошибка поиска нуля: концевик не отпустился при отъезде; проверьте $27 или проводку",
         "laser.grbl.alarm.9": "Ошибка поиска нуля: концевик не найден в пределах поиска",
+        "laser.origin": "Начало координат",
+        "laser.origin.center": "Центр поля",
+        "laser.origin.corner": "Левый нижний угол",
     },
 } satisfies Locale;

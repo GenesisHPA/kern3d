@@ -13,6 +13,7 @@ import {
     scaling,
     translation,
 } from "./geometry";
+import type { BedOrigin, MachineProfile } from "./machineProfile";
 
 /**
  * A laser job as the document keeps it: the objects on the bed and how each is burnt. The
@@ -106,6 +107,11 @@ export type LaserObject = LaserVectorObject | LaserImageObject;
 
 export interface LaserJobData {
     version: 1;
+    /**
+     * The origin the objects' coordinates are measured from. A job stored before there was a
+     * choice has none and was made on the corner; `withOrigin` moves a job onto the machine's.
+     */
+    origin: BedOrigin;
     objects: LaserObject[];
 }
 
@@ -138,8 +144,27 @@ export function defaultOperation(mode: LaserMode): LaserOperation {
     };
 }
 
-export function defaultLaserJob(): LaserJobData {
-    return { version: 1, objects: [] };
+export function defaultLaserJob(origin: BedOrigin = "center"): LaserJobData {
+    return { version: 1, origin, objects: [] };
+}
+
+/**
+ * The job measured from `profile`'s origin: every object shifted by half the bed when the job
+ * was laid out from the other one, so it stays where it was on the bed. A copy when it moves.
+ */
+export function withOrigin(
+    job: LaserJobData,
+    profile: Pick<MachineProfile, "origin" | "bedWidth" | "bedHeight">,
+): LaserJobData {
+    if (job.origin === profile.origin) return job;
+    const sign = profile.origin === "center" ? -1 : 1;
+    const dx = (sign * profile.bedWidth) / 2;
+    const dy = (sign * profile.bedHeight) / 2;
+    return {
+        ...job,
+        origin: profile.origin,
+        objects: job.objects.map((o) => ({ ...o, x: o.x + dx, y: o.y + dy })),
+    };
 }
 
 let counter = 0;
@@ -261,10 +286,15 @@ function parseObject(raw: any): LaserObject | undefined {
 /** A job from its stored JSON; anything unreadable becomes an empty job, unknown fields defaults. */
 export function parseLaserJob(json: string | undefined): LaserJobData {
     if (json === undefined || json === "") return defaultLaserJob();
+    // unreadable falls through to an empty job below
     try {
         const raw = JSON.parse(json);
         const objects = Array.isArray(raw?.objects) ? raw.objects.map(parseObject) : [];
-        return { version: 1, objects: objects.filter((o: LaserObject | undefined) => o !== undefined) };
+        return {
+            version: 1,
+            origin: raw?.origin === "center" ? "center" : "corner",
+            objects: objects.filter((o: LaserObject | undefined) => o !== undefined),
+        };
     } catch {
         return defaultLaserJob();
     }

@@ -9,12 +9,18 @@ import {
     type LaserVectorObject,
     parseLaserJob,
     stringifyLaserJob,
+    withOrigin,
 } from "../../src/laser/laserData";
-import { defaultMachineProfile, type MachineProfile, normalizeProfile } from "../../src/laser/machineProfile";
+import {
+    bedRect,
+    defaultMachineProfile,
+    type MachineProfile,
+    normalizeProfile,
+} from "../../src/laser/machineProfile";
 import { dither, type GrayImage, grayFromRgba, powerMap, resampleGray } from "../../src/laser/raster";
 import { estimateTime, formatDuration, parseToolpath, trapezoidTime } from "../../src/laser/toolpath";
 
-const profile: MachineProfile = { ...defaultMachineProfile(), returnHome: false };
+const profile: MachineProfile = { ...defaultMachineProfile(), origin: "corner", returnHome: false };
 
 function squareObject(): LaserVectorObject {
     return {
@@ -50,7 +56,7 @@ function body(lines: string[]): string[] {
 
 describe("vector G-code", () => {
     test("a 10 × 10 square is traced once round at S500 F1000", () => {
-        const job: LaserJobData = { version: 1, objects: [squareObject()] };
+        const job: LaserJobData = { version: 1, origin: "corner", objects: [squareObject()] };
         const { lines, warnings } = generateGcode(job, profile);
         expect(warnings).toEqual([]);
         expect(body(lines)).toEqual([
@@ -71,7 +77,7 @@ describe("vector G-code", () => {
         square.op.passes = 2;
         square.op.air = true;
         const { lines } = generateGcode(
-            { version: 1, objects: [square] },
+            { version: 1, origin: "corner", objects: [square] },
             { ...profile, dynamicPower: false, returnHome: true },
         );
         const b = body(lines);
@@ -83,7 +89,7 @@ describe("vector G-code", () => {
 
     test("the object's placement moves, scales and turns its outline", () => {
         const square = { ...squareObject(), x: 20, y: 30, width: 20, height: 20, angle: 90 };
-        const { lines } = generateGcode({ version: 1, objects: [square] }, profile);
+        const { lines } = generateGcode({ version: 1, origin: "corner", objects: [square] }, profile);
         const moves = parseToolpath(lines, profile.rapid);
         const xs = moves.flatMap((m) => [m.x1]);
         const ys = moves.flatMap((m) => [m.y1]);
@@ -96,7 +102,7 @@ describe("vector G-code", () => {
     test("fill mode hatches the square bidirectionally", () => {
         const square = squareObject();
         square.op = { ...square.op, mode: "fill", fillInterval: 2.5 };
-        const b = body(generateGcode({ version: 1, objects: [square] }, profile).lines);
+        const b = body(generateGcode({ version: 1, origin: "corner", objects: [square] }, profile).lines);
         expect(b.slice(3, -1)).toEqual([
             "G0 X0 Y1.25",
             "G1 X10 S500 F1000",
@@ -111,9 +117,9 @@ describe("vector G-code", () => {
 
     test("a job past the bed is flagged", () => {
         const square = { ...squareObject(), x: 395 };
-        expect(generateGcode({ version: 1, objects: [square] }, profile).warnings).toContain(
-            "laser.warn.outsideBed",
-        );
+        expect(
+            generateGcode({ version: 1, origin: "corner", objects: [square] }, profile).warnings,
+        ).toContain("laser.warn.outsideBed");
     });
 
     test("numbers are written the way GRBL reads them", () => {
@@ -155,7 +161,10 @@ describe("raster G-code", () => {
         // top row: black, mid grey; bottom row: white, quarter grey
         const image: GrayImage = { width: 2, height: 2, data: Float32Array.from([0, 0.5, 1, 0.75]) };
         const o = imageObject(0.2, 0.2, 2, 2);
-        const b = body(generateGcode({ version: 1, objects: [o] }, profile, new Map([["img", image]])).lines);
+        const b = body(
+            generateGcode({ version: 1, origin: "corner", objects: [o] }, profile, new Map([["img", image]]))
+                .lines,
+        );
         expect(b.slice(3, -1)).toEqual([
             // bottom row (y 0.05), left to right: the white pixel is the leading blank, skipped
             "G0 X0.1 Y0.05",
@@ -172,7 +181,10 @@ describe("raster G-code", () => {
         const o = imageObject(0.2, 0.1, 2, 1);
         o.x = 10;
         o.op.raster.overscan = 2;
-        const b = body(generateGcode({ version: 1, objects: [o] }, profile, new Map([["img", image]])).lines);
+        const b = body(
+            generateGcode({ version: 1, origin: "corner", objects: [o] }, profile, new Map([["img", image]]))
+                .lines,
+        );
         expect(b.slice(3, -1)).toEqual(["G0 X8 Y0.05", "G1 X10 S0 F1000", "G1 X10.2 S1000", "G1 X12.2 S0"]);
     });
 
@@ -184,7 +196,7 @@ describe("raster G-code", () => {
         const o = imageObject(3, 0.1, 30, 1);
         const b = body(
             generateGcode(
-                { version: 1, objects: [o] },
+                { version: 1, origin: "corner", objects: [o] },
                 profile,
                 new Map([["img", { width: 30, height: 1, data }]]),
             ).lines,
@@ -194,7 +206,7 @@ describe("raster G-code", () => {
 
     test("a missing picture is reported, not burnt", () => {
         const o = imageObject(1, 1, 2, 2);
-        expect(generateGcode({ version: 1, objects: [o] }, profile).warnings).toEqual([
+        expect(generateGcode({ version: 1, origin: "corner", objects: [o] }, profile).warnings).toEqual([
             "laser.warn.imageMissing",
         ]);
     });
@@ -293,14 +305,53 @@ describe("frame", () => {
     });
 });
 
+describe("bed origin", () => {
+    const center: MachineProfile = { ...profile, origin: "center" };
+
+    test("the bed spans −W/2…+W/2 around a centre origin and 0…W from a corner", () => {
+        expect(bedRect(center)).toEqual({ minX: -200, minY: -200, maxX: 200, maxY: 200 });
+        expect(bedRect(profile)).toEqual({ minX: 0, minY: 0, maxX: 400, maxY: 400 });
+    });
+
+    test("a job laid out on the centre writes its own coordinates", () => {
+        const square = { ...squareObject(), x: -5, y: -5 };
+        const b = body(generateGcode({ version: 1, origin: "center", objects: [square] }, center).lines);
+        expect(b.slice(3, 5)).toEqual(["G0 X-5 Y-5", "G1 X5 S500 F1000"]);
+    });
+
+    test("an old corner job on a centre machine stays where it was on the bed", () => {
+        // (195, 195) from the corner of a 400 mm bed is (−5, −5) from its centre
+        const square = { ...squareObject(), x: 195, y: 195 };
+        const moved = withOrigin({ version: 1, origin: "corner", objects: [square] }, center);
+        expect(moved.origin).toBe("center");
+        expect([moved.objects[0].x, moved.objects[0].y]).toEqual([-5, -5]);
+        const b = body(generateGcode({ version: 1, origin: "corner", objects: [square] }, center).lines);
+        expect(b[3]).toBe("G0 X-5 Y-5");
+        // and back
+        const back = withOrigin(moved, profile);
+        expect([back.objects[0].x, back.objects[0].y]).toEqual([195, 195]);
+    });
+
+    test("a job past the edge of a centred bed is flagged and clipped to it", () => {
+        const square = { ...squareObject(), x: 195, y: -5 };
+        const result = generateGcode({ version: 1, origin: "center", objects: [square] }, center);
+        expect(result.warnings).toContain("laser.warn.outsideBed");
+        expect(result.lines).toContain("G1 X200 S500 F1000");
+    });
+
+    test("a stored job without an origin was made on the corner", () => {
+        expect(parseLaserJob(JSON.stringify({ version: 1, objects: [] })).origin).toBe("corner");
+    });
+});
+
 describe("stored data", () => {
     test("a job survives its JSON", () => {
-        const job: LaserJobData = { version: 1, objects: [squareObject()] };
+        const job: LaserJobData = { version: 1, origin: "corner", objects: [squareObject()] };
         expect(parseLaserJob(stringifyLaserJob(job))).toEqual(job);
     });
 
     test("junk reads as an empty job", () => {
-        expect(parseLaserJob("{not json")).toEqual({ version: 1, objects: [] });
+        expect(parseLaserJob("{not json")).toEqual({ version: 1, origin: "center", objects: [] });
     });
 
     test("a machine profile keeps sane values and defaults the rest", () => {

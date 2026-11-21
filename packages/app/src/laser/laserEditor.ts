@@ -13,7 +13,7 @@ import {
 } from "@chili3d/core";
 import { DrawingNode } from "../drawing/drawingNode";
 import { bodyOutline, drawingSheet, faceOutline, type ModelView } from "./fromModel";
-import { type Affine, apply, invert, type Pt } from "./geometry";
+import { type Affine, apply, type Bounds, invert, type Pt } from "./geometry";
 import {
     defaultOperation,
     jobBounds,
@@ -23,6 +23,7 @@ import {
     objectCorners,
     objectMatrix,
     placement,
+    withOrigin,
 } from "./laserData";
 import style from "./laserEditor.module.css";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
@@ -30,7 +31,7 @@ import { LaserMachine } from "./laserMachine";
 import type { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
-import { loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
+import { bedRect, loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
 
@@ -129,7 +130,8 @@ export class LaserEditor {
             hide: () => this.conceal(),
             close: () => this.close(),
         };
-        this.data = node.data;
+        // a job laid out from the other origin is shown (and next saved) from the machine's
+        this.data = withOrigin(node.data, this.profile);
         this.committed = node.content;
         this.dialog = document.createElement("dialog");
         this.dialog.className = style.dialog;
@@ -238,7 +240,7 @@ export class LaserEditor {
         if (property !== "content" || this.node.content === this.committed) return;
         // undo / redo replaced the job under us
         this.committed = this.node.content;
-        this.data = this.node.data;
+        this.data = withOrigin(this.node.data, this.profile);
         if (!this.data.objects.some((o) => o.id === this.selection)) this.selection = undefined;
         this.changed();
         this.render();
@@ -274,8 +276,19 @@ export class LaserEditor {
     setProfile(edit: (p: MachineProfile) => void) {
         edit(this.profile);
         saveMachineProfile(this.profile);
+        if (this.data.origin !== this.profile.origin) {
+            // the objects keep their place on the bed; their coordinates follow the new origin
+            this.data = withOrigin(this.data, this.profile);
+            this.commit();
+        }
         this.changed();
         this.render();
+        this.fit();
+    }
+
+    /** Where a new object of this size goes: centred on a centre origin, on the corner otherwise. */
+    private newPlace(w: number, h: number): { x: number; y: number } {
+        return this.profile.origin === "center" ? { x: -w / 2, y: -h / 2 } : { x: 0, y: 0 };
     }
 
     private add(o: LaserObject) {
@@ -296,8 +309,7 @@ export class LaserEditor {
             id: newLaserId(),
             name,
             kind: "vector",
-            x: 0,
-            y: 0,
+            ...this.newPlace(w, h),
             width: w,
             height: h,
             angle: 0,
@@ -339,8 +351,7 @@ export class LaserEditor {
                 id: newLaserId(),
                 name: file.fileName.replace(/\.(png|jpe?g|bmp)$/i, ""),
                 kind: "image",
-                x: 0,
-                y: 0,
+                ...this.newPlace(w, h),
                 width: w,
                 height: h,
                 angle: 0,
@@ -529,7 +540,7 @@ export class LaserEditor {
     // ---- rendering --------------------------------------------------------------------------
 
     render() {
-        this.world.setAttribute("transform", `matrix(1 0 0 -1 0 ${this.profile.bedHeight})`);
+        this.world.setAttribute("transform", "matrix(1 0 0 -1 0 0)");
         this.renderBed();
         this.renderObjects();
         this.renderOverlay();
@@ -537,52 +548,74 @@ export class LaserEditor {
         this.statusText.textContent = this.output.summary() || t("laser.prompt.select");
     }
 
+    /**
+     * The bed in job coordinates: white, a 10 mm grid (50 mm darker) running from the origin,
+     * figures every 50 mm along the bottom and left edges, and the origin's red X/Y arrows — in
+     * the middle of the bed for a centre origin, at its lower-left corner for a corner one.
+     */
     private renderBed() {
-        const { bedWidth: w, bedHeight: h } = this.profile;
+        const b = bedRect(this.profile);
         const g = this.bedGroup;
-        g.replaceChildren(svgElement("rect", { x: 0, y: 0, width: w, height: h, fill: "#fff" }));
-        const minor = svgElement("path", {
-            stroke: "#e9ecef",
-            "stroke-width": 1,
-            "vector-effect": "non-scaling-stroke",
-            fill: "none",
-        });
-        const major = svgElement("path", {
-            stroke: "#ced4da",
-            "stroke-width": 1,
-            "vector-effect": "non-scaling-stroke",
-            fill: "none",
-        });
+        const w = b.maxX - b.minX;
+        const h = b.maxY - b.minY;
+        g.replaceChildren(svgElement("rect", { x: b.minX, y: b.minY, width: w, height: h, fill: "#fff" }));
+        const line = (stroke: string, width = 1) =>
+            svgElement("path", {
+                stroke,
+                "stroke-width": width,
+                "vector-effect": "non-scaling-stroke",
+                fill: "none",
+            });
+        const minor = line("#e9ecef");
+        const major = line("#ced4da");
         let dMinor = "";
         let dMajor = "";
-        for (let x = 10; x < w; x += 10) {
-            if (x % 50 === 0) dMajor += `M${x} 0V${h}`;
-            else dMinor += `M${x} 0V${h}`;
+        for (let x = Math.ceil(b.minX / 10) * 10; x <= b.maxX; x += 10) {
+            if (x === b.minX || x === b.maxX) continue;
+            if (x % 50 === 0) dMajor += `M${x} ${b.minY}V${b.maxY}`;
+            else dMinor += `M${x} ${b.minY}V${b.maxY}`;
         }
-        for (let y = 10; y < h; y += 10) {
-            if (y % 50 === 0) dMajor += `M0 ${y}H${w}`;
-            else dMinor += `M0 ${y}H${w}`;
+        for (let y = Math.ceil(b.minY / 10) * 10; y <= b.maxY; y += 10) {
+            if (y === b.minY || y === b.maxY) continue;
+            if (y % 50 === 0) dMajor += `M${b.minX} ${y}H${b.maxX}`;
+            else dMinor += `M${b.minX} ${y}H${b.maxX}`;
         }
         minor.setAttribute("d", dMinor);
         major.setAttribute("d", dMajor);
-        const axes = svgElement("path", {
-            d: `M0 0H${Math.min(30, w)}M0 0V${Math.min(30, h)}`,
-            stroke: "#e03131",
-            "stroke-width": 2,
-            "vector-effect": "non-scaling-stroke",
-            fill: "none",
-        });
-        const frame = svgElement("rect", {
-            x: 0,
-            y: 0,
-            width: w,
-            height: h,
-            fill: "none",
-            stroke: "#343a40",
-            "stroke-width": 1,
-            "vector-effect": "non-scaling-stroke",
-        });
-        g.append(minor, major, frame, axes);
+        const arrow = Math.min(30, w / 4, h / 4);
+        const axes = line("#e03131", 2);
+        axes.setAttribute(
+            "d",
+            `M0 0H${arrow}M0 0V${arrow}M${arrow * 0.8} ${arrow * 0.08}L${arrow} 0L${arrow * 0.8} ${-arrow * 0.08}M${arrow * 0.08} ${arrow * 0.8}L0 ${arrow}L${-arrow * 0.08} ${arrow * 0.8}`,
+        );
+        const frame = svgElement("rect", { x: b.minX, y: b.minY, width: w, height: h, fill: "none" });
+        frame.setAttribute("stroke", "#343a40");
+        frame.setAttribute("stroke-width", "1");
+        frame.setAttribute("vector-effect", "non-scaling-stroke");
+        g.append(minor, major, frame, this.rulers(b), axes);
+    }
+
+    /** Figures every 50 mm outside the bottom and left edges, upright on screen. */
+    private rulers(b: Bounds): SVGGElement {
+        const g = svgElement("g", { fill: "#e9ecef", "font-family": "sans-serif" });
+        const size = Math.max(b.maxX - b.minX, b.maxY - b.minY) / 70;
+        g.setAttribute("font-size", String(size));
+        const text = (x: number, y: number, value: number, anchor: string) => {
+            const e = svgElement("text", {
+                x,
+                y: -y,
+                transform: "scale(1 -1)",
+                "text-anchor": anchor,
+                "dominant-baseline": "middle",
+            });
+            e.textContent = String(value);
+            g.append(e);
+        };
+        for (let x = Math.ceil(b.minX / 50) * 50; x <= b.maxX; x += 50)
+            text(x, b.minY - size * 1.2, x, "middle");
+        for (let y = Math.ceil(b.minY / 50) * 50; y <= b.maxY; y += 50)
+            text(b.minX - size * 0.6, y, y, "end");
+        return g;
     }
 
     /** Each object drawn in its own frame under its placement matrix, so a drag only moves a transform. */
@@ -723,14 +756,20 @@ export class LaserEditor {
     }
 
     fit() {
-        const { bedWidth: width, bedHeight: height } = this.profile;
+        const b = bedRect(this.profile);
+        const width = b.maxX - b.minX;
+        const height = b.maxY - b.minY;
         const rect = this.svg.getBoundingClientRect();
         const aspect = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : width / height;
-        let w = width * 1.08;
-        let h = height * 1.08;
+        // room for the rulers below and to the left
+        let w = width * 1.14;
+        let h = height * 1.14;
         if (w / h < aspect) w = h * aspect;
         else h = w / aspect;
-        this.setViewBox({ x: width / 2 - w / 2, y: height / 2 - h / 2, w, h });
+        // the world is flipped: bed y runs up, the screen's down
+        const cx = (b.minX + b.maxX) / 2 - width * 0.02;
+        const cy = -(b.minY + b.maxY) / 2 + height * 0.02;
+        this.setViewBox({ x: cx - w / 2, y: cy - h / 2, w, h });
         this.renderOverlay();
     }
 

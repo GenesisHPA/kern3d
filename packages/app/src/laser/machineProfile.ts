@@ -1,13 +1,24 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import type { Bounds } from "./geometry";
+
+/**
+ * Where X0 Y0 is on the bed: its centre (the galvo / EzCAD convention, coordinates run
+ * −W/2…+W/2) or its lower-left corner (a gantry GRBL machine's home).
+ */
+export const BED_ORIGINS = ["center", "corner"] as const;
+export type BedOrigin = (typeof BED_ORIGINS)[number];
+
 /**
  * The engraver this workstation drives: its bed, GRBL's power scale and motion limits, and the
  * serial speed. It belongs to the machine, not to a job, so it is kept in the browser's storage
  * rather than in the document.
  */
 export interface MachineProfile {
-    /** Work area, mm; the origin is the bed's lower-left corner. */
+    /** Where X0 Y0 is on the bed. */
+    origin: BedOrigin;
+    /** Work area, mm. */
     bedWidth: number;
     bedHeight: number;
     /** GRBL `$30`: the S value of full power. */
@@ -31,6 +42,7 @@ export interface MachineProfile {
 
 export function defaultMachineProfile(): MachineProfile {
     return {
+        origin: "center",
         bedWidth: 400,
         bedHeight: 400,
         maxS: 1000,
@@ -45,6 +57,14 @@ export function defaultMachineProfile(): MachineProfile {
     };
 }
 
+/** The bed in job coordinates: [0, W] × [0, H] from a corner origin, centred on a centre one. */
+export function bedRect(profile: Pick<MachineProfile, "origin" | "bedWidth" | "bedHeight">): Bounds {
+    const { bedWidth: w, bedHeight: h } = profile;
+    return profile.origin === "center"
+        ? { minX: -w / 2, minY: -h / 2, maxX: w / 2, maxY: h / 2 }
+        : { minX: 0, minY: 0, maxX: w, maxY: h };
+}
+
 const STORAGE_KEY = "kern3d.laser.machine";
 
 /** The stored profile with defaults for whatever is missing or not a sensible number. */
@@ -54,7 +74,9 @@ export function normalizeProfile(raw: Partial<MachineProfile> | undefined): Mach
     const out = { ...base };
     for (const key of Object.keys(base) as (keyof MachineProfile)[]) {
         const value = raw[key];
-        if (typeof base[key] === "boolean") {
+        if (key === "origin") {
+            if (BED_ORIGINS.includes(value as BedOrigin)) out.origin = value as BedOrigin;
+        } else if (typeof base[key] === "boolean") {
             if (typeof value === "boolean") (out as any)[key] = value;
         } else if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
             (out as any)[key] = value;

@@ -1318,6 +1318,9 @@ export const I18N_KEYS = [
     "laser.grbl.alarm.7",
     "laser.grbl.alarm.8",
     "laser.grbl.alarm.9",
+    "laser.origin",
+    "laser.origin.center",
+    "laser.origin.corner",
 ] as const;
 
 export type I18nKeys = (typeof I18N_KEYS)[number];
