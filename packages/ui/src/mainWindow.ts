@@ -8,6 +8,7 @@ import {
     I18n,
     type IApplication,
     type IWindow,
+    isKernelCrash,
     PubSub,
     Ribbon,
     RibbonTab,
@@ -86,10 +87,19 @@ export class MainWindow extends HTMLElement implements IWindow {
         new Function(text)();
     }
 
+    /**
+     * A kernel crash's own text ("memory access out of bounds", "Aborted()") says nothing a user
+     * can act on, while what follows from it does: the kernel's memory may be damaged, so the work
+     * should be saved and the app restarted. The status bar still keeps the raw text.
+     */
+    private static readonly displayError = (message: string) => {
+        Toast.error(isKernelCrash(message) ? I18n.translate("error.kernel.crashed") : message);
+    };
+
     private _initEventHandlers(app: IApplication) {
         const displayHome = debounce(this.displayHome, 100);
         PubSub.default.sub("showToast", Toast.info);
-        PubSub.default.sub("displayError", Toast.error);
+        PubSub.default.sub("displayError", MainWindow.displayError);
         PubSub.default.sub("displayValidation", Toast.error);
         PubSub.default.sub("showDialog", showDialog);
         PubSub.default.sub("showFloatPanel", showFloatPanel);

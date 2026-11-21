@@ -303,6 +303,35 @@ export default {
         "toast.recoverCylinders.none": "Pick an imported body with no features after the import",
         "toast.import.facetedLarge":
             "Large STL mesh: cylinders not recovered automatically — use “Recover Cylinders”",
+        "toast.import.stlAsMesh":
+            "The STL's triangles could not be made a solid: it was imported as a mesh (view, measure, export only)",
+        "toast.import.stlKernelCrash":
+            "The geometry kernel crashed converting this STL; the crash was contained (the rest of the app is unaffected) and the part was imported as a mesh",
+        "toast.import.stlSplit{0}": "The STL holds {0} separate parts: each is a body of its own",
+        "error.kernel.crashed":
+            "The geometry kernel crashed and its memory may be damaged. Save your work and restart the app.",
+        "error.offsetFace.zero": "Offset Face: the distance is 0, so nothing moves",
+        "error.offsetFace.noInput": "Offset Face requires a preceding feature",
+        "error.offsetFace.noFaces": "Offset Face requires at least one face",
+        "error.offsetFace.noKernel": "The kernel cannot offset faces",
+        "error.offsetFace.tooFar{0}{1}":
+            "Offset Face: {0} mm is too far for this body (max ≈ {1} mm). Try a smaller distance.",
+        "error.offsetFace.tooFarAny{0}":
+            "Offset Face: {0} mm is too far, and so is anything smaller. Check the faces around it.",
+        "error.offsetFace.blocked":
+            "Offset Face: these faces can't be offset at any distance. Faces that run into fillets or other curved faces often stop this — try moving a flat face, or offset before rounding the edges.",
+        "error.offsetFace.notSolid": "Offset Face needs a solid body.",
+        "error.offsetFace.cavity":
+            "Offset Face: the body has a sealed cavity inside, and this move would reach its wall. Try a smaller distance, or move a face farther from the cavity.",
+        "error.offsetFace.cavityWall":
+            "Offset Face: moving the wall of a sealed cavity inside the body isn't supported yet — only the outer faces can be moved.",
+        "error.offsetFace.severalSolids":
+            "Offset Face: this body is made of several separate solids. Split it into separate bodies first (or import the parts separately).",
+        "error.offsetFace.sharpChain":
+            "Offset Face: this body has rounded edges meeting at a sharp corner, which OCCT can't offset without corrupting its memory. Offset the faces before rounding the edges, or round every edge at the corner so they blend.",
+        "error.offsetFace.rounds":
+            "Offset Face: the rounds beside the moved face can't be re-made at their radius. Turn Keep rounds off, or move a face without rounds beside it.",
+        "error.offsetFace.failed": "Offset Face failed. Try a smaller distance, or other faces.",
         "toast.makeEditable{0}": "Bodies made editable: {0}",
         "command.modify.move": "Move",
         "command.modify.paintBucket": "Paint Bucket",

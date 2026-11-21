@@ -3,7 +3,7 @@
 
 export * from "./assembly";
 export { editableBodyOf, isImportedBody, makeEditable, solidifyMeshes } from "./commands/makeEditableCommand";
-export { meshToSolid } from "./commands/meshToSolid";
+export { meshToSolid, RECOVER_ON_IMPORT_FACES } from "./commands/meshToSolid";
 export * from "./datum";
 export * from "./features";
 export * from "./parametricBodyNode";
