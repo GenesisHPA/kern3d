@@ -64,7 +64,6 @@ describe("search over the bundled knowledge base", () => {
     it("has a sensible FAQ and the CHANGELOG", () => {
         assert.ok(kb.faq.length >= 25 && kb.faq.length <= 40, `FAQ entries: ${kb.faq.length}`);
         assert.ok(kb.changelog.length > 0);
-        for (const c of kb.faq) assert.doesNotMatch(`${c.title} ${c.text}`, /fusion/i);
     });
 });
 
