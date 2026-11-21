@@ -17,6 +17,7 @@ import style from "./laserEditor.module.css";
 import { catalogFonts, localFontFamilies, localFontsAvailable } from "./laserFonts";
 import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
 import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
+import { ALIGNS, type Align } from "./selection";
 import { defaultQuiet, type LaserFontRef, type LaserShape, TEXT_ALIGNS } from "./shapes";
 
 /** The installed fonts, once listed (asking the browser's permission) this session. */
@@ -27,8 +28,13 @@ const LOCAL_FONTS = "__local";
 export interface LaserJobPanelHost {
     readonly data: LaserJobData;
     readonly selection: string | undefined;
+    /** Every selected object (several with Shift / Ctrl or a rubber band). */
+    readonly selectedIds: readonly string[];
     readonly profile: MachineProfile;
-    select(id: string | undefined): void;
+    /** `additive`: Shift / Ctrl — added to the selection, or taken out of it. */
+    select(id: string | undefined, additive?: boolean): void;
+    alignSelected(align: Align, toBed: boolean): void;
+    distributeSelected(axis: "x" | "y"): void;
     /** Applies `edit` to the selected object and writes the job back as one undo step. */
     editSelected(edit: (o: LaserObject) => void): void;
     move(id: string, delta: -1 | 1): void;
@@ -59,6 +65,8 @@ export const MODE_COLORS: Record<LaserOperation["mode"], string> = {
 export class LaserJobPanel {
     readonly element = el("div");
     private modelSource = "";
+    /** Align to the bed rather than to the selection's box. */
+    private alignToBed = false;
     private modelView: ModelView = "top";
 
     constructor(private readonly host: LaserJobPanelHost) {}
@@ -75,6 +83,7 @@ export class LaserJobPanel {
             ...this.bedSection(),
             ...this.objectsSection(),
             ...this.modelSection(),
+            ...this.arrangeSection(),
             ...this.objectSection(),
         );
         if (path !== undefined) restoreFocus(this.element, path, caret);
@@ -125,13 +134,14 @@ export class LaserJobPanel {
             ];
         const list = el("div", { className: style.list });
         for (const o of objects) {
-            const current = o.id === this.host.selection;
+            const current = this.host.selectedIds.includes(o.id);
             list.append(
                 el(
                     "div",
                     {
                         className: current ? `${style.listRow} ${style.current}` : style.listRow,
-                        onclick: () => this.host.select(o.id),
+                        onclick: (e: MouseEvent) =>
+                            this.host.select(o.id, e.shiftKey || e.ctrlKey || e.metaKey),
                         title: t(`laser.mode.${o.op.mode}`),
                     },
                     el("div", { className: style.swatch, style: `background:${MODE_COLORS[o.op.mode]}` }),
@@ -156,6 +166,49 @@ export class LaserJobPanel {
                       ),
                   ];
         return [heading("laser.objects"), list, ...order];
+    }
+
+    /** Align and distribute the selection (one object: to the bed), as in EzCAD's toolbar. */
+    private arrangeSection(): HTMLElement[] {
+        const count = this.host.selectedIds.length;
+        if (count === 0) return [];
+        const toBed = this.alignToBed || count === 1;
+        const rows: HTMLElement[] = [heading("laser.arrange")];
+        if (count > 1)
+            rows.push(el("div", { className: style.muted, textContent: t("laser.arrange.count", count) }));
+        rows.push(
+            el(
+                "div",
+                { className: style.buttons },
+                ...ALIGNS.map((a) =>
+                    button(
+                        `laser.align.${a}`,
+                        () => this.host.alignSelected(a, toBed),
+                        `laser.align.${a}.hint`,
+                    ),
+                ),
+            ),
+        );
+        if (count > 1)
+            rows.push(
+                row(
+                    "laser.align.toBed",
+                    checkbox(this.alignToBed, (v) => {
+                        this.alignToBed = v;
+                        this.render();
+                    }),
+                ),
+            );
+        if (count > 2)
+            rows.push(
+                el(
+                    "div",
+                    { className: style.buttons },
+                    button("laser.distribute.x", () => this.host.distributeSelected("x")),
+                    button("laser.distribute.y", () => this.host.distributeSelected("y")),
+                ),
+            );
+        return rows;
     }
 
     private modelSection(): HTMLElement[] {

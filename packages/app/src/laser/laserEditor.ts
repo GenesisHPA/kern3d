@@ -6,6 +6,7 @@ import {
     type FontOutline,
     type IDocument,
     PubSub,
+    readBinaryFileAsync,
     readFileAsync,
     ShapeNode,
     ShapeTypes,
@@ -14,6 +15,7 @@ import {
     workspaceTabs,
 } from "@chili3d/core";
 import { DrawingNode } from "../drawing/drawingNode";
+import { importEzd } from "./ezdImport";
 import { framePaths } from "./framePaths";
 import { bodyOutline, drawingSheet, faceOutline, type ModelView } from "./fromModel";
 import { type Affine, apply, type Bounds, invert, type LaserPath, type Pt } from "./geometry";
@@ -48,6 +50,18 @@ import { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
 import { bedRect, loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
+import {
+    type Align,
+    alignObjects,
+    boundsOf,
+    distributeObjects,
+    inside,
+    moveAll,
+    normalizeAngle,
+    type Placement,
+    rotateAll,
+    scaleAll,
+} from "./selection";
 import { bakeSize, regenerate, shapeObject } from "./shapeObject";
 import { defaultQuiet, type LaserShape, needsFont } from "./shapes";
 import type { SvgImport } from "./svgImport";
@@ -92,7 +106,12 @@ type Drag =
     | { kind: "pan"; x: number; y: number; box: ViewBox }
     | { kind: "move"; id: string; start: Pt; origin: LaserObject; moved: boolean }
     | { kind: "scale"; id: string; corner: number; origin: LaserObject }
-    | { kind: "rotate"; id: string; center: Pt; startAngle: number; origin: LaserObject };
+    | { kind: "rotate"; id: string; center: Pt; startAngle: number; origin: LaserObject }
+    /** A rubber band on empty bed: what it wholly holds is selected (added with Shift / Ctrl). */
+    | { kind: "band"; start: Pt; end: Pt; additive: boolean; base: string[] }
+    | { kind: "groupMove"; ids: string[]; origins: Placement[]; start: Pt; moved: boolean }
+    | { kind: "groupScale"; ids: string[]; origins: Placement[]; anchor: Pt; from: Pt }
+    | { kind: "groupRotate"; ids: string[]; origins: Placement[]; centre: Pt; startAngle: number };
 
 /** Box-frame corners in `objectCorners` order: lower left, lower right, upper right, upper left. */
 const CORNER_SIGNS: [number, number][] = [
@@ -154,7 +173,21 @@ export class LaserEditor {
     private readonly objectElements = new Map<string, SVGGraphicsElement>();
     data: LaserJobData;
     private committed: string;
-    selection: string | undefined;
+    /** Every selected object, in the order picked; one of them is «the» selection. */
+    private chosen: string[] = [];
+
+    /** The selected object when exactly one is. */
+    get selection(): string | undefined {
+        return this.chosen.length === 1 ? this.chosen[0] : undefined;
+    }
+
+    set selection(id: string | undefined) {
+        this.chosen = id === undefined ? [] : [id];
+    }
+
+    get selectedIds(): readonly string[] {
+        return this.chosen;
+    }
     profile: MachineProfile = loadMachineProfile();
     private viewBox: ViewBox = { x: 0, y: 0, w: 400, h: 400 };
     private drag: Drag | undefined;
@@ -314,7 +347,8 @@ export class LaserEditor {
         // undo / redo replaced the job under us
         this.committed = this.node.content;
         this.data = withOrigin(this.node.data, this.profile);
-        if (!this.data.objects.some((o) => o.id === this.selection)) this.selection = undefined;
+        const known = new Set(this.data.objects.map((o) => o.id));
+        this.chosen = this.chosen.filter((id) => known.has(id));
         this.changed();
         this.render();
     };
@@ -342,8 +376,40 @@ export class LaserEditor {
         return this.data.objects.find((o) => o.id === this.selection);
     }
 
-    select(id: string | undefined) {
-        this.selection = id;
+    select(id: string | undefined, additive = false) {
+        if (additive && id !== undefined) {
+            this.chosen = this.chosen.includes(id)
+                ? this.chosen.filter((x) => x !== id)
+                : [...this.chosen, id];
+        } else this.selection = id;
+        this.render();
+    }
+
+    selectMany(ids: readonly string[]) {
+        const known = new Set(this.data.objects.map((o) => o.id));
+        this.chosen = ids.filter((id) => known.has(id));
+        this.render();
+    }
+
+    /** The selected objects in burn order. */
+    selectedObjects(): LaserObject[] {
+        const ids = new Set(this.chosen);
+        return this.data.objects.filter((o) => ids.has(o.id));
+    }
+
+    /** Aligned to the selection's box, or with `toBed` (or one object alone) to the bed. */
+    alignSelected(align: Align, toBed: boolean) {
+        const objects = this.selectedObjects();
+        if (objects.length === 0) return;
+        const target = toBed || objects.length === 1 ? bedRect(this.profile) : boundsOf(objects);
+        alignObjects(objects, align, target);
+        this.commit();
+        this.render();
+    }
+
+    distributeSelected(axis: "x" | "y") {
+        distributeObjects(this.selectedObjects(), axis);
+        this.commit();
         this.render();
     }
 
@@ -400,6 +466,40 @@ export class LaserEditor {
         if (!files.isOk) return;
         for (const file of files.value)
             this.addImport(importSvg(file.data), file.fileName.replace(/\.svg$/i, ""));
+    }
+
+    /**
+     * EzCAD 2 projects: each top-level object (a group whole) with its pen's power, speed,
+     * passes, frequency and hatch, measured from the field centre, all of them selected and the
+     * view fitted; what was skipped or guessed in one word per kind.
+     */
+    private async importEzdFile() {
+        const files = await readBinaryFileAsync(".ezd", true);
+        if (!files.isOk) return;
+        for (const file of files.value) {
+            const imported = importEzd(file.data);
+            if (imported === undefined) {
+                PubSub.default.pub("showToast", "laser.ezd.notEzd");
+                continue;
+            }
+            if (imported.objects.length === 0) {
+                PubSub.default.pub("showToast", "toast.laser.nothingToEngrave");
+                continue;
+            }
+            const placed = withOrigin(
+                { version: 1, origin: "center", objects: imported.objects },
+                this.profile,
+            );
+            this.data.objects.push(...placed.objects);
+            this.chosen = placed.objects.map((o) => o.id);
+            this.commit();
+            this.render();
+            this.fit();
+            const notes = ezdWarnings(imported.warnings);
+            const summary = t("laser.ezd.imported", placed.objects.length, file.fileName);
+            this.setStatus(notes === "" ? summary : `${summary}. ${notes}`);
+            if (notes !== "") PubSub.default.pub("showToast", "laser.ezd.warnings" as never, notes);
+        }
     }
 
     private async importImageFile() {
@@ -485,19 +585,26 @@ export class LaserEditor {
     }
 
     private deleteSelected() {
-        const index = this.data.objects.findIndex((o) => o.id === this.selection);
-        if (index < 0) return;
-        this.data.objects.splice(index, 1);
-        this.selection = undefined;
+        const ids = new Set(this.chosen);
+        if (ids.size === 0) return;
+        this.data.objects = this.data.objects.filter((o) => !ids.has(o.id));
+        this.chosen = [];
         this.commit();
         this.render();
     }
 
     private duplicateSelected() {
-        const o = this.selected();
-        if (o === undefined) return;
-        const copy = { ...structuredClone(o), id: newLaserId(), x: o.x + 5, y: o.y + 5 };
-        this.add(copy);
+        const copies = this.selectedObjects().map((o) => ({
+            ...structuredClone(o),
+            id: newLaserId(),
+            x: o.x + 5,
+            y: o.y + 5,
+        }));
+        if (copies.length === 0) return;
+        this.data.objects.push(...copies);
+        this.chosen = copies.map((o) => o.id);
+        this.commit();
+        this.render();
     }
 
     private move(id: string, delta: -1 | 1) {
@@ -519,10 +626,15 @@ export class LaserEditor {
             get selection() {
                 return editor.selection;
             },
+            get selectedIds() {
+                return editor.selectedIds;
+            },
             get profile() {
                 return editor.profile;
             },
-            select: (id) => this.select(id),
+            select: (id, additive) => this.select(id, additive),
+            alignSelected: (align, toBed) => this.alignSelected(align, toBed),
+            distributeSelected: (axis) => this.distributeSelected(axis),
             editSelected: (edit) => {
                 const o = this.selected();
                 if (o === undefined) return;
@@ -607,9 +719,9 @@ export class LaserEditor {
             ...this.toolButtonsList(),
             this.snapButton,
             this.separator(),
-            // importers: SVG and pictures; an EzCAD .ezd import belongs beside them
             button("laser.import.svg", () => void this.importSvgFile()),
             button("laser.import.image", () => void this.importImageFile()),
+            button("laser.import.ezd", () => void this.importEzdFile(), "laser.import.ezd.hint"),
             this.separator(),
             button("laser.duplicate", () => this.duplicateSelected()),
             button("laser.delete", () => this.deleteSelected()),
@@ -807,9 +919,60 @@ export class LaserEditor {
         );
     }
 
+    /** Several selected: one box round them all, with the handles of a single object. */
+    private groupBox(): LaserObject | undefined {
+        const objects = this.selectedObjects();
+        if (objects.length < 2) return undefined;
+        const b = boundsOf(objects);
+        return {
+            x: b.minX,
+            y: b.minY,
+            width: Math.max(b.maxX - b.minX, 0.01),
+            height: Math.max(b.maxY - b.minY, 0.01),
+            angle: 0,
+        } as LaserObject;
+    }
+
     private renderOverlay() {
         this.overlayGroup.replaceChildren();
-        const o = this.selected();
+        const group = this.groupBox();
+        if (group !== undefined) {
+            for (const each of this.selectedObjects()) {
+                this.overlayGroup.append(
+                    svgElement("polygon", {
+                        points: objectCorners(each)
+                            .map((p) => `${p.x},${p.y}`)
+                            .join(" "),
+                        fill: "none",
+                        stroke: "#1677ff",
+                        "stroke-width": 1,
+                        opacity: 0.55,
+                        "vector-effect": "non-scaling-stroke",
+                        "pointer-events": "none",
+                    }),
+                );
+            }
+        }
+        const band = this.drag?.kind === "band" ? this.drag : undefined;
+        if (band !== undefined) {
+            const x = Math.min(band.start.x, band.end.x);
+            const y = Math.min(band.start.y, band.end.y);
+            this.overlayGroup.append(
+                svgElement("rect", {
+                    x,
+                    y,
+                    width: Math.abs(band.end.x - band.start.x),
+                    height: Math.abs(band.end.y - band.start.y),
+                    fill: "rgba(22,119,255,0.08)",
+                    stroke: "#1677ff",
+                    "stroke-width": 1,
+                    "stroke-dasharray": "3 3",
+                    "vector-effect": "non-scaling-stroke",
+                    "pointer-events": "none",
+                }),
+            );
+        }
+        const o = group ?? this.selected();
         if (o === undefined) return;
         const corners = objectCorners(o);
         const px = this.pixel();
@@ -1184,6 +1347,32 @@ export class LaserEditor {
             return;
         }
         const p = this.bedPoint(e);
+        const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+        const group = this.groupBox();
+        if (group !== undefined) {
+            const h = this.hitHandle(group, p);
+            if (h !== undefined) {
+                const objects = this.selectedObjects();
+                const ids = objects.map((o) => o.id);
+                const origins = objects.map(({ x, y, width, height, angle }) => ({
+                    x,
+                    y,
+                    width,
+                    height,
+                    angle,
+                }));
+                const corners = objectCorners(group);
+                if (h.kind === "rotate") {
+                    const centre = { x: group.x + group.width / 2, y: group.y + group.height / 2 };
+                    const startAngle = Math.atan2(p.y - centre.y, p.x - centre.x);
+                    this.drag = { kind: "groupRotate", ids, origins, centre, startAngle };
+                } else {
+                    const anchor = corners[(h.index + 2) % 4];
+                    this.drag = { kind: "groupScale", ids, origins, anchor, from: corners[h.index] };
+                }
+                return;
+            }
+        }
         const current = this.selected();
         const handle = current === undefined ? undefined : this.hitHandle(current, p);
         if (current !== undefined && handle !== undefined) {
@@ -1199,8 +1388,26 @@ export class LaserEditor {
         }
         const hit = this.hitObject(p);
         if (hit === undefined) {
-            if (this.selection !== undefined) this.select(undefined);
-            this.drag = { kind: "pan", x: e.clientX, y: e.clientY, box: { ...this.viewBox } };
+            // EzCAD: a drag on empty bed selects what it encloses (the view pans with the
+            // middle or right button)
+            const base = additive ? [...this.chosen] : [];
+            if (!additive && this.chosen.length > 0) this.select(undefined);
+            this.drag = { kind: "band", start: p, end: p, additive, base };
+            return;
+        }
+        if (additive) {
+            this.select(hit.id, true);
+            return;
+        }
+        if (this.chosen.length > 1 && this.chosen.includes(hit.id)) {
+            const objects = this.selectedObjects();
+            this.drag = {
+                kind: "groupMove",
+                ids: objects.map((o) => o.id),
+                origins: objects.map(({ x, y, width, height, angle }) => ({ x, y, width, height, angle })),
+                start: p,
+                moved: false,
+            };
             return;
         }
         if (hit.id !== this.selection) this.select(hit.id);
@@ -1222,6 +1429,15 @@ export class LaserEditor {
                 x: drag.box.x - (e.clientX - drag.x) * k,
                 y: drag.box.y - (e.clientY - drag.y) * k,
             });
+            return;
+        }
+        if (drag.kind === "band") {
+            drag.end = p;
+            this.renderOverlay();
+            return;
+        }
+        if (drag.kind === "groupMove" || drag.kind === "groupScale" || drag.kind === "groupRotate") {
+            this.dragGroup(drag, p, e);
             return;
         }
         const o = this.data.objects.find((x) => x.id === drag.id);
@@ -1254,6 +1470,29 @@ export class LaserEditor {
             return;
         }
         if (drag === undefined || drag.kind === "pan") return;
+        if (drag.kind === "band") {
+            const band = {
+                minX: Math.min(drag.start.x, drag.end.x),
+                minY: Math.min(drag.start.y, drag.end.y),
+                maxX: Math.max(drag.start.x, drag.end.x),
+                maxY: Math.max(drag.start.y, drag.end.y),
+            };
+            const caught = inside(this.data.objects, band).map((o) => o.id);
+            this.selectMany([...new Set([...drag.base, ...caught])]);
+            return;
+        }
+        if (drag.kind === "groupMove" || drag.kind === "groupScale" || drag.kind === "groupRotate") {
+            if (drag.kind === "groupMove" && !drag.moved) {
+                // a click on one of several selected: that one alone
+                const hit = this.hitObject(drag.start);
+                if (hit !== undefined) this.select(hit.id);
+                return;
+            }
+            for (const o of this.selectedObjects()) if (o.kind === "vector") bakeSize(o);
+            this.commit();
+            this.render();
+            return;
+        }
         if (drag.kind === "move" && !drag.moved) return;
         const o = this.data.objects.find((x) => x.id === drag.id);
         // a rectangle or ellipse takes its new size as its own: round corners stay round
@@ -1261,6 +1500,39 @@ export class LaserEditor {
         this.commit();
         this.render();
     };
+
+    private dragGroup(
+        drag: Extract<Drag, { kind: "groupMove" | "groupScale" | "groupRotate" }>,
+        p: Pt,
+        e: PointerEvent,
+    ) {
+        const ids = new Set(drag.ids);
+        const objects = this.data.objects.filter((o) => ids.has(o.id));
+        // origins follow the ids' order; the objects come in burn order
+        const order = objects.map((o) => drag.origins[drag.ids.indexOf(o.id)]);
+        if (drag.kind === "groupMove") {
+            const dx = p.x - drag.start.x;
+            const dy = p.y - drag.start.y;
+            if (!drag.moved && Math.hypot(dx, dy) < 3 * this.pixel()) return;
+            drag.moved = true;
+            moveAll(objects, order, dx, dy);
+        } else if (drag.kind === "groupScale") {
+            const w = drag.from.x - drag.anchor.x;
+            const h = drag.from.y - drag.anchor.y;
+            const sx = Math.abs(w) > 1e-9 ? (p.x - drag.anchor.x) / w : 1;
+            const sy = Math.abs(h) > 1e-9 ? (p.y - drag.anchor.y) / h : 1;
+            // the group keeps its proportions, as a locked object does
+            const k = Math.max(0.01, Math.max(sx, sy));
+            scaleAll(objects, order, drag.anchor, k, k);
+        } else {
+            const a = Math.atan2(p.y - drag.centre.y, p.x - drag.centre.x);
+            let deg = ((a - drag.startAngle) * 180) / Math.PI;
+            if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+            rotateAll(objects, order, drag.centre, normalizeAngle(deg));
+        }
+        for (const o of objects) this.updateObjectTransform(o);
+        this.renderOverlay();
+    }
 
     private readonly onWheel = (e: WheelEvent) => {
         e.preventDefault();
@@ -1297,6 +1569,12 @@ export class LaserEditor {
             e.preventDefault();
             if (e.shiftKey) this.node.document.history.redo();
             else this.node.document.history.undo();
+        } else if ((e.ctrlKey || e.metaKey) && key === "a") {
+            e.preventDefault();
+            this.selectMany(this.data.objects.map((o) => o.id));
+        } else if ((e.ctrlKey || e.metaKey) && key === "d") {
+            e.preventDefault();
+            this.duplicateSelected();
         } else if ((e.ctrlKey || e.metaKey) && key === "y") {
             e.preventDefault();
             this.node.document.history.redo();
@@ -1309,19 +1587,21 @@ export class LaserEditor {
         } else if (key === "delete") {
             e.preventDefault();
             this.deleteSelected();
-        } else if (key.startsWith("arrow") && this.selection !== undefined) {
+        } else if (key.startsWith("arrow") && this.chosen.length > 0) {
             e.preventDefault();
             this.nudge(key, e.shiftKey ? 10 : 1);
         }
     };
 
     private nudge(key: string, step: number) {
-        const o = this.selected();
-        if (o === undefined) return;
-        if (key === "arrowleft") o.x -= step;
-        if (key === "arrowright") o.x += step;
-        if (key === "arrowup") o.y += step;
-        if (key === "arrowdown") o.y -= step;
+        const objects = this.selectedObjects();
+        if (objects.length === 0) return;
+        for (const o of objects) {
+            if (key === "arrowleft") o.x -= step;
+            if (key === "arrowright") o.x += step;
+            if (key === "arrowup") o.y += step;
+            if (key === "arrowdown") o.y -= step;
+        }
         this.commit();
         this.render();
     }
@@ -1349,6 +1629,39 @@ export function scaledPlacement(origin: LaserObject, corner: number, p: Pt) {
     const minV = sy === 1 ? fy : fy - h;
     const center = apply(m, { x: minU + w / 2, y: minV + h / 2 });
     return { x: center.x - w / 2, y: center.y - h / 2, width: w, height: h };
+}
+
+/** The importer's warning codes, each kind once with how many times it came up. */
+const EZD_WARNINGS = [
+    "hatch-auto-rotate-ignored",
+    "hatch-extra-patterns-ignored",
+    "hatch-crosshatch-single-angle",
+    "hatch-contour-not-marked",
+    "hatch-settings-guessed",
+    "hatch-settings-unreadable",
+    "hatch-cached-lines-used",
+    "text-without-outline",
+    "mixed-pens",
+    "image-inside-group-skipped",
+    "image-mirror-ignored",
+    "control-object-skipped",
+    "empty-object-skipped",
+    "unsupported-object",
+    "unknown-object-type",
+    "unreadable-object",
+    "unreadable-section",
+];
+
+export function ezdWarnings(warnings: readonly string[]): string {
+    const counts = new Map<string, number>();
+    for (const w of warnings) {
+        const code = w.split(":")[0];
+        const key = EZD_WARNINGS.includes(code) ? code : "other";
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts]
+        .map(([code, n]) => `${t(`laser.ezd.warn.${code}`)}${n > 1 ? ` (${n})` : ""}`)
+        .join("; ");
 }
 
 function loadImage(url: string): Promise<HTMLImageElement | undefined> {
