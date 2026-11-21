@@ -37,6 +37,12 @@ export interface RebuildOptions {
     readonly budgetMs?: number;
 }
 
+/** Diagnostics for the corpus test (unset in the app). */
+export let REBUILD_DEBUG: ((line: string) => void) | undefined;
+export function setRebuildDebug(hook: ((line: string) => void) | undefined) {
+    REBUILD_DEBUG = hook;
+}
+
 /** What a corrective feature must take off the difference, as a share of the volume. */
 const MIN_GAIN = 5e-4;
 
@@ -214,16 +220,23 @@ export function rebuildPart(
     }
     // still off: the stretches no feature describes taken as the part's own pieces — last, so
     // a part that features can describe never gets them
-    if (ratio > goal && Date.now() < deadline + 60_000) {
-        const alt = attempt(best.frame, true);
-        if (alt !== undefined && alt.error === undefined && alt.ratio < ratio) {
-            discard(model);
-            model = alt.model;
-            rounded = alt.rounded;
-            ratio = alt.ratio;
-            corrections = 0;
-        } else if (alt !== undefined) {
-            discard(alt.model);
+    if (ratio > goal) {
+        // on every axis tried: the axis features liked best need not be the one the pieces fit
+        for (const frame of frames.slice(0, 3)) {
+            if (ratio <= goal) break;
+            const alt = attempt(frame, true);
+            REBUILD_DEBUG?.(
+                `pieces on axis ${frame.axis.map((x) => x.toFixed(2))}: ${alt === undefined ? "none" : `${(alt.ratio * 100).toFixed(3)}% ${alt.error ?? ""}`}`,
+            );
+            if (alt !== undefined && alt.error === undefined && alt.ratio < ratio) {
+                discard(model);
+                model = alt.model;
+                rounded = alt.rounded;
+                ratio = alt.ratio;
+                corrections = 0;
+            } else if (alt !== undefined) {
+                discard(alt.model);
+            }
         }
     }
     const timings = { plan: t1 - t0, build: t2 - t1, compare: t3 - t2, correct: Date.now() - t3 };

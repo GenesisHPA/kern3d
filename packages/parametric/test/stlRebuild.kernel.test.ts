@@ -14,7 +14,7 @@ import { fitProfile, profileArea } from "../src/stlRebuild/fit2d";
 import { meshVolume, weldTriangles } from "../src/stlRebuild/mesh";
 import { type EdgeTreatment, planExtrusions, setPlanDebug } from "../src/stlRebuild/plan";
 import { meshDifference } from "../src/stlRebuild/raycast";
-import { rebuildPart } from "../src/stlRebuild/rebuild";
+import { rebuildPart, setRebuildDebug } from "../src/stlRebuild/rebuild";
 import { loopArea, slabsOf, sliceFrames } from "../src/stlRebuild/slices";
 import { deviation, solidVolume, surfaceFit, trianglesOf } from "../src/stlRebuild/verify";
 import "../src/features";
@@ -179,7 +179,9 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
             log(`REBUILD ${path.basename(file)}: reference failed ${reference.error}`);
             return;
         }
+        setRebuildDebug((line) => log(`  ${path.basename(file)}: ${line}`));
         const report = rebuildPart(document(), trianglesOf(stl), reference.value, path.basename(file));
+        setRebuildDebug(undefined);
         const names = report.model?.sketches.map((x) => x.name.split(" ")[0]) ?? [];
         const counts = [...new Set(names)]
             .map((n) => `${n}×${names.filter((x) => x === n).length}`)
