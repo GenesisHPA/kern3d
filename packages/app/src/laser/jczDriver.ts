@@ -308,6 +308,7 @@ export class JczDriver implements LaserDriver {
         const job = jczProgram(program.job, this.profile(), program.images);
         for (const w of job.warnings) this.log(t(w), "err");
         const start = async () => {
+            await this.stopping;
             if (this.framingActive) await this.stopFramingNow();
             const packets = packLists(job.commands);
             this.total = packets.length;
@@ -388,6 +389,8 @@ export class JczDriver implements LaserDriver {
         const [x, y] = new GalvoMapper(this.profile()).zero();
         this.galvoX = x;
         this.galvoY = y;
+        // a board still finishing the list it was stopped in ignores a jump sent meanwhile
+        await this.waitIdle();
         await this.send([Cmd.GotoXY, x, y, 0, 0xffff]);
     }
 
@@ -428,6 +431,8 @@ export class JczDriver implements LaserDriver {
             }
         }
         const loop = async () => {
+            // a stop still settling the board (and parking it) goes first, whole
+            await this.stopping;
             await this.send([Cmd.ResetList]);
             this.portBits = 1 << profile.jcz.lightPin;
             await this.streamLists(packets());

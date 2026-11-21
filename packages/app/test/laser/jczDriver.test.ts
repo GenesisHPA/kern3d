@@ -44,6 +44,11 @@ class FakeBoard implements LmcTransport {
         this.closed = true;
     }
 
+    /** The commands sent, the driver's status polls left out. */
+    sent(): number[][] {
+        return this.commands.filter((c) => c[0] !== Cmd.GetVersion);
+    }
+
     ops(): number[] {
         return this.commands.map((c) => c[0]).filter((op) => op !== Cmd.GetVersion);
     }
@@ -198,7 +203,7 @@ describe("JCZ driver on a fake board", () => {
             Cmd.GotoXY,
         ]);
         expect(board.lists).toHaveLength(1);
-        expect(board.commands[board.commands.length - 2].slice(0, 2)).toEqual([Cmd.WritePort, 0]);
+        expect(board.sent().at(-2)?.slice(0, 2)).toEqual([Cmd.WritePort, 0]);
     });
 
     test("the red pointer loops in light-mode lists until stopped: light port, jumps, never a mark", async () => {
@@ -224,7 +229,7 @@ describe("JCZ driver on a fake board", () => {
             await tick();
         expect(driver.framing).toBe(false);
         // light off, then the mirrors back on the zero instead of wherever the loop was
-        expect(board.commands[board.commands.length - 2].slice(0, 2)).toEqual([Cmd.WritePort, 0]);
+        expect(board.sent().at(-2)?.slice(0, 2)).toEqual([Cmd.WritePort, 0]);
         expect(board.commands[board.commands.length - 1].slice(0, 3)).toEqual([Cmd.GotoXY, 0x8000, 0x8000]);
     });
 
