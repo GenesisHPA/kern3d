@@ -12,7 +12,7 @@ import { type LaserShape, polygon, roundedRect } from "./shapes";
  * figure and where it goes.
  */
 
-export const DRAW_TOOLS = ["select", "line", "rect", "ellipse", "polygon", "text"] as const;
+export const DRAW_TOOLS = ["select", "line", "rect", "ellipse", "polygon", "text", "barcode"] as const;
 export type DrawTool = (typeof DRAW_TOOLS)[number];
 
 /** EzCAD-like single keys for the tools. */
@@ -23,6 +23,7 @@ export const TOOL_KEYS: Record<string, DrawTool> = {
     e: "ellipse",
     p: "polygon",
     t: "text",
+    b: "barcode",
 };
 
 export type Draft =

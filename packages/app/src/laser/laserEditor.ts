@@ -49,7 +49,7 @@ import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
 import { bedRect, loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
 import { bakeSize, regenerate, shapeObject } from "./shapeObject";
-import type { LaserShape } from "./shapes";
+import { defaultQuiet, type LaserShape, needsFont } from "./shapes";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
 
@@ -920,7 +920,8 @@ export class LaserEditor {
         this.cancelDraft();
         this.tool = tool;
         this.keepTool = keep;
-        this.svg.style.cursor = tool === "select" ? "" : tool === "text" ? "text" : "crosshair";
+        this.svg.style.cursor =
+            tool === "select" ? "" : tool === "text" ? "text" : tool === "barcode" ? "copy" : "crosshair";
         this.showTool();
         this.setStatus(
             tool === "select"
@@ -1024,21 +1025,54 @@ export class LaserEditor {
         this.jobPanel.focusText();
     }
 
-    /** A parameter of the selected figure changed: its outlines again, a text with its font. */
+    /** A click with the barcode tool: a QR code to change in the panel. */
+    private async placeBarcode(at: Pt) {
+        const shape: LaserShape = {
+            type: "barcode",
+            format: "qr",
+            data: "Kern3D",
+            level: "M",
+            module: 0.5,
+            quiet: defaultQuiet("qr"),
+            barHeight: 15,
+            showText: true,
+            invert: false,
+        };
+        this.addFigure({ shape, at: { centre: at } });
+        this.showPanel("job");
+        this.jobPanel.focusText();
+    }
+
+    /** The font a figure is drawn with: a text's own, a barcode's digits in the default one. */
+    private async fontFor(shape: LaserShape): Promise<FontOutline | undefined> {
+        if (!needsFont(shape)) return undefined;
+        return loadLaserFont(shape.type === "text" ? shape.font : defaultLaserFont());
+    }
+
+    /**
+     * A parameter of the selected figure changed: its outlines again, a text with its font. A
+     * change the figure cannot take (a font out of reach, data a barcode cannot hold) is undone
+     * with a word why.
+     */
     private async editShape(edit: (shape: LaserShape) => void) {
         const o = this.selected();
         if (o?.kind !== "vector" || o.shape === undefined) return;
+        const before = structuredClone(o.shape);
         edit(o.shape);
-        let font: FontOutline | undefined;
-        if (o.shape.type === "text") {
-            font = await loadLaserFont(o.shape.font);
-            if (font === undefined) {
-                PubSub.default.pub("showToast", "laser.draw.fontFailed");
-                this.render();
-                return;
-            }
+        const font = await this.fontFor(o.shape);
+        if (o.shape.type === "text" && font === undefined) {
+            o.shape = before;
+            PubSub.default.pub("showToast", "laser.draw.fontFailed");
+            this.render();
+            return;
         }
-        regenerate(o, font);
+        const result = regenerate(o, font);
+        if (!result.ok) {
+            o.shape = before;
+            PubSub.default.pub("showToast", (result.error ?? "laser.barcode.cannot") as never);
+            this.render();
+            return;
+        }
         this.commit();
         this.render();
     }
@@ -1047,6 +1081,10 @@ export class LaserEditor {
         const p = this.drawPoint(e);
         if (this.tool === "text") {
             void this.placeText(p);
+            return;
+        }
+        if (this.tool === "barcode") {
+            void this.placeBarcode(p);
             return;
         }
         if (this.tool === "line") {

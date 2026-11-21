@@ -1,6 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { BARCODE_FORMATS } from "./barcodeShape";
+import { QR_LEVELS } from "./barcodes";
 import type { ModelView } from "./fromModel";
 import {
     DITHER_KINDS,
@@ -15,7 +17,7 @@ import style from "./laserEditor.module.css";
 import { catalogFonts, localFontFamilies, localFontsAvailable } from "./laserFonts";
 import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
 import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
-import { type LaserFontRef, type LaserShape, TEXT_ALIGNS } from "./shapes";
+import { defaultQuiet, type LaserFontRef, type LaserShape, TEXT_ALIGNS } from "./shapes";
 
 /** The installed fonts, once listed (asking the browser's permission) this session. */
 let localFamilies: LaserFontRef[] | undefined;
@@ -312,6 +314,8 @@ export class LaserJobPanel {
             );
         } else if (shape.type === "text") {
             rows.push(...this.textRows(shape, this.editAs(shape)));
+        } else if (shape.type === "barcode") {
+            rows.push(...this.barcodeRows(shape, this.editAs(shape)));
         }
         rows.push(
             el(
@@ -333,6 +337,85 @@ export class LaserJobPanel {
             this.host.editShape((s) => {
                 if (s.type === current.type) f(s as S);
             });
+    }
+
+    private barcodeRows(
+        shape: Extract<LaserShape, { type: "barcode" }>,
+        edit: (f: (s: Extract<LaserShape, { type: "barcode" }>) => void) => void,
+    ): HTMLElement[] {
+        const area = el("textarea", { rows: 2 });
+        area.setAttribute("data-shape-text", "");
+        area.value = shape.data;
+        area.className = style.textArea;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        area.oninput = () => {
+            if (timer !== undefined) clearTimeout(timer);
+            const value = area.value;
+            timer = setTimeout(() => edit((s) => (s.data = value)), 300);
+        };
+        const linear = shape.format === "code128" || shape.format === "ean13";
+        const rows: HTMLElement[] = [
+            row(
+                "laser.barcode.format",
+                select(
+                    BARCODE_FORMATS.map((f) => ({ value: f, label: t(`laser.barcode.${f}.name`) })),
+                    shape.format,
+                    (v) =>
+                        edit((s) => {
+                            s.format = v;
+                            s.quiet = defaultQuiet(v);
+                            if (v === "ean13" && !/^\d{12,13}$/.test(s.data)) s.data = "400638133393";
+                        }),
+                ),
+            ),
+            area,
+        ];
+        if (shape.format === "qr")
+            rows.push(
+                row(
+                    "laser.barcode.level",
+                    select(
+                        QR_LEVELS.map((l) => ({ value: l, label: t(`laser.barcode.level.${l}`) })),
+                        shape.level,
+                        (v) => edit((s) => (s.level = v)),
+                    ),
+                ),
+            );
+        rows.push(
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.barcode.module",
+                    numberField(shape.module, (v) => edit((s) => (s.module = v)), { min: 0.01, step: 0.05 }),
+                ),
+                row(
+                    "laser.barcode.quiet",
+                    numberField(shape.quiet, (v) => edit((s) => (s.quiet = Math.round(v))), {
+                        min: 0,
+                        step: 1,
+                    }),
+                ),
+            ),
+        );
+        if (linear)
+            rows.push(
+                row(
+                    "laser.barcode.barHeight",
+                    numberField(shape.barHeight, (v) => edit((s) => (s.barHeight = v)), { min: 0.1 }),
+                ),
+                row(
+                    "laser.barcode.showText",
+                    checkbox(shape.showText, (v) => edit((s) => (s.showText = v))),
+                ),
+            );
+        rows.push(
+            row(
+                "laser.barcode.invert",
+                checkbox(shape.invert, (v) => edit((s) => (s.invert = v))),
+            ),
+        );
+        return rows;
     }
 
     private textRows(

@@ -168,7 +168,7 @@ describe("objects drawn with a tool", () => {
         o.width *= 2; // stretched to twice its width
         const centre = apply(placement(o), { x: o.width / 2, y: o.height / 2 });
         if (o.shape?.type === "polygon") o.shape.radius = 20;
-        expect(regenerate(o)).toBe(true);
+        expect(regenerate(o).ok).toBe(true);
         const after = apply(placement(o), { x: o.width / 2, y: o.height / 2 });
         expect(after.x).toBeCloseTo(centre.x, 6);
         expect(after.y).toBeCloseTo(centre.y, 6);
@@ -194,10 +194,68 @@ describe("objects drawn with a tool", () => {
         const o = shapeObject(text(), "T", { corner: { x: 0, y: 0 } }, boxFont());
         if (o === undefined) throw new Error("no object");
         if (o.shape?.type === "text") o.shape.text = "ABC";
-        expect(regenerate(o)).toBe(false);
-        expect(regenerate(o, boxFont())).toBe(true);
+        expect(regenerate(o).ok).toBe(false);
+        expect(regenerate(o, boxFont()).ok).toBe(true);
         expect(o.paths).toHaveLength(3);
         applyGeometry(o, { paths: o.paths, width: o.sourceWidth, height: o.sourceHeight });
         expect(o.sourceWidth).toBeCloseTo(17, 6);
+    });
+});
+
+describe("barcodes as figures", () => {
+    const qr = (over = {}): LaserShape => ({
+        type: "barcode",
+        format: "qr",
+        data: "HELLO WORLD",
+        level: "Q",
+        module: 0.5,
+        quiet: 4,
+        barHeight: 15,
+        showText: false,
+        invert: false,
+        ...over,
+    });
+
+    test("a QR's box is its modules and the quiet zone; dark runs are merged rectangles", () => {
+        const g = shapeGeometry(qr());
+        // version 1: 21 modules + 2 × 4 quiet, 0.5 mm each
+        expect(g.width).toBeCloseTo(14.5, 9);
+        expect(g.height).toBeCloseTo(14.5, 9);
+        expect(g.paths.every((p) => p.closed && p.points.length === 4)).toBe(true);
+        // fewer rectangles than dark modules: runs in a row are one
+        expect(g.paths.length).toBeLessThan(21 * 21 * 0.6);
+        const b = pathsBounds(g.paths);
+        expect(b.minX).toBeCloseTo(2, 9);
+        expect(b.maxY).toBeCloseTo(12.5, 9);
+    });
+
+    test("inverted, the background is one more outline round the quiet zone", () => {
+        const plain = shapeGeometry(qr());
+        const inv = shapeGeometry(qr({ invert: true }));
+        expect(inv.paths.length).toBe(plain.paths.length + 1);
+        expect(pathsBounds([inv.paths[0]])).toEqual({ minX: 0, minY: 0, maxX: 14.5, maxY: 14.5 });
+    });
+
+    test("an EAN-13 is 95 modules wide plus the quiet zone; a wrong check digit makes nothing", () => {
+        const g = shapeGeometry(qr({ format: "ean13", data: "400638133393", quiet: 9, module: 0.33 }));
+        expect(g.width).toBeCloseTo((95 + 18) * 0.33, 9);
+        expect(shapeGeometry(qr({ format: "ean13", data: "4006381333932" })).error).toBe(
+            "laser.barcode.ean13",
+        );
+    });
+
+    test("digits under a Code 128 come with a font, and without one the bars still do", () => {
+        const withText = shapeGeometry(qr({ format: "code128", data: "AB12", showText: true }), boxFont());
+        const bars = shapeGeometry(qr({ format: "code128", data: "AB12", showText: true }));
+        expect(withText.paths.length).toBeGreaterThan(bars.paths.length);
+        expect(withText.height).toBeGreaterThan(bars.height);
+    });
+
+    test("a drawn barcode is filled and survives the stored job", () => {
+        const o = shapeObject(qr(), "QR", { centre: { x: 0, y: 0 } });
+        expect(o?.op.mode).toBe("fill");
+        const job = parseLaserJob(stringifyLaserJob({ version: 1, origin: "center", objects: o ? [o] : [] }));
+        const back = job.objects[0];
+        expect(back.kind === "vector" && back.shape).toEqual(o?.shape);
     });
 });

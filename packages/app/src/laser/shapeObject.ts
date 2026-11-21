@@ -4,7 +4,7 @@
 import type { FontOutline } from "@chili3d/core";
 import { apply, type Pt } from "./geometry";
 import { defaultOperation, type LaserVectorObject, newLaserId, placement } from "./laserData";
-import { type LaserShape, type ShapeGeometry, shapeGeometry } from "./shapes";
+import { type LaserShape, needsFont, type ShapeGeometry, shapeGeometry } from "./shapes";
 
 /**
  * A drawn figure as a laser object, and its outlines made anew after a change of parameters:
@@ -26,12 +26,17 @@ export function applyGeometry(o: LaserVectorObject, g: ShapeGeometry) {
     o.y = centre.y - o.height / 2;
 }
 
-/** The object's outlines from its shape again; false for a text whose font is not at hand. */
-export function regenerate(o: LaserVectorObject, font?: FontOutline): boolean {
-    if (o.shape === undefined) return false;
-    if (o.shape.type === "text" && font === undefined) return false;
-    applyGeometry(o, shapeGeometry(o.shape, font));
-    return true;
+/**
+ * The object's outlines from its shape again. False — the object left as it was — for a text
+ * whose font is not at hand, or a barcode its data does not fit (`error` says which).
+ */
+export function regenerate(o: LaserVectorObject, font?: FontOutline): { ok: boolean; error?: string } {
+    if (o.shape === undefined) return { ok: false };
+    if (o.shape.type === "text" && font === undefined) return { ok: false };
+    const g = shapeGeometry(o.shape, needsFont(o.shape) ? font : undefined);
+    if (g.paths.length === 0) return { ok: false, error: g.error };
+    applyGeometry(o, g);
+    return { ok: true };
 }
 
 /**
@@ -83,11 +88,12 @@ export function shapeObject(
         width: g.width,
         height: g.height,
         angle: at.angle ?? 0,
-        lockAspect: shape.type === "text" || shape.type === "polygon",
+        lockAspect: shape.type === "text" || shape.type === "polygon" || shape.type === "barcode",
         paths: g.paths,
         sourceWidth: g.width,
         sourceHeight: g.height,
         shape,
-        op: defaultOperation("line"),
+        // a barcode's modules are areas: filled, as EzCAD hatches them
+        op: defaultOperation(shape.type === "barcode" ? "fill" : "line"),
     };
 }

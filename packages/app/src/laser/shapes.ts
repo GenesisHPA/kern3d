@@ -2,6 +2,8 @@
 // See LICENSE file in the project root for full license information.
 
 import type { FontOutline } from "@chili3d/core";
+import { BARCODE_FORMATS, type BarcodeSpec, barcodeGeometry } from "./barcodeShape";
+import { QR_LEVELS } from "./barcodes";
 import { arcSegments, ellipsePath, flattenCubic, flattenQuadratic } from "./flatten";
 import { type LaserPath, type Pt, pathsBounds } from "./geometry";
 
@@ -47,7 +49,8 @@ export type LaserShape =
           /** 0: a straight line. Otherwise the text runs along a circle of this radius, mm:
            * positive over its top (reading clockwise), negative along its bottom. */
           arcRadius: number;
-      };
+      }
+    | ({ type: "barcode" } & BarcodeSpec);
 
 export type LaserShapeType = LaserShape["type"];
 
@@ -55,6 +58,8 @@ export interface ShapeGeometry {
     paths: LaserPath[];
     width: number;
     height: number;
+    /** Why there are no outlines (an i18n key): data a barcode cannot hold. */
+    error?: string;
 }
 
 /** Curves are flattened finer than an imported SVG: these are drawn to be engraved. */
@@ -64,7 +69,26 @@ const MIN_SIZE = 0.01;
 
 /** The figure's outlines in its own frame, the box from 0, 0. */
 export function shapeGeometry(shape: LaserShape, font?: FontOutline): ShapeGeometry {
+    // a barcode's box is its symbol and quiet zone, not just the ink
+    if (shape.type === "barcode") return barcodeGeometry(shape, font, captionPaths);
     return normalize(rawPaths(shape, font));
+}
+
+/** A plain line of text for a barcode's digits. */
+function captionPaths(text: string, size: number, font: FontOutline): LaserPath[] {
+    return textPaths(
+        {
+            type: "text",
+            text,
+            font: { family: "" },
+            size,
+            letterSpacing: 0,
+            lineSpacing: 1.2,
+            align: "left",
+            arcRadius: 0,
+        },
+        font,
+    );
 }
 
 function rawPaths(shape: LaserShape, font: FontOutline | undefined): LaserPath[] {
@@ -81,7 +105,22 @@ function rawPaths(shape: LaserShape, font: FontOutline | undefined): LaserPath[]
             return [polygon(shape.sides, shape.radius, shape.star)];
         case "text":
             return font === undefined ? [] : textPaths(shape, font);
+        case "barcode":
+            return [];
     }
+}
+
+/** A text, or a barcode with its digits under it, is made with a font. */
+export function needsFont(shape: LaserShape): boolean {
+    return (
+        shape.type === "text" ||
+        (shape.type === "barcode" && shape.showText && /^(code128|ean13)$/.test(shape.format))
+    );
+}
+
+/** The quiet zone each code asks for, in modules. */
+export function defaultQuiet(format: BarcodeSpec["format"]): number {
+    return { qr: 4, datamatrix: 1, code128: 10, ean13: 9 }[format];
 }
 
 /** Moved so its box starts at 0, 0. */
@@ -292,6 +331,20 @@ export function parseShape(raw: any): LaserShape | undefined {
                 radius: Math.max(num(raw.radius, 10), MIN_SIZE),
                 star: Math.max(0, Math.min(0.99, num(raw.star, 0))),
             };
+        case "barcode": {
+            const format = BARCODE_FORMATS.includes(raw.format) ? raw.format : "qr";
+            return {
+                type: "barcode",
+                format,
+                data: typeof raw.data === "string" ? raw.data : "",
+                level: QR_LEVELS.includes(raw.level) ? raw.level : "M",
+                module: Math.max(num(raw.module, 0.5), 0.01),
+                quiet: Math.max(0, num(raw.quiet, defaultQuiet(format))),
+                barHeight: Math.max(num(raw.barHeight, 15), 0.1),
+                showText: raw.showText !== false,
+                invert: raw.invert === true,
+            };
+        }
         case "text": {
             const font = raw.font ?? {};
             return {
