@@ -236,21 +236,30 @@ export function rebuildPart(
         diff.extraShape?.dispose();
         if (!improved) break;
     }
-    // still off: the stretches no feature describes taken as the part's own pieces — last, so
-    // a part that features can describe never gets them
-    if (ratio > goal) {
+    // still off: the stretches no feature describes taken as the part's own pieces — last, and
+    // judged by the surface, not the volume: true arcs where the STL had facets cost volume
+    // (a perfect rebuild of a round reads ~0.5 %) but no surface point
+    const fitEps = Math.max(tol * 4, 0.05);
+    const surfaceOf = (m: BuiltModel) => {
+        const shape = bodyShape(m);
+        return shape === undefined ? 1 : surfaceFit(mesh, shape, fitEps).off;
+    };
+    let surface = surfaceOf(model);
+    if (surface > 0.02) {
         // on every axis tried: the axis features liked best need not be the one the pieces fit
         for (const frame of frames.slice(0, 3)) {
-            if (ratio <= goal) break;
+            if (surface <= 0.02) break;
             const alt = attempt(frame, true);
+            const altSurface = alt === undefined || alt.error !== undefined ? 1 : surfaceOf(alt.model);
             REBUILD_DEBUG?.(
-                `pieces on axis ${frame.axis.map((x) => x.toFixed(2))}: ${alt === undefined ? "none" : `${(alt.ratio * 100).toFixed(3)}% ${alt.error ?? ""}`}`,
+                `pieces on axis ${frame.axis.map((x) => x.toFixed(2))}: ${alt === undefined ? "none" : `${(alt.ratio * 100).toFixed(3)}% surface ${(altSurface * 100).toFixed(1)}% ${alt.error ?? ""}`}`,
             );
-            if (alt !== undefined && alt.error === undefined && alt.ratio < ratio) {
+            if (alt !== undefined && alt.error === undefined && altSurface < surface - 0.01) {
                 discard(model);
                 model = alt.model;
                 rounded = alt.rounded;
                 ratio = alt.ratio;
+                surface = altSurface;
                 corrections = 0;
             } else if (alt !== undefined) {
                 discard(alt.model);
@@ -258,9 +267,7 @@ export function rebuildPart(
         }
     }
     const timings = { plan: t1 - t0, build: t2 - t1, compare: t3 - t2, correct: Date.now() - t3 };
-    const finalShape = bodyShape(model);
-    const surfaceOff =
-        finalShape === undefined ? 1 : surfaceFit(mesh, finalShape, Math.max(tol * 4, 0.05)).off;
+    const surfaceOff = surface;
     return {
         model,
         ratio,
