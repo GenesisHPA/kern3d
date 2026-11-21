@@ -32,6 +32,11 @@ export interface LmcTransport {
     write(bytes: Uint8Array): Promise<void>;
     read(): Promise<Uint8Array>;
     close(): Promise<void>;
+    /**
+     * Reads away replies left in the board from a session that ended between a command and
+     * its reply; without it every reply of this session would belong to the command before.
+     */
+    drain?(): Promise<number>;
 }
 
 export type LmcOpener = () => Promise<LmcTransport>;
@@ -191,6 +196,8 @@ export class JczDriver implements LaserDriver {
         if (this.transport !== undefined) return;
         this.transport = await this.open();
         try {
+            const stale = (await this.transport.drain?.()) ?? 0;
+            if (stale > 0) this.log(`USB: ${stale} stale repl${stale === 1 ? "y" : "ies"} read away`, "in");
             await this.init();
         } catch (error) {
             await this.transport?.close().catch(() => {});
@@ -245,6 +252,10 @@ export class JczDriver implements LaserDriver {
 
     async disconnect(): Promise<void> {
         if (this.transport === undefined) return;
+        // no status poll may slip in between the last commands and the close: its reply
+        // would be left in the board for the next session
+        this.stopPoll?.();
+        this.stopPoll = undefined;
         try {
             await this.stopping;
             if (this.framingActive || this.state === "running" || this.state === "paused") await this.abort();
@@ -253,6 +264,7 @@ export class JczDriver implements LaserDriver {
         } catch {
             // the board may already be gone; let go of it anyway
         }
+        await this.queue;
         await this.transport?.close().catch(() => {});
         this.lost();
     }

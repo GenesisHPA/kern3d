@@ -72,16 +72,36 @@ export async function openLmcUsb(): Promise<LmcTransport> {
         throw new UsbOpenError("openFailed", String((error as Error)?.message ?? error));
     }
     const board = device;
+    const transferIn = async () => {
+        const result = await board.transferIn(LMC_ENDPOINT_IN & 0x7f, 8);
+        if (result.status !== "ok" || result.data === undefined)
+            throw new Error(`USB read: ${result.status}`);
+        return new Uint8Array(result.data.buffer, result.data.byteOffset, result.data.byteLength);
+    };
+    /** WebUSB cannot cancel a read: one still waiting from the drain takes the next reply. */
+    let pending: Promise<Uint8Array> | undefined;
     return {
         async write(bytes) {
             const result = await board.transferOut(LMC_ENDPOINT_OUT & 0x7f, bytes);
             if (result.status !== "ok") throw new Error(`USB write: ${result.status}`);
         },
-        async read() {
-            const result = await board.transferIn(LMC_ENDPOINT_IN & 0x7f, 8);
-            if (result.status !== "ok" || result.data === undefined)
-                throw new Error(`USB read: ${result.status}`);
-            return new Uint8Array(result.data.buffer, result.data.byteOffset, result.data.byteLength);
+        read() {
+            const p = pending ?? transferIn();
+            pending = undefined;
+            return p;
+        },
+        async drain() {
+            let stale = 0;
+            for (let i = 0; i < 8; i++) {
+                const p = transferIn();
+                const got = await Promise.race([p, new Promise<undefined>((r) => setTimeout(r, 150))]);
+                if (got === undefined) {
+                    pending = p;
+                    break;
+                }
+                stale++;
+            }
+            return stale;
         },
         async close() {
             await board.releaseInterface(0).catch(() => {});
