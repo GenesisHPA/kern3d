@@ -26,6 +26,7 @@ import {
 import style from "./laserEditor.module.css";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
 import type { LaserNode } from "./laserNode";
+import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
 import { loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
 import type { SvgImport } from "./svgImport";
@@ -106,6 +107,7 @@ export class LaserEditor {
     protected readonly panelBody: HTMLDivElement;
     protected readonly toolbar: HTMLDivElement;
     private readonly jobPanel: LaserJobPanel;
+    protected readonly output: LaserOutput;
     private readonly objectElements = new Map<string, SVGGraphicsElement>();
     data: LaserJobData;
     private committed: string;
@@ -139,6 +141,22 @@ export class LaserEditor {
         this.statusText = el("span");
         this.statusPosition = el("span");
         this.jobPanel = new LaserJobPanel(this.jobPanelHost());
+        const editor = this;
+        this.output = new LaserOutput({
+            get data() {
+                return editor.data;
+            },
+            get profile() {
+                return editor.profile;
+            },
+            get jobName() {
+                return editor.node.name;
+            },
+            previewGroup: this.previewGroup,
+            setProfile: (edit) => this.setProfile(edit),
+            setStatus: (text) => this.setStatus(text),
+            renderPanel: () => this.renderPanel(),
+        });
         this.panelTabs = el("div", { className: style.panelTabs });
         this.panelBody = el("div", { className: style.panelBody });
         this.toolbar = this.createToolbar();
@@ -223,7 +241,9 @@ export class LaserEditor {
     }
 
     /** The job changed (an edit, undo): whatever was computed from it is stale. Subclass hook. */
-    protected changed() {}
+    protected changed() {
+        this.output.invalidate();
+    }
 
     selected(): LaserObject | undefined {
         return this.data.objects.find((o) => o.id === this.selection);
@@ -431,6 +451,7 @@ export class LaserEditor {
                     return this.jobPanel.element;
                 },
             },
+            { id: "output", title: t("laser.panel.output"), render: () => this.output.panel() },
         ];
     }
 
@@ -470,6 +491,9 @@ export class LaserEditor {
             button("laser.delete", () => this.deleteSelected()),
             this.separator(),
             button("laser.fit", () => this.fit()),
+            this.separator(),
+            button("laser.generate", () => void this.output.generate()),
+            button("laser.save", () => void this.output.save()),
         ];
     }
 
@@ -492,7 +516,7 @@ export class LaserEditor {
         this.renderObjects();
         this.renderOverlay();
         this.renderPanel();
-        this.statusText.textContent = t("laser.prompt.select");
+        this.statusText.textContent = this.output.summary() || t("laser.prompt.select");
     }
 
     private renderBed() {

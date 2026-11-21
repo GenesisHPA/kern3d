@@ -1,0 +1,49 @@
+{
+    "//": "The laser workspace end to end without a machine: a job is created and opened over the model, a square outline and a small gradient picture are put on the bed (through the node, the way undo would), the square is selected from the object list, and the G-code is generated and previewed. Screenshots show the bed, the selection and the toolpath.",
+    "start": "document",
+    "steps": [
+        {
+            "kind": "runCommand",
+            "name": "laser.create"
+        },
+        {
+            "kind": "waitFor",
+            "selector": "dialog[open] svg"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const node = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group')[0]; if (!node) throw new Error('no laser job in the document'); const c = document.createElement('canvas'); c.width = 60; c.height = 40; const g = c.getContext('2d'); const grad = g.createLinearGradient(0, 0, 60, 0); grad.addColorStop(0, '#000'); grad.addColorStop(1, '#fff'); g.fillStyle = grad; g.fillRect(0, 0, 60, 40); const op = (mode) => ({ mode, power: 50, speed: 1000, passes: 1, air: false, fillInterval: 0.5, fillAngle: 45, raster: { mode: 'grayscale', dither: 'floyd', resolution: 5, brightness: 0, contrast: 0, gamma: 1, invert: false, threshold: 50, whiteClip: 5, minPower: 0, overscan: 2 } }); const square = { id: 'sq', name: 'square', kind: 'vector', x: 20, y: 20, width: 50, height: 50, angle: 0, lockAspect: true, sourceWidth: 10, sourceHeight: 10, paths: [{ closed: true, points: [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}] }, { closed: true, points: [{x:3,y:3},{x:7,y:3},{x:7,y:7},{x:3,y:7}] }], op: op('fill') }; const image = { id: 'img', name: 'gradient', kind: 'image', x: 100, y: 30, width: 60, height: 40, angle: 15, lockAspect: true, dataUrl: c.toDataURL(), pixelWidth: 60, pixelHeight: 40, op: op('image') }; node.content = JSON.stringify({ version: 1, objects: [square, image] }); return node.name; })()",
+            "log": true
+        },
+        {
+            "kind": "screenshot",
+            "name": "01-job"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const row = [...document.querySelectorAll('dialog[open] div')].find((d) => d.textContent === 'square' && d.parentElement && d.parentElement.onclick); if (!row) throw new Error('no object row'); row.parentElement.click(); const inputs = document.querySelectorAll('dialog[open] input[type=number]'); return inputs.length; })()",
+            "log": true
+        },
+        {
+            "kind": "screenshot",
+            "name": "02-selected"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const b = [...document.querySelectorAll('dialog[open] button')].find((x) => x.textContent === 'Рассчитать G-code' || x.textContent === 'Generate G-code'); if (!b) throw new Error('no generate button'); b.click(); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 2500
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const paths = document.querySelectorAll('dialog[open] svg g[pointer-events=none] path'); if (paths.length < 3) throw new Error('no toolpath preview: ' + paths.length); const status = document.querySelector('dialog[open] div:last-child > span').textContent; if (!/\\d+:\\d\\d/.test(status)) throw new Error('no time estimate: ' + status); return status; })()",
+            "log": true
+        },
+        {
+            "kind": "screenshot",
+            "name": "03-toolpath"
+        }
+    ]
+}

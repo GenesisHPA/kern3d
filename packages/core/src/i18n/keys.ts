@@ -1212,6 +1212,23 @@ export const I18N_KEYS = [
     "laser.raster.whiteClip",
     "laser.raster.minPower",
     "laser.raster.overscan",
+    "laser.panel.output",
+    "laser.output",
+    "laser.output.stale",
+    "laser.generate",
+    "laser.save",
+    "laser.preview",
+    "laser.summary",
+    "laser.warn.outsideBed",
+    "laser.warn.imageMissing",
+    "laser.machine.settings",
+    "laser.machine.maxS",
+    "laser.machine.dynamic",
+    "laser.machine.accel",
+    "laser.machine.rapid",
+    "laser.machine.junction",
+    "laser.machine.returnHome",
+    "laser.machine.laserModeHint",
 ] as const;
 
 export type I18nKeys = (typeof I18N_KEYS)[number];
