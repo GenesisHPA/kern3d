@@ -13,6 +13,8 @@ import {
     vertex,
 } from "./mesh";
 
+import { regionAxes } from "./regions";
+
 /** Normals within ~0.5° of the axis are caps; within ~0.5° of its plane, walls. */
 const AXIS_TOL = Math.sin((0.5 * Math.PI) / 180);
 const CAP_COS = Math.cos((0.5 * Math.PI) / 180);
@@ -102,7 +104,16 @@ export function frameFor(mesh: TriMesh, axis: Vec3, flats = planarDirections(mes
 export function sliceFrames(mesh: TriMesh): SliceFrame[] {
     const flats = planarDirections(mesh);
     const candidates: Vec3[] = [...WORLD];
-    for (const { dir } of flats) {
+    // the flat faces' normals, then the axes the curved regions' sides name (an oblique boss
+    // or hole whose faces are not among the large flat ones)
+    const directions = [
+        ...flats.map((f) => f.dir),
+        ...regionAxes(
+            mesh,
+            flats.map((f) => f.dir),
+        ),
+    ];
+    for (const dir of directions) {
         if (!candidates.some((c) => Math.abs(dot(c, dir)) > 0.9999)) candidates.push(dir);
     }
     const scored = candidates.map((axis, i) => {

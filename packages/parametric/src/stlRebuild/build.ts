@@ -9,8 +9,20 @@ import { ConstraintKind, type SketchData, type SketchPointRef } from "../sketch/
 import { SketchNode } from "../sketch/sketchNode";
 import { SketchSolver } from "../sketch/solver";
 import type { Curve2D, Profile2D } from "./fit2d";
-import { dot, scale, type Vec3 } from "./mesh";
-import type { EdgeTreatment, PlannedExtrude } from "./plan";
+import { dot, scale, type Vec3, weldTriangles } from "./mesh";
+import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan";
+import { sliceFrames } from "./slices";
+import { trianglesOf } from "./verify";
+
+/**
+ * Measures a body against the part, as a share of the part's volume (lower is closer); given to
+ * `buildModel` so a piece no feature of the main axis describes can be tried as features along
+ * its own axis before it is taken from the part as a mesh piece.
+ */
+export type BodyJudge = (body: ParametricBodyNode) => number;
+
+/** Most features a mesh piece may be rebuilt as along its own axis. */
+const MAX_PIECE_FEATURES = 6;
 
 const xyz = (v: Vec3) => new XYZ({ x: v[0], y: v[1], z: v[2] });
 
@@ -107,6 +119,7 @@ export function buildModel(
     name: string,
     tol: number,
     reference?: IShape,
+    judge?: BodyJudge,
 ): BuiltModel {
     const body = new ParametricBodyNode({ document, features: [] });
     body.name = name;
@@ -115,7 +128,12 @@ export function buildModel(
     // one feature at a time: a taper the kernel refuses is redone straight, so one bad cone
     // does not take the whole body down
     for (const plan of plans) {
-        if (plan.fromMesh && reference !== undefined && appendMeshPiece(model, plan, reference)) continue;
+        if (
+            plan.fromMesh &&
+            reference !== undefined &&
+            appendMeshPiece(model, plan, reference, document, tol, judge)
+        )
+            continue;
         appendExtrude(model, document, plan, tol);
         const failed = !body.shape.isOk || body.featureItems().at(-1)?.error !== undefined;
         if (!failed || plan.draft === undefined) continue;
@@ -242,6 +260,24 @@ export function appendTreatment(model: BuiltModel, treatment: EdgeTreatment, tol
     return false;
 }
 
+/** What a piece rebuilt with true arcs may read further off than its mesh, as a share of the part. */
+const PIECE_ARC_SLACK = 5e-4;
+
+/**
+ * A mesh piece planned along its own best axes as a few fused extrudes — a boss or rib in
+ * another direction than the part's main one. Undefined when no axis gives a short plan.
+ */
+function planPiece(piece: IShape, tol: number): PlannedExtrude[] | undefined {
+    const mesh = weldTriangles(trianglesOf(piece));
+    if (mesh.areas.length === 0) return undefined;
+    for (const frame of sliceFrames(mesh).slice(0, 2)) {
+        const plans = planExtrusions(mesh, frame, tol, { holes: false, operation: "fuse", role: "add" });
+        if (plans.length > 0 && plans.length <= MAX_PIECE_FEATURES && !plans.some((p) => p.fromMesh))
+            return plans.map((p) => ({ ...p, operation: "fuse" as const }));
+    }
+    return undefined;
+}
+
 function cross3(a: Vec3, b: Vec3): Vec3 {
     return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
@@ -303,7 +339,14 @@ function leanDirection(
  * slab (a box over the slab's loops, between its two heights), kept as an imported piece fused
  * into the body. False — nothing added — when the clip or the fuse fails.
  */
-function appendMeshPiece(model: BuiltModel, plan: PlannedExtrude, reference: IShape): boolean {
+function appendMeshPiece(
+    model: BuiltModel,
+    plan: PlannedExtrude,
+    reference: IShape,
+    document: IDocument,
+    tol: number,
+    judge?: BodyJudge,
+): boolean {
     const { axis, xvec, yvec } = plan.frame;
     let minU = Number.POSITIVE_INFINITY;
     let minV = Number.POSITIVE_INFINITY;
@@ -344,10 +387,22 @@ function appendMeshPiece(model: BuiltModel, plan: PlannedExtrude, reference: ISh
     const piece = shapeFactory.booleanCommon([reference], [box.value]);
     box.value.dispose();
     if (!piece.isOk) return false;
+    const planned = judge === undefined ? undefined : planPiece(piece.value, tol);
     const brep = shapeConverter.convertToBrep(piece.value);
     piece.value.dispose();
     if (!brep.isOk) return false;
     const before = model.body.features;
+    const sketchesBefore = model.sketches.length;
+    // the piece as features along its own axis, if that is no further from the part than the
+    // mesh piece (a true arc where the STL had facets costs a little volume, never surface)
+    let asFeatures: number | undefined;
+    if (planned !== undefined && judge !== undefined) {
+        for (const p of planned) appendExtrude(model, document, p, tol);
+        if (model.body.shape.isOk && !model.body.featureItems().some((x) => x.error !== undefined))
+            asFeatures = judge(model.body);
+        model.body.setFeaturesEmitShapeChanged(before);
+        for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
+    }
     model.body.setFeaturesEmitShapeChanged([
         ...before,
         {
@@ -357,7 +412,22 @@ function appendMeshPiece(model: BuiltModel, plan: PlannedExtrude, reference: ISh
             ...(before.length > 0 ? { operation: "fuse" as const } : {}),
         },
     ]);
-    if (model.body.shape.isOk && model.body.featureItems().at(-1)?.error === undefined) return true;
+    const meshOk = model.body.shape.isOk && model.body.featureItems().at(-1)?.error === undefined;
+    const asMesh = meshOk && asFeatures !== undefined ? judge?.(model.body) : undefined;
+    if (
+        planned !== undefined &&
+        asFeatures !== undefined &&
+        (!meshOk || asMesh === undefined || asFeatures <= asMesh + PIECE_ARC_SLACK)
+    ) {
+        model.body.setFeaturesEmitShapeChanged(before);
+        for (const p of planned) appendExtrude(model, document, p, tol);
+        if (model.body.shape.isOk && !model.body.featureItems().some((x) => x.error !== undefined))
+            return true;
+        model.body.setFeaturesEmitShapeChanged(before);
+        for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
+        return false;
+    }
+    if (meshOk) return true;
     model.body.setFeaturesEmitShapeChanged(before);
     return false;
 }

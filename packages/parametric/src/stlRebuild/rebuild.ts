@@ -172,7 +172,9 @@ export function rebuildPart(
         if (meshPieces && volumeOf(plans.filter((p) => p.fromMesh)) > volumeOf(plans) * 0.75)
             return undefined;
         const tb = Date.now();
-        const model = buildModel(document, plans, name, tol, reference);
+        const model = buildModel(document, plans, name, tol, reference, (body) =>
+            measure(referenceMesh, body.shape.isOk ? body.shape.value : undefined),
+        );
         const shape = bodyShape(model);
         const failed = failedFeature(model) ?? (soundBody(shape, partSolids) ? undefined : "unsound body");
         REBUILD_DEBUG?.(`axis ${axisName}: build ${Date.now() - tb} ms${failed ? ` failed: ${failed}` : ""}`);
