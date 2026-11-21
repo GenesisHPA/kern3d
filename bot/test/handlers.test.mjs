@@ -84,6 +84,8 @@ describe("commands", () => {
     it("/start shows the question buttons, each one opening its FAQ entry", async () => {
         const { ctx, sent } = context();
         const start = await replyFor(ctx, msg("/start"));
+        // the bot's own command answers the same way
+        assert.match((await replyFor(ctx, msg("/kern3d"))).text, /О чём спросить/);
         assert.match(start.text, /О чём спросить/);
         const buttons = start.reply_markup.inline_keyboard.flat();
         // every suggested question was found in the FAQ, plus «все вопросы»

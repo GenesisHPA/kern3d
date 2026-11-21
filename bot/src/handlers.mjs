@@ -5,6 +5,8 @@ import { formatDate, LINKS, linksHtml, versionOf } from "./releases.mjs";
 import { escapeHtml } from "./telegram.mjs";
 
 export const COMMANDS = [
+    // /kern3d is ours alone: in a group /start and /help reach every bot there
+    ["kern3d", "Вопросы о Kern3D — кнопки"],
     ["help", "Что умеет бот"],
     ["version", "Последняя версия и ссылки"],
     ["download", "Скачать Kern3D"],
@@ -108,6 +110,7 @@ function helpText(me, where = "private") {
     return [
         "<b>Бот Kern3D</b> — подсказки по программе, ссылки на скачивание и новости о релизах.",
         "",
+        "/kern3d — вопросы кнопками (в группе вызывает только этого бота)",
         "/version — последняя версия и ссылки",
         "/download — скачать для Windows и Linux, онлайн-версия",
         "/changes — что нового; <code>/changes 0.9.5</code> — изменения версии",
@@ -234,6 +237,7 @@ export async function replyFor(ctx, message) {
         if (command.target && command.target.toLowerCase() !== mine) return null;
         switch (command.name) {
             case "start":
+            case "kern3d":
             case "help":
                 return withQuestions(
                     ctx,
