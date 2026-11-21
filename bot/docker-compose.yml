@@ -1,0 +1,16 @@
+services:
+  kern3d-bot:
+    build: .
+    container_name: kern3d-bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - kern3d-bot-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+volumes:
+  kern3d-bot-data:

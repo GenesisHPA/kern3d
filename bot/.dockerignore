@@ -1,0 +1,6 @@
+.env
+node_modules
+test
+scripts
+*.md
+!kb/*.md

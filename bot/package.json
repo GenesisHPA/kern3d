@@ -1,0 +1,15 @@
+{
+    "name": "kern3d-bot",
+    "private": true,
+    "version": "1.0.0",
+    "description": "Telegram bot for Kern3D: FAQ search and release announcements",
+    "type": "module",
+    "engines": {
+        "node": ">=22"
+    },
+    "scripts": {
+        "start": "node src/main.mjs",
+        "test": "node --test \"test/*.test.mjs\"",
+        "build:kb": "node scripts/build-commands.mjs"
+    }
+}

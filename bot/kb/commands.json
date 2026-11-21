@@ -1,0 +1,1124 @@
+[
+    {
+        "key": "act.alignCamera",
+        "name": "Выровнять камеру",
+        "tab": "Прямое моделирование",
+        "group": "Акт"
+    },
+    {
+        "key": "ai.toggleChat",
+        "name": "AI Assistant",
+        "tab": "Тело",
+        "group": "Вставка"
+    },
+    {
+        "key": "annotate.angle",
+        "name": "Угол",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "annotate.diameter",
+        "name": "Диаметр",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "annotate.dimension",
+        "name": "Размер",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "annotate.radius",
+        "name": "Радиус",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "annotate.text",
+        "name": "Текст",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "assemble.activateComponent",
+        "name": "Активировать компонент",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "assemble.asBuiltJoint",
+        "name": "Сочленение по месту",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "assemble.driveJoint",
+        "name": "Привод сочленения",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "assemble.joint",
+        "name": "Сочленение",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "assemble.newComponent",
+        "name": "Новый компонент",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "boolean.common",
+        "name": "Пересечение",
+        "tab": "Прямое моделирование",
+        "group": "Булевый"
+    },
+    {
+        "key": "boolean.cut",
+        "name": "Вычитание",
+        "tab": "Прямое моделирование",
+        "group": "Булевый"
+    },
+    {
+        "key": "boolean.join",
+        "name": "Объединение",
+        "tab": "Прямое моделирование",
+        "group": "Булевый"
+    },
+    {
+        "key": "constraint.coincident",
+        "name": "Совпадение",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.curvature",
+        "name": "Непрерывность кривизны"
+    },
+    {
+        "key": "constraint.ellipseNormal",
+        "name": "Перпендикуляр к эллипсу"
+    },
+    {
+        "key": "constraint.equal",
+        "name": "Равенство",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.equalOffset",
+        "name": "Равное смещение"
+    },
+    {
+        "key": "constraint.fix",
+        "name": "Фиксировать точку",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.horizontal",
+        "name": "Горизонтально",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.horizontalAlign",
+        "name": "Выровнять по горизонтали",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.midpoint",
+        "name": "Середина",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.parallel",
+        "name": "Параллельно",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.perpendicular",
+        "name": "Перпендикулярно",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.pointOn",
+        "name": "Точка на объекте",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.symmetric",
+        "name": "Симметрия",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.tangent",
+        "name": "Касательная",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.toggleDriven",
+        "name": "Задающий / Измерительный",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.vertical",
+        "name": "Вертикально",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "constraint.verticalAlign",
+        "name": "Выровнять по вертикали",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "convert.curveProjection",
+        "name": "Проекция",
+        "tab": "Прямое моделирование",
+        "group": "Инструменты"
+    },
+    {
+        "key": "convert.fuse",
+        "name": "Сплавить"
+    },
+    {
+        "key": "convert.toCompound",
+        "name": "В составной объект",
+        "tab": "Прямое моделирование",
+        "group": "Конвертер"
+    },
+    {
+        "key": "convert.toFace",
+        "name": "В грань",
+        "tab": "Прямое моделирование",
+        "group": "Конвертер"
+    },
+    {
+        "key": "convert.toShell",
+        "name": "В оболочку",
+        "tab": "Прямое моделирование",
+        "group": "Конвертер"
+    },
+    {
+        "key": "convert.toSolid",
+        "name": "В тело",
+        "tab": "Прямое моделирование",
+        "group": "Конвертер"
+    },
+    {
+        "key": "convert.toWire",
+        "name": "В контур",
+        "tab": "Прямое моделирование",
+        "group": "Конвертер"
+    },
+    {
+        "key": "create.arc",
+        "name": "Дуга",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.arc2point",
+        "name": "Дуга в 2 точки",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.arc3point",
+        "name": "Дуга в 3 точки",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.arcTTR",
+        "name": "Дуга TTR",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.bezier",
+        "name": "Кривая Безье",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.box",
+        "name": "Параллелепипед",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.circle",
+        "name": "Окружность",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.cone",
+        "name": "Конус",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.copyShape",
+        "name": "Копировать фигуру",
+        "tab": "Прямое моделирование",
+        "group": "Инструменты"
+    },
+    {
+        "key": "create.cylinder",
+        "name": "Цилиндр",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.ellipse",
+        "name": "Эллипс",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.ellipsoid",
+        "name": "Эллипсоид"
+    },
+    {
+        "key": "create.extrude",
+        "name": "Выдавливание",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.folder",
+        "name": "Папка"
+    },
+    {
+        "key": "create.gordon",
+        "name": "Gordon Surface",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.group",
+        "name": "Группа",
+        "tab": "Прямое моделирование",
+        "group": "Инструменты"
+    },
+    {
+        "key": "create.helix",
+        "name": "Спираль",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.line",
+        "name": "Линия",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.loft",
+        "name": "Лофт",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.offset",
+        "name": "Смещение",
+        "tab": "Прямое моделирование",
+        "group": "Инструменты"
+    },
+    {
+        "key": "create.pipe",
+        "name": "Труба",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.point",
+        "name": "Точка",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.polygon",
+        "name": "Многоугольник",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.pyramid",
+        "name": "Пирамида",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.rect",
+        "name": "Прямоугольник",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.refSegment",
+        "name": "Сегмент"
+    },
+    {
+        "key": "create.regularPolygon",
+        "name": "Правильный многоугольник",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.revol",
+        "name": "Вращение",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.section",
+        "name": "Сечение",
+        "tab": "Прямое моделирование",
+        "group": "Инструменты"
+    },
+    {
+        "key": "create.sphere",
+        "name": "Сфера",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.sweep",
+        "name": "Сдвиг",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.text",
+        "name": "Text",
+        "tab": "Прямое моделирование",
+        "group": "Рисование"
+    },
+    {
+        "key": "create.thickSolid",
+        "name": "Толстостенное тело"
+    },
+    {
+        "key": "dimension",
+        "name": "Размер",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "dimension.angle",
+        "name": "Угол",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "dimension.distance",
+        "name": "Расстояние",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "dimension.horizontalDistance",
+        "name": "Горизонтальное расстояние",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "dimension.pointLineDistance",
+        "name": "Расстояние точка-линия",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "dimension.radius",
+        "name": "Радиус",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "dimension.verticalDistance",
+        "name": "Вертикальное расстояние",
+        "tab": "Эскиз",
+        "group": "Зависимости"
+    },
+    {
+        "key": "doc.new",
+        "name": "Новый документ"
+    },
+    {
+        "key": "doc.open",
+        "name": "Открыть документ"
+    },
+    {
+        "key": "doc.save",
+        "name": "Сохранить документ"
+    },
+    {
+        "key": "doc.saveToFile",
+        "name": "Сохранить в файл"
+    },
+    {
+        "key": "drawing.create",
+        "name": "Создать чертёж",
+        "tab": "Чертёж",
+        "group": "Чертёж"
+    },
+    {
+        "key": "drawing.createEmpty",
+        "name": "Пустой чертёж",
+        "tab": "Чертёж",
+        "group": "Чертёж"
+    },
+    {
+        "key": "drawing.open",
+        "name": "Открыть чертёж",
+        "tab": "Чертёж",
+        "group": "Чертёж"
+    },
+    {
+        "key": "edit.redo",
+        "name": "Повторить"
+    },
+    {
+        "key": "edit.undo",
+        "name": "Отменить"
+    },
+    {
+        "key": "feature.axis",
+        "name": "Ось",
+        "tab": "Тело",
+        "group": "Построение"
+    },
+    {
+        "key": "feature.chamfer",
+        "name": "Фаска",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.common",
+        "name": "Пересечение",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.cut",
+        "name": "Вычесть",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.draft",
+        "name": "Уклон",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.extrude",
+        "name": "Выдавливание",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.fillet",
+        "name": "Скругление",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.fuse",
+        "name": "Объединить",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.helix",
+        "name": "Спираль",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.hole",
+        "name": "Отверстие",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.loft",
+        "name": "Лофт",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.mirror",
+        "name": "Зеркало",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.modifyChamfer",
+        "name": "Modify Chamfer",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.modifyFillet",
+        "name": "Modify Fillet",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.offsetFace",
+        "name": "Смещение грани",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.patternCircular",
+        "name": "Круговой массив",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.patternCurve",
+        "name": "Массив по кривой",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.patternLinear",
+        "name": "Линейный массив",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.plane",
+        "name": "Плоскость",
+        "tab": "Тело",
+        "group": "Построение"
+    },
+    {
+        "key": "feature.point",
+        "name": "Точка",
+        "tab": "Тело",
+        "group": "Построение"
+    },
+    {
+        "key": "feature.pressPull",
+        "name": "Вдавить/вытянуть",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.primitiveBox",
+        "name": "Параллелепипед",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.primitiveCone",
+        "name": "Конус",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.primitiveCylinder",
+        "name": "Цилиндр",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.primitiveSphere",
+        "name": "Сфера",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.removeFeature",
+        "name": "Удалить элемент",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.reselect",
+        "name": "Выбрать повторно"
+    },
+    {
+        "key": "feature.revolve",
+        "name": "Вращение",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.rib",
+        "name": "Rib",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.sew",
+        "name": "Сшить"
+    },
+    {
+        "key": "feature.shell",
+        "name": "Оболочка",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.split",
+        "name": "Разделить",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "feature.sweep",
+        "name": "Сдвиг",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.thicken",
+        "name": "Утолщение",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.thread",
+        "name": "Резьба",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "feature.transform",
+        "name": "Transform"
+    },
+    {
+        "key": "feature.variable",
+        "name": "Изменить параметры",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "file.export",
+        "name": "Экспорт",
+        "tab": "Тело",
+        "group": "Вставка"
+    },
+    {
+        "key": "file.import",
+        "name": "Импорт",
+        "tab": "Тело",
+        "group": "Вставка"
+    },
+    {
+        "key": "inspect.interference",
+        "name": "Пересечения тел",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "inspect.massProperties",
+        "name": "Массовые свойства",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "inspect.section",
+        "name": "Анализ сечения",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "measure.length",
+        "name": "Длина",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "measure.select",
+        "name": "Измерить выбранное",
+        "tab": "Тело",
+        "group": "Анализ"
+    },
+    {
+        "key": "modify.align",
+        "name": "Выровнять",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "modify.array",
+        "name": "Массив",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "modify.break",
+        "name": "Разбить",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.brushAdd",
+        "name": "Добавить шаблон",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.brushClear",
+        "name": "Очистить шаблон",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.brushRemove",
+        "name": "Удалить шаблон",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.chamfer",
+        "name": "Фаска",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.checkShape",
+        "name": "Проверить фигуру",
+        "tab": "Прямое моделирование",
+        "group": "Инструменты"
+    },
+    {
+        "key": "modify.deleteNode",
+        "name": "Удалить узел",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.detach",
+        "name": "Detach",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "modify.explode",
+        "name": "Разбить на части",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.extend",
+        "name": "Extend",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.fillet",
+        "name": "Скругление",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.makeEditable",
+        "name": "Сделать редактируемым",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.mirror",
+        "name": "Отразить",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "modify.move",
+        "name": "Переместить",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "modify.moveCopy",
+        "name": "Переместить/Копировать",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "modify.paintBucket",
+        "name": "Внешний вид",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.recoverCylinders",
+        "name": "Распознать цилиндры",
+        "tab": "Тело",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.removeFeature",
+        "name": "Удалить функцию",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.removeShapes",
+        "name": "Удалить фигуры",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.repairShape",
+        "name": "Исправить фигуру",
+        "tab": "Прямое моделирование",
+        "group": "Инструменты"
+    },
+    {
+        "key": "modify.rotate",
+        "name": "Повернуть",
+        "tab": "Тело",
+        "group": "Сборка"
+    },
+    {
+        "key": "modify.sew",
+        "name": "Прошить",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.shell",
+        "name": "Оболочка",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.simplifyShape",
+        "name": "Упростить",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.split",
+        "name": "Разделить",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "modify.trim",
+        "name": "Обрезать",
+        "tab": "Прямое моделирование",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.arc",
+        "name": "Дуга",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.array",
+        "name": "Массив",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.bezier",
+        "name": "Безье",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.break",
+        "name": "Разбить",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.chamfer",
+        "name": "Фаска",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.circle",
+        "name": "Окружность",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.conic",
+        "name": "Коника",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.constraints",
+        "name": "Список зависимостей",
+        "tab": "Эскиз",
+        "group": "Анализ"
+    },
+    {
+        "key": "sketch.create",
+        "name": "Новый эскиз",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.ellipse",
+        "name": "Эллипс",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.ellipseArc",
+        "name": "Дуга эллипса",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.enter",
+        "name": "Редактировать эскиз",
+        "tab": "Тело",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.exit",
+        "name": "Завершить эскиз",
+        "tab": "Эскиз",
+        "group": "Завершить эскиз"
+    },
+    {
+        "key": "sketch.extend",
+        "name": "Удлинить",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.fillet",
+        "name": "Скругление",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.line",
+        "name": "Линия",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.mirror",
+        "name": "Зеркало",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.nurbs",
+        "name": "Сплайн",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.offset",
+        "name": "Смещение",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.point",
+        "name": "Точка",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.polygon",
+        "name": "Многоугольник",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.projectEdges",
+        "name": "Проецировать кромки",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.rectangle",
+        "name": "Прямоугольник",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.text",
+        "name": "Текст",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.toggleConstruction",
+        "name": "Переключить построение",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.toggleExternal",
+        "name": "Переключить роль ссылки",
+        "tab": "Эскиз",
+        "group": "Создать"
+    },
+    {
+        "key": "sketch.transform",
+        "name": "Преобразовать",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "sketch.trim",
+        "name": "Обрезать",
+        "tab": "Эскиз",
+        "group": "Изменить"
+    },
+    {
+        "key": "special.last",
+        "name": "Повторить последнюю команду"
+    },
+    {
+        "key": "workingPlane.alignToPlane",
+        "name": "Рабочая плоскость по плоскости",
+        "tab": "Тело",
+        "group": "Построение"
+    },
+    {
+        "key": "workingPlane.fromSection",
+        "name": "Рабочая плоскость по сечению",
+        "tab": "Тело",
+        "group": "Построение"
+    },
+    {
+        "key": "workingPlane.set",
+        "name": "Задать рабочую плоскость",
+        "tab": "Тело",
+        "group": "Построение"
+    },
+    {
+        "key": "workingPlane.toggleDynamic",
+        "name": "Динамическая рабочая плоскость",
+        "tab": "Тело",
+        "group": "Построение"
+    }
+]

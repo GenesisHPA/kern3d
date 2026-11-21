@@ -7,7 +7,8 @@ import packages from "./package.json" with { type: "json" };
 const configDir = import.meta.dirname;
 
 export default defineConfig({
-    exclude: ["**/cpp/**"],
+    // bot/ has its own node:test suite (node --test "bot/test/*.test.mjs").
+    exclude: ["**/cpp/**", "**/bot/**"],
     coverage: {
         exclude: ["**/wasm/lib/**", "**/test-utils/**"],
     },
