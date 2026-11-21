@@ -174,10 +174,15 @@ export function rebuildPart(
         const tb = Date.now();
         const model = buildModel(document, plans, name, tol, reference);
         const shape = bodyShape(model);
-        const failed = failedFeature(model) ?? (soundBody(shape, partSolids) ? undefined : "unsound body");
-        REBUILD_DEBUG?.(`axis ${axisName}: build ${Date.now() - tb} ms${failed ? ` failed: ${failed}` : ""}`);
+        const failed = failedFeature(model);
+        // an unsound body is still a result (the mesh pieces' sewn faces often fail the strict
+        // check); it only takes no more booleans — corrections and rounds are for sound ones
+        const sound = soundBody(shape, partSolids);
+        REBUILD_DEBUG?.(
+            `axis ${axisName}: build ${Date.now() - tb} ms${failed ? ` failed: ${failed}` : ""}${sound ? "" : " (unsound)"}`,
+        );
         if (failed !== undefined || shape === undefined)
-            return { model, ratio: 1, rounded: 0, plans, frame, error: failed ?? "no shape" };
+            return { model, ratio: 1, rounded: 0, plans, frame, sound, error: failed ?? "no shape" };
         // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
         const tm = Date.now();
         let ratio = measure(referenceMesh, shape);
@@ -185,7 +190,8 @@ export function rebuildPart(
         let rounded = 0;
         const tt = Date.now();
         for (const treatment of treatments) {
-            if (!inTime()) break;
+            if (!inTime() || !sound) break;
+            REBUILD_DEBUG?.(`treatment ${treatment.kind} ${treatment.size.toFixed(3)}`);
             const before = model.body.features;
             if (!appendTreatment(model, treatment, tol)) continue;
             const treated = bodyShape(model);
@@ -201,7 +207,7 @@ export function rebuildPart(
             REBUILD_DEBUG?.(
                 `axis ${axisName}: ${rounded}/${treatments.length} treatments kept, ${Date.now() - tt} ms`,
             );
-        return { model, ratio, rounded, plans, frame, error: undefined as string | undefined };
+        return { model, ratio, rounded, plans, frame, sound, error: undefined as string | undefined };
     };
     const discard = (model: BuiltModel) => {
         for (const n of [model.body, ...model.sketches]) n.parent?.remove(n);
@@ -214,9 +220,12 @@ export function rebuildPart(
         if (best !== undefined && best.error === undefined && !inTime()) break;
         const next = attempt(frame);
         if (next === undefined) continue;
+        // a sound body before an unsound one, then the closer
+        const rank = (x: NonNullable<typeof best>) => (x.error !== undefined ? 2 : x.sound ? 0 : 1);
         if (
             best === undefined ||
-            (next.error === undefined && (best.error !== undefined || next.ratio < best.ratio))
+            rank(next) < rank(best) ||
+            (rank(next) === rank(best) && next.error === undefined && next.ratio < best.ratio)
         ) {
             if (best !== undefined) discard(best.model);
             best = next;
@@ -245,8 +254,9 @@ export function rebuildPart(
     let ratio = firstRatio;
     let corrections = 0;
     const refVolume = solidVolume(reference);
-    const corrective = referenceFaces <= MAX_DIFFERENCE_FACES;
-    if (!corrective) REBUILD_DEBUG?.(`corrections skipped: ${referenceFaces} faces`);
+    const corrective = referenceFaces <= MAX_DIFFERENCE_FACES && best.sound;
+    if (!corrective)
+        REBUILD_DEBUG?.(`corrections skipped: ${best.sound ? `${referenceFaces} faces` : "unsound body"}`);
     for (
         let pass = 0;
         corrective && pass < (options.passes ?? 2) && ratio > goal && Date.now() < deadline;

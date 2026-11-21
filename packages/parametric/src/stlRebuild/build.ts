@@ -117,6 +117,10 @@ export function buildModel(
     for (const plan of plans) {
         if (plan.fromMesh && reference !== undefined && appendMeshPiece(model, plan, reference)) continue;
         appendExtrude(model, document, plan, tol);
+        // meshed feature by feature: each step triangulates only its new faces, the rest kept
+        // from the step before — meshing the finished body in one go aborted the kernel on
+        // extruder-idler (a valid B-rep), meshing it as it grew did not
+        if (body.shape.isOk) void body.shape.value.mesh;
         const failed = !body.shape.isOk || body.featureItems().at(-1)?.error !== undefined;
         if (!failed || plan.draft === undefined) continue;
         removeLast(model);
