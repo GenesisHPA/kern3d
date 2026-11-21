@@ -1530,6 +1530,7 @@ export default {
         "laser.shape.toCurves.hint":
             "The object becomes plain outlines: the figure's parameters can no longer be changed",
         "laser.shape.font": "Font",
+        "laser.shape.font.stroke": "Single-line (engraving)",
         "laser.shape.font.standard": "Standard",
         "laser.shape.font.installed": "Installed",
         "laser.shape.font.webGroup": "From the internet",

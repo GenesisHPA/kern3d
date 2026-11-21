@@ -1514,6 +1514,9 @@ ${t(hint)}`;
             this.render();
             return;
         }
+        // single-line letters are open strokes: traced, never filled
+        if (o.shape.type === "text" && o.shape.font.stroke !== undefined && o.op.mode === "fill")
+            o.op.mode = "line";
         this.commit();
         this.render();
     }

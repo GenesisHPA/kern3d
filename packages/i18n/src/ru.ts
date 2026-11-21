@@ -1363,6 +1363,7 @@ export default {
         "laser.shape.toCurves": "Преобразовать в кривые",
         "laser.shape.toCurves.hint": "Объект станет обычными контурами: параметры фигуры больше не правятся",
         "laser.shape.font": "Шрифт",
+        "laser.shape.font.stroke": "Однолинейные (гравировка)",
         "laser.shape.font.standard": "Стандартные",
         "laser.shape.font.installed": "Установленные",
         "laser.shape.font.webGroup": "Из интернета",

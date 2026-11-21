@@ -7,6 +7,7 @@ import { QR_LEVELS } from "./barcodes";
 import { arcSegments, ellipsePath, flattenCubic, flattenQuadratic } from "./flatten";
 import { type LaserPath, type Pt, pathsBounds } from "./geometry";
 import { flattenSubPaths, parseSubPaths, type SubPath } from "./pathShape";
+import { isStrokeFont } from "./strokeFonts";
 
 /**
  * The parametric figures the laser editor draws (as EzCAD and LightBurn do): a polyline, a
@@ -30,6 +31,8 @@ export interface LaserFontRef {
     local?: boolean;
     /** Installed in Windows, read by the desktop app from its font folder. */
     system?: boolean;
+    /** A single-line (engraving) font bundled with the app, by its id (strokeFonts.ts). */
+    stroke?: string;
 }
 
 export type LaserShape =
@@ -270,6 +273,8 @@ function onArc(dx: number, y: number, along: number, r: number): Pt {
 }
 
 function layout(line: string, font: FontOutline, scale: number, spacing: number) {
+    // a single-line font's contours are strokes, traced open; an outline font's are closed
+    const open = isStrokeFont(font);
     const glyphs: GlyphRun[] = [];
     let pen = 0;
     let count = 0;
@@ -292,7 +297,15 @@ function layout(line: string, font: FontOutline, scale: number, spacing: number)
                 current = to;
             }
             const clean = dropRepeats(points);
-            if (clean.length >= 3) paths.push({ closed: true, points: clean });
+            if (open) {
+                // a stroke that comes back to its start (an O) is a loop: closed, its last
+                // segment kept by the closing; any other stroke stays open, end to end
+                const first = points[0];
+                const end = points[points.length - 1];
+                const loop = clean.length >= 3 && Math.hypot(first.x - end.x, first.y - end.y) <= 1e-9;
+                if (loop) paths.push({ closed: true, points: clean });
+                else if (clean.length >= 2) paths.push({ closed: false, points: clean });
+            } else if (clean.length >= 3) paths.push({ closed: true, points: clean });
         }
         glyphs.push({ paths, offset: pen, advance });
         pen += advance;
@@ -365,6 +378,8 @@ export function parseShape(raw: any): LaserShape | undefined {
                     family: typeof font.family === "string" ? font.family : "Roboto",
                     url: typeof font.url === "string" ? font.url : undefined,
                     local: font.local === true ? true : undefined,
+                    system: font.system === true ? true : undefined,
+                    stroke: typeof font.stroke === "string" ? font.stroke : undefined,
                 },
                 size: Math.max(num(raw.size, 10), 0.1),
                 letterSpacing: num(raw.letterSpacing, 0),

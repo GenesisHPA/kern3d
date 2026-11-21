@@ -19,6 +19,7 @@ import {
     isStandardFont,
     localFontFamilies,
     localFontsAvailable,
+    strokeFonts,
     systemFonts,
     systemFontsAvailable,
 } from "./laserFonts";
@@ -539,6 +540,7 @@ export class LaserJobPanel {
         }
         const system = systemFamilies ?? [];
         const groups: { label: string; fonts: LaserFontRef[] }[] = [
+            { label: t("laser.shape.font.stroke"), fonts: strokeFonts() },
             { label: t("laser.shape.font.standard"), fonts: system.filter((f) => isStandardFont(f.family)) },
             {
                 label: t("laser.shape.font.installed"),
@@ -547,7 +549,10 @@ export class LaserJobPanel {
             { label: t("laser.shape.font.installed"), fonts: localFamilies ?? [] },
             { label: t("laser.shape.font.webGroup"), fonts: catalogFonts() },
         ].filter((g) => g.fonts.length > 0);
-        const keyOf = (f: LaserFontRef) => `${f.system ? "system" : f.local ? "local" : "web"}:${f.family}`;
+        const keyOf = (f: LaserFontRef) =>
+            f.stroke !== undefined
+                ? `stroke:${f.stroke}`
+                : `${f.system ? "system" : f.local ? "local" : "web"}:${f.family}`;
         const all = groups.flatMap((g) => g.fonts);
         if (!all.some((f) => keyOf(f) === keyOf(shape.font))) {
             groups.unshift({ label: t("laser.shape.font.current"), fonts: [shape.font] });
@@ -620,7 +625,15 @@ export class LaserJobPanel {
     private operationSection(o: LaserObject): HTMLElement[] {
         const op = o.op;
         const edit = (f: (op: LaserOperation) => void) => this.host.editSelected((x) => f(x.op));
-        const modes = o.kind === "image" ? (["image"] as const) : (["line", "fill"] as const);
+        // a single-line font's strokes are traced; there is no inside to fill
+        const strokeText =
+            o.kind === "vector" && o.shape?.type === "text" && o.shape.font.stroke !== undefined;
+        const modes =
+            o.kind === "image"
+                ? (["image"] as const)
+                : strokeText
+                  ? (["line"] as const)
+                  : (["line", "fill"] as const);
         const rows: HTMLElement[] = [
             heading("laser.operation"),
             row(

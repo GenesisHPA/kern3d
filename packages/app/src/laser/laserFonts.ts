@@ -13,6 +13,7 @@ import {
     rememberOutline,
 } from "@chili3d/core";
 import type { LaserFontRef } from "./shapes";
+import { loadStrokeFont, STROKE_FONTS } from "./strokeFonts";
 
 /**
  * The fonts a laser text can be set in: the app's catalogue (open fonts fetched once a session)
@@ -128,6 +129,7 @@ function regularFace(entries: LocalFontEntry[], family: string): LocalFontEntry 
 
 /** The font's outlines: from this session's memory, the catalogue's address or the system. */
 export async function loadLaserFont(ref: LaserFontRef): Promise<FontOutline | undefined> {
+    if (ref.stroke !== undefined) return loadStrokeFont(ref.stroke);
     if (ref.system) {
         const known = cachedOutline(ref.family, SYSTEM_URL);
         if (known !== undefined) return known;
@@ -163,4 +165,9 @@ export async function loadLaserFont(ref: LaserFontRef): Promise<FontOutline | un
     const url = ref.url ?? FontCatalog.find((f) => f.family === ref.family)?.url ?? "";
     const result = await outlineFor(ref.family, url);
     return result.isOk ? result.value : undefined;
+}
+
+/** The bundled single-line (engraving) fonts, as the font menu lists them. */
+export function strokeFonts(): LaserFontRef[] {
+    return STROKE_FONTS.map((f) => ({ family: f.family, stroke: f.id }));
 }

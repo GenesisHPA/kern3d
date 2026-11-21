@@ -1453,6 +1453,7 @@ export const I18N_KEYS = [
     "laser.shape.toCurves",
     "laser.shape.toCurves.hint",
     "laser.shape.font",
+    "laser.shape.font.stroke",
     "laser.shape.font.standard",
     "laser.shape.font.installed",
     "laser.shape.font.webGroup",
