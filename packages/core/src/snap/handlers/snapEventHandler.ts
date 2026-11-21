@@ -4,7 +4,7 @@
 import { Config, VisualConfig } from "../../config";
 import type { IDocument } from "../../document";
 import { type AsyncController, type MessageType, Precision, PubSub, Result } from "../../foundation";
-import type { I18nKeys } from "../../i18n";
+import { I18n, type I18nKeys } from "../../i18n";
 import type { XYZ } from "../../math";
 import { NOT_REFERENCE_GEOMETRY_FILTER } from "../../selectionFilter";
 import { MeshDataUtils, type ShapeType, ShapeTypes } from "../../shape";
@@ -207,7 +207,7 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
 
     protected formatSnapPrompt(
         snaped: SnapResult,
-    ): HTMLElement | { level: MessageType; msg: string } | undefined {
+    ): HTMLElement | { level: MessageType; msg: string; hint?: string } | undefined {
         let prompt = this.data.prompt?.(snaped);
         if (!prompt) {
             const distance = snaped.distance ?? snaped.refPoint?.distanceTo(snaped.point!);
@@ -223,6 +223,8 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
         return {
             level: "info",
             msg: [snaped.info, prompt].filter((x) => x !== undefined).join(" -> "),
+            // A measured value can be typed instead of picked: say so, the box opens only on a key.
+            ...(prompt ? { hint: I18n.translate("prompt.typeValue") } : {}),
         };
     }
 

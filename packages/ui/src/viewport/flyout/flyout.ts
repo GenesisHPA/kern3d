@@ -33,18 +33,18 @@ export class Flyout extends HTMLElement {
         PubSub.default.remove("clearInput", this.clearInput);
     }
 
-    private readonly showTip = (dom: HTMLElement | { level: MessageType; msg: string }) => {
+    private readonly showTip = (dom: HTMLElement | { level: MessageType; msg: string; hint?: string }) => {
         if (dom instanceof HTMLElement) {
             this._tip?.remove();
 
             this._tip = dom;
             this.append(this._tip);
         } else if (this._tip instanceof Tip) {
-            this._tip.set(dom.msg, dom.level);
+            this._tip.set(dom.msg, dom.level, dom.hint);
         } else {
             this._tip?.remove();
 
-            this._tip = new Tip(dom.msg, dom.level);
+            this._tip = new Tip(dom.msg, dom.level, dom.hint);
             this.append(this._tip);
         }
     };

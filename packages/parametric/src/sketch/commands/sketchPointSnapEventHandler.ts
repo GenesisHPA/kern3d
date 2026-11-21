@@ -83,7 +83,7 @@ export class SketchPointSnapEventHandler extends PointSnapEventHandler {
 
     protected override formatSnapPrompt(
         snaped: SnapResult,
-    ): HTMLElement | { level: MessageType; msg: string } | undefined {
+    ): HTMLElement | { level: MessageType; msg: string; hint?: string } | undefined {
         const icon = this.sketchSnapIcon();
         return icon ?? super.formatSnapPrompt(snaped);
     }

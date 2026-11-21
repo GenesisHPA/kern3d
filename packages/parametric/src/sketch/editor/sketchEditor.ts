@@ -37,6 +37,7 @@ import {
     MAX_ARRAY_COUNT,
     withField,
 } from "../arrayOps";
+import { dimensionForSize, type EntitySize, entitySize, isValidSize } from "../entitySize";
 import type { SketchPreviewAt } from "../previewTypes";
 import { displaySketchError } from "../sketchError";
 import {
@@ -59,6 +60,7 @@ import * as datumPrompt from "./datumPrompt";
 import { type DimensionAnchor, datumReading } from "./dimensionLayout";
 import { SketchAnnotationManager } from "./sketchAnnotations";
 import { SketchConstraintsPanel } from "./sketchConstraintsPanel";
+import { SketchEntityPanel } from "./sketchEntityPanel";
 import { SketchEventHandler } from "./sketchEventHandler";
 import { promptSketchText, type SketchTextEdit } from "./sketchTextPrompt";
 
@@ -213,6 +215,9 @@ export class SketchEditor implements IDisposable {
     /** The entity set currently pushed to the node's constraint colouring — see `publishConstraintColors`. */
     private colouring: ReadonlySet<number> | undefined;
     private constraintsPanel?: SketchConstraintsPanel;
+    private entityPanel?: SketchEntityPanel;
+    /** The entity whose size the panel shows, re-read after every solve. */
+    private sizedEntity: number | undefined;
 
     /**
      * At most one sketch is edited at a time (`enter` exits any previous session),
@@ -944,6 +949,7 @@ export class SketchEditor implements IDisposable {
         this.annotations.refresh();
         this.publishSolveStatus();
         this.constraintsPanel?.refresh();
+        if (this.sizedEntity !== undefined) this.entityPanel?.show(entitySize(this.solver, this.sizedEntity));
         return outcome;
     }
 
@@ -1363,6 +1369,9 @@ export class SketchEditor implements IDisposable {
 
     private teardownSession(): void {
         this.closeConstraintsPanel();
+        this.entityPanel?.dispose();
+        this.entityPanel = undefined;
+        this.sizedEntity = undefined;
         this.document.variables.removePropertyChanged(this.handleVariablesChanged);
         this.eventHandler.dispose();
         this.annotations.dispose();
@@ -1471,6 +1480,57 @@ export class SketchEditor implements IDisposable {
      */
     get fullyConstrained(): ReadonlySet<number> | undefined {
         return this.colouring;
+    }
+
+    /**
+     * The size panel for the selection: shown for one circle, arc or line, hidden otherwise
+     * (the sketch handler calls this whenever its selection changes).
+     */
+    showEntitySize(entityIds: readonly number[]): void {
+        if (this.disposed) return;
+        const size = entityIds.length === 1 ? entitySize(this.solver, entityIds[0]) : undefined;
+        this.sizedEntity = size?.entityId;
+        if (size === undefined) {
+            this.entityPanel?.show(undefined);
+            return;
+        }
+        if (this.entityPanel === undefined) {
+            const host = this.view.dom;
+            if (host === undefined) return;
+            this.entityPanel = new SketchEntityPanel((target, value) => this.applyEntitySize(target, value));
+            host.append(this.entityPanel.element);
+        }
+        this.entityPanel.show(size);
+    }
+
+    /**
+     * Writes a size typed into the panel: into the dimension already on it, or a new driving
+     * one (a circle's reads Ø). A new one the sketch already fixes by other constraints is taken
+     * back with a message rather than left as a reference the user did not ask for.
+     */
+    applyEntitySize(size: EntitySize, value: ParameterValue): void {
+        if (this.disposed) return;
+        if (size.driven === true) {
+            PubSub.default.pub("showToast", "sketch.drivenNotEditable");
+            return;
+        }
+        if (!isValidSize(value)) {
+            PubSub.default.pub("showToast", "sketch.size.invalid");
+            return;
+        }
+        const target = dimensionForSize(this.solver, size);
+        if (target === undefined) return;
+        if (target.added) {
+            this.solve(true);
+            if (this.diagnostics.redundant.includes(target.constraintId)) {
+                this.solver.removeConstraint(target.constraintId);
+                this.solve(true);
+                PubSub.default.pub("showToast", "sketch.size.fixedByConstraints");
+                return;
+            }
+        }
+        this.writeDatum(target.constraintId, value);
+        this.applyDatum();
     }
 
     toggleConstraintsPanel(): void {

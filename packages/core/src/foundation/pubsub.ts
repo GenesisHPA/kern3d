@@ -77,7 +77,8 @@ export interface PubSubEventMap {
     showConfirmControl: (controller: AsyncController) => void;
     showDialog: (title: I18nKeys, content: HTMLElement, buttons?: DialogButton[] | (() => void)) => void;
     showFloatPanel: (options: FloatPanelOptions) => void;
-    showFloatTip: (dom: HTMLElement | { level: MessageType; msg: string }) => void;
+    /** `hint` is a second, smaller line (e.g. that the value can be typed). */
+    showFloatTip: (dom: HTMLElement | { level: MessageType; msg: string; hint?: string }) => void;
     /**
      * Puts up the floating input. See `ShowInputOptions` for how the box opens; without any,
      * it takes the focus with its text as typed into.

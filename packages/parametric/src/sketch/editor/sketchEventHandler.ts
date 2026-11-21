@@ -1257,6 +1257,7 @@ export class SketchEventHandler implements IEventHandler {
 
     private updateSelectionHighlight(view: IView): void {
         this.clearSelectionHighlight(view);
+        this.editor.showEntitySize([...this.selectedEntities]);
         if (this.selectedEntities.size === 0) {
             this.syncAnnotationHighlights();
             return;
@@ -1274,6 +1275,7 @@ export class SketchEventHandler implements IEventHandler {
         if (this.selectedEntities.size === 0) return;
         this.selectedEntities.clear();
         this.clearSelectionHighlight(view);
+        this.editor.showEntitySize([]);
         this.syncAnnotationHighlights();
         view.update();
     }
