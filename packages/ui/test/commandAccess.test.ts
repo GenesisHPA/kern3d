@@ -213,6 +213,7 @@ describe("NavigationBar", () => {
         const camera = {
             cameraType: "perspective",
             rotate: rs.fn((_dx: number, _dy: number) => {}),
+            startRotate: rs.fn((_x: number, _y: number) => {}),
             pan: rs.fn((_dx: number, _dy: number) => {}),
             zoom: rs.fn((_x: number, _y: number, _delta: number) => {}),
             fitContent: rs.fn(),
@@ -233,10 +234,26 @@ describe("NavigationBar", () => {
         window.dispatchEvent(new PointerEvent("pointermove", { clientX: 13, clientY: 15 }));
         window.dispatchEvent(new PointerEvent("pointerup", { clientX: 13, clientY: 15 }));
         expect(camera.rotate.mock.calls).toEqual([[12, 20]]);
+        // The orbit pivots about the model point under the cursor where the drag began.
+        expect(camera.startRotate.mock.calls).toEqual([[10, 10]]);
 
         bar.setMode("pan");
         bar.applyDrag(2, 3);
         expect(camera.pan.mock.calls).toEqual([[2, 3]]);
+    });
+
+    test("starting a command leaves the drag mode", () => {
+        const { bar } = makeBar();
+        bar.setMode("orbit");
+        PubSub.default.pub("executeCommand", "create.box" as never);
+        expect(bar.activeMode).toBeUndefined();
+    });
+
+    test("the orbit tip names the mouse gesture of the active profile", () => {
+        const { bar } = makeBar();
+        const tip = (bar.querySelector('[data-nav="orbit"]') as HTMLElement).title;
+        // The tool's tip, then the gesture line ("Shift + wheel" in the default profile).
+        expect(tip.split(String.fromCharCode(10))).toHaveLength(2);
     });
 
     test("Escape leaves the drag mode, and the canvas is the view's again", () => {

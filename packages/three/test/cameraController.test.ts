@@ -4,6 +4,7 @@
 import { Config, type IDocument, type OrbitMode } from "@chili3d/core";
 import { createMockSelection } from "@chili3d/core/test-utils";
 import {
+    BoxGeometry,
     BufferAttribute,
     BufferGeometry,
     Mesh,
@@ -285,40 +286,35 @@ describe("CameraController — startRotate", () => {
         expect(cc.target.z).toBeCloseTo(0);
     });
 
-    test("selected geometry ignores invalid children when choosing the rotate center", () => {
-        const shape = new Object3D();
-        const validGeometry = new BufferGeometry();
-        validGeometry.setAttribute(
-            "position",
-            new BufferAttribute(new Float32Array([10, 10, 10, 20, 20, 20]), 3),
-        );
-        const invalidGeometry = new BufferGeometry();
-        invalidGeometry.setAttribute("position", new BufferAttribute(new Float32Array([0, 0, 0]), 3));
-        invalidGeometry.computeBoundingBox();
-        invalidGeometry.boundingBox!.min.set(Number.NaN, Number.NaN, Number.NaN);
-        invalidGeometry.boundingBox!.max.set(Number.NaN, Number.NaN, Number.NaN);
-        shape.add(new Mesh(validGeometry, new MeshBasicMaterial()));
-        shape.add(new Mesh(invalidGeometry, new MeshBasicMaterial()));
-
+    test("the pivot is the model point under the cursor, whatever is selected", () => {
+        const visualShapes = new Object3D();
+        visualShapes.add(new Mesh(new BoxGeometry(10, 10, 10), new MeshBasicMaterial()));
+        visualShapes.updateMatrixWorld(true);
         const node = {};
         const selection = { ...createMockSelection(), getSelectedNodes: () => [node] };
         const document = {
             selection,
-            visual: { context: { getVisual: () => shape } },
+            visual: { context: { getVisual: () => new Object3D() } },
         } as unknown as IDocument;
-        const cc = new CameraController(createFakeView({ document }));
+        const cc = new CameraController(
+            createFakeView({ document, content: { visualShapes } as unknown as ThreeVisualContext }),
+        );
 
+        cc.lookAt({ x: 0, y: -100, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
+        cc.camera.updateMatrixWorld(true);
         cc.startRotate(0, 0);
-        expect((cc as any)._rotateCenter.toArray()).toEqual([15, 15, 15]);
+        const pivot: Vector3 = (cc as any)._rotateCenter;
+        expect(pivot).toBeDefined();
+        // On the box's surface, facing the camera: between the face distance and the corner's.
+        const fromCentre = pivot.length();
+        expect(fromCentre).toBeGreaterThanOrEqual(5 - 1e-6);
+        expect(fromCentre).toBeLessThanOrEqual(Math.sqrt(75) + 1e-6);
         cc.rotate(20, 10);
         expect([...cc.cameraPosition.toArray(), ...cc.target.toArray()].every(Number.isFinite)).toBe(true);
     });
 
-    test("detected geometry without a valid box leaves the camera finite", () => {
+    test("over empty space the orbit keeps the view's own target", () => {
         const visual = new ThreeMeshObject(createThreeMockVisualContext(), createTestMeshNode());
-        const geometry = (visual.mesh as Mesh).geometry;
-        geometry.boundingBox!.min.set(Number.NaN, Number.NaN, Number.NaN);
-        geometry.boundingBox!.max.set(Number.NaN, Number.NaN, Number.NaN);
         const view = createFakeView({ detectVisual: () => [visual] });
         const cc = new CameraController(view);
 

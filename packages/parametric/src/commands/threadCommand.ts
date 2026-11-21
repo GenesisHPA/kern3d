@@ -117,6 +117,15 @@ export class ThreadFeatureCommand extends MultistepCommand {
         this.setProperty("flip", value, () => this.updatePreview());
     }
 
+    /** Left-hand thread (counter-clockwise rising). */
+    @property("feature.thread.leftHand")
+    get leftHand(): boolean {
+        return this.getPrivateValue("leftHand", false);
+    }
+    set leftHand(value: boolean) {
+        this.setProperty("leftHand", value, () => this.updatePreview());
+    }
+
     /** Radial play for a printed fit (0 = the basic profile). */
     @property("feature.thread.clearance", { unit: LENGTH_UNITS })
     get clearance(): ParameterValue {
@@ -170,6 +179,7 @@ export class ThreadFeatureCommand extends MultistepCommand {
             ...(this.length === "" ? {} : { length: this.length }),
             ...(this.offset === 0 || this.offset === "" ? {} : { offset: this.offset }),
             ...(this.flip ? { flip: true } : {}),
+            ...(this.leftHand ? { leftHand: true } : {}),
             ...(this.clearance === 0 || this.clearance === "" ? {} : { clearance: this.clearance }),
         };
     }

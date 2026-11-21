@@ -65,6 +65,7 @@ const threadHandler: FeatureHandler<ThreadFeatureData> = {
         { key: "length", display: "feature.thread.length", value: feature.length ?? "", unit: LENGTH_UNITS },
         { key: "offset", display: "feature.thread.offset", value: feature.offset ?? 0, unit: LENGTH_UNITS },
         { key: "flip", display: "feature.thread.flip", value: feature.flip === true },
+        { key: "leftHand", display: "feature.thread.leftHand", value: feature.leftHand === true },
         {
             key: "clearance",
             display: "feature.thread.clearance",
@@ -75,7 +76,7 @@ const threadHandler: FeatureHandler<ThreadFeatureData> = {
 
     setParameter: (feature, key, value) => {
         if (key === "size") return typeof value === "string" ? applySize(feature, value) : feature;
-        if (key === "modeled" || key === "flip") {
+        if (key === "modeled" || key === "flip" || key === "leftHand") {
             return typeof value === "boolean" ? { ...feature, [key]: value } : feature;
         }
         if (typeof value === "boolean") return feature;
@@ -119,7 +120,7 @@ function applySize(feature: ThreadFeatureData, size: string): ThreadFeatureData 
 /** The fields a thread's geometry is built from. */
 export type ThreadSpecFields = Pick<
     ThreadFeatureData,
-    "form" | "diameter" | "pitch" | "length" | "offset" | "flip" | "clearance"
+    "form" | "diameter" | "pitch" | "length" | "offset" | "flip" | "leftHand" | "clearance"
 >;
 
 /** The feature's numbers in millimetres; the geometric checks are `planThread`'s. */
@@ -145,6 +146,7 @@ export function resolveThreadSpec(feature: ThreadSpecFields, scope: Scope): Resu
         clearance: clearance ?? 0,
         length,
         flip: feature.flip === true,
+        leftHand: feature.leftHand === true,
     });
 }
 

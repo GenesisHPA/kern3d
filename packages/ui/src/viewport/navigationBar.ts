@@ -7,6 +7,7 @@ import {
     I18n,
     type I18nKeys,
     type IView,
+    Navigation3D,
     type OrbitMode,
     OrbitModes,
     PubSub,
@@ -32,7 +33,8 @@ const OrbitModeLabels: Record<OrbitMode, I18nKeys> = {
  * The bar at the bottom centre of the canvas: orbit / pan / zoom drag modes (the orbit's arrow
  * picks turntable or free orbit), fit, the display
  * mode, perspective or orthographic, the ground grid, and section analysis. A drag mode stays on
- * until its button is pressed again or Esc; it takes the left button over the canvas before the
+ * until its button is pressed again, Esc, or a command starts; an orbit pivots about the model
+ * point under the cursor; it takes the left button over the canvas before the
  * view's own handlers see it, so selection and commands are untouched while it is off.
  */
 export class NavigationBar extends HTMLElement {
@@ -134,7 +136,10 @@ export class NavigationBar extends HTMLElement {
     }
 
     refresh() {
-        this.modeButtons.forEach((button, mode) => button.classList.toggle(style.active, mode === this.mode));
+        this.modeButtons.forEach((button, mode) => {
+            button.classList.toggle(style.active, mode === this.mode);
+            button.title = this.modeTip(mode);
+        });
         this.gridButton.classList.toggle(style.active, this.view.showGrid === true);
         this.gridButton.style.display = this.view.showGrid === undefined ? "none" : "";
         this.sectionButton.classList.toggle(style.active, this.view.sectionPlane !== undefined);
@@ -144,21 +149,35 @@ export class NavigationBar extends HTMLElement {
         );
     }
 
+    /** The mode's tip plus the mouse gesture that does the same without the tool (active profile). */
+    private modeTip(mode: NavigationMode): string {
+        const tip = I18n.translate(`navbar.${mode}`);
+        if (mode === "zoom") return tip;
+        const keys = Navigation3D.navigationKeyMap()[mode === "orbit" ? "rotate" : "pan"];
+        const gesture = keys.replace("Middle", I18n.translate("navbar.middleButton")).replaceAll("+", " + ");
+        return `${tip}\n${I18n.translate("navbar.mouseHint", gesture)}`;
+    }
+
     setMode(mode: NavigationMode | undefined) {
         const host = this.view.dom;
         if (this.mode !== undefined && host) {
             host.removeEventListener("pointerdown", this.onCanvasDown, true);
             host.classList.remove(style.navigating);
             window.removeEventListener("keydown", this.onKeyDown, true);
+            PubSub.default.remove("executeCommand", this.onCommand);
         }
         this.mode = mode;
         if (mode !== undefined && host) {
             host.addEventListener("pointerdown", this.onCanvasDown, true);
             host.classList.add(style.navigating);
             window.addEventListener("keydown", this.onKeyDown, true);
+            PubSub.default.sub("executeCommand", this.onCommand);
         }
         this.refresh();
     }
+
+    /** Starting any command ends a drag mode, so the command gets the left button. */
+    private readonly onCommand = () => this.setMode(undefined);
 
     private readonly onKeyDown = (e: KeyboardEvent) => {
         if (e.key !== "Escape") return;
@@ -171,6 +190,13 @@ export class NavigationBar extends HTMLElement {
         e.stopPropagation();
         e.preventDefault();
         this.last = { x: e.clientX, y: e.clientY };
+        if (this.mode === "orbit") {
+            const rect = this.view.dom?.getBoundingClientRect();
+            this.view.cameraController.startRotate(
+                e.clientX - (rect?.left ?? 0),
+                e.clientY - (rect?.top ?? 0),
+            );
+        }
         window.addEventListener("pointermove", this.onDrag, true);
         window.addEventListener("pointerup", this.onDragEnd, true);
     };

@@ -1019,6 +1019,8 @@ export interface ThreadFeatureData extends FeatureBase {
     readonly offset?: ParameterValue;
     /** Measure from the other end of the face. */
     readonly flip?: boolean;
+    /** A left-hand thread (counter-clockwise rising); absent is right-hand. */
+    readonly leftHand?: boolean;
     /**
      * Radial clearance for a printed fit: an external thread is cut this much deeper, an internal
      * one this much wider. Absent is 0 (the basic profile).

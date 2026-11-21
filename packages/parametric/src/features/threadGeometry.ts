@@ -8,6 +8,8 @@ import {
     type IShape,
     type ISurface,
     type IWire,
+    Matrix4,
+    Plane,
     Result,
     ShapeTypes,
     type TrackedShape,
@@ -67,6 +69,8 @@ export interface ThreadSpec {
     /** Undefined runs the rest of the face. */
     readonly length?: number;
     readonly flip: boolean;
+    /** Left-hand: the right-hand tool mirrored through its own axial plane. */
+    readonly leftHand?: boolean;
 }
 
 /** A cylindrical face's frame: its axis, its radius, which side the material is on, its span. */
@@ -178,6 +182,7 @@ export interface ThreadPlan {
     /** The helix's radius: the groove's root. */
     readonly rootRadius: number;
     readonly section: readonly SectionSide[];
+    readonly leftHand: boolean;
 }
 
 /**
@@ -203,6 +208,7 @@ export function planThread(frame: CylinderFrame, spec: ThreadSpec): Result<Threa
         pitch,
         rootRadius: radii.value.root,
         section: radii.value.section,
+        leftHand: spec.leftHand === true,
     });
 }
 
@@ -361,10 +367,34 @@ export function buildThreadTool(plan: ThreadPlan, featureId: string): Result<Thr
         if (!helix.isOk) return Result.err(helix.error);
         owned.push(helix.value);
         const roles = sectionEdgeRoles(profile.value, plan.section, at);
-        return sweepTool(profile.value, helix.value, frame.axis, roles, featureId);
+        const tool = sweepTool(profile.value, helix.value, frame.axis, roles, featureId);
+        return plan.leftHand && tool.isOk ? mirrorTool(tool.value, base, frame.axis, xvec) : tool;
     } finally {
         owned.forEach((x) => x.dispose());
     }
+}
+
+/**
+ * A left-hand tool: the right-hand one mirrored through the plane holding the axis and the
+ * section (normal axis × xvec), so the section stays where it was and only the helix's sense
+ * turns round. OCCT's transform copies the topology in the same order, so the content ids
+ * seeded on the right-hand tool stay valid by index; a changed count drops them.
+ */
+function mirrorTool(tool: ThreadTool, base: XYZ, axis: XYZ, xvec: XYZ): Result<ThreadTool> {
+    const plane = new Plane({ origin: base, normal: axis.cross(xvec), xvec });
+    const shape = tool.shape.transformedMul(Matrix4.createMirrorWithPlane(plane));
+    tool.shape.dispose();
+    if (shape.findSubShapes(ShapeTypes.solid).length !== 1 || !shape.checkShape()) {
+        shape.dispose();
+        return Result.err("Thread sweep did not make a valid solid");
+    }
+    const faces = shape.findSubShapes(ShapeTypes.face).length;
+    const edges = shape.findSubShapes(ShapeTypes.edge).length;
+    return Result.ok({
+        shape,
+        faceIds: faces === tool.faceIds.length ? tool.faceIds : new Array(faces).fill(undefined),
+        edgeIds: edges === tool.edgeIds.length ? tool.edgeIds : new Array(edges).fill(undefined),
+    });
 }
 
 function sweepTool(

@@ -10,7 +10,8 @@ export const Navigation3DSelector = (props: HTMLProps<HTMLElement>) => {
         nav3DTypes.push(
             option({
                 selected: nav3DType === Config.instance.navigation3D,
-                textContent: nav3DType,
+                // The default profile keeps its upstream id in saved settings; it is shown as the product.
+                textContent: nav3DType === "Chili3d" ? "Kern3D" : nav3DType,
             }),
         ),
     );

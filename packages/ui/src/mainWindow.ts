@@ -19,6 +19,7 @@ import { Editor } from "./editor";
 import { showFloatPanel } from "./floatPanel";
 import { Home } from "./home";
 import { Permanent } from "./permanent";
+import { installSelectOnFocus } from "./selectOnFocus";
 import { Toast } from "./toast";
 
 const quickCommands: CommandKeys[] = ["doc.save", "doc.saveToFile", "edit.undo", "edit.redo"];
@@ -37,6 +38,7 @@ export class MainWindow extends HTMLElement implements IWindow {
         super();
         this.tabIndex = 0;
         this.ensureDom(dom);
+        installSelectOnFocus();
         this.ribbon = new Ribbon(quickCommands, tabs.map(RibbonTab.fromProfile));
     }
 

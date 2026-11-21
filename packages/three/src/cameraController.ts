@@ -29,7 +29,6 @@ import type { ThreeGeometry } from "./threeGeometry";
 import { ThreeHelper } from "./threeHelper";
 import type { ThreeView } from "./threeView";
 import type { ThreeVisualContext } from "./threeVisualContext";
-import { ThreeVisualObject } from "./threeVisualObject";
 
 const DEG_TO_RAD = Math.PI / 180.0;
 const ZOOM_SPEED_FACTOR = 0.1;
@@ -190,19 +189,23 @@ export class CameraController extends Observable implements ICameraController {
         camera.bottom = -frustumHalfHeight;
     }
 
+    /**
+     * Orbit pivot, as classic CAD does it: the point of the model under the cursor when the orbit
+     * starts; over empty space the view's own target (the screen centre), so nothing jumps.
+     */
     startRotate(x: number, y: number): void {
         this.cancelTransition();
-        this._rotateCenter = this.selectedNodesCenter();
-        if (this._rotateCenter) {
-            return;
-        }
+        this._rotateCenter = this.surfacePointAt(x, y);
+    }
 
-        const shape = this.view.detectVisual(x, y).at(0);
-        if (shape instanceof ThreeVisualObject) {
-            const box = new Box3();
-            this.expandValidBox(box, shape);
-            if (!box.isEmpty()) this._rotateCenter = box.getCenter(new Vector3());
-        }
+    /** The nearest visible model point under screen point (x, y), or undefined over empty space. */
+    private surfacePointAt(x: number, y: number): Vector3 | undefined {
+        const raycaster = new Raycaster();
+        raycaster.setFromCamera(this.view.screenToCameraRect(x, y), this.camera);
+        const hit = raycaster
+            .intersectObjects(this.view.content.visualShapes.children)
+            .find((x) => x.object.visible && Number.isFinite(x.point.x));
+        return hit?.point.clone();
     }
 
     private selectedNodesCenter() {

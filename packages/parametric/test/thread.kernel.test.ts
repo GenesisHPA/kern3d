@@ -4,13 +4,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CommandStore, type IFace, type IShape, Matrix4, ShapeTypes, XYZ } from "@chili3d/core";
+import { CommandStore, type IFace, type IShape, Matrix4, Plane, ShapeTypes, XYZ } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { rs } from "@rstest/core";
 import { ThreadFeatureCommand } from "../src/commands/threadCommand";
 import type { FeatureData, PrimitiveFeatureData, ThreadFeatureData } from "../src/features/feature";
 import { featureHandler } from "../src/features/feature";
+import { primitiveFrameXvec } from "../src/features/primitive";
 import { captureProfileRef } from "../src/features/profileRef";
 import { cylinderOfFace } from "../src/features/threadGeometry";
 import { threadRow } from "../src/features/threadStandards";
@@ -221,6 +222,26 @@ describe("thread feature (real kernel)", () => {
         expect(isFullAt(span, 27)).toBe(true);
         expect(isFullAt(flipped, 2)).toBe(true);
         expect(isFullAt(flipped, 27)).toBe(true);
+    });
+
+    test("a left-hand thread is the right-hand one mirrored through its axial plane", () => {
+        const right = shapeOf(threaded(body([rod(4, 20)]), 4, "M8"));
+        const leftNode = threaded(body([rod(4, 20)]), 4, "M8", { leftHand: true });
+        expect(errors(leftNode)).toEqual([undefined, undefined]);
+        const left = shapeOf(leftNode);
+        expect(left.checkShape()).toBe(true);
+        expect(solidsOf(left)).toBe(1);
+        expect(left.volume()).toBeCloseTo(right.volume(), 3);
+        // Not the same groove: the two bodies differ by material on both sides.
+        const diff = shapeFactory.booleanCut([right], [left]);
+        expect(diff.isOk && diff.value.volume()).toBeGreaterThan(1);
+        // ...and mirrored through the plane holding the axis and the tool's start, they coincide.
+        const xvec = primitiveFrameXvec(XYZ.unitZ);
+        const plane = new Plane({ origin: XYZ.zero, normal: XYZ.unitZ.cross(xvec), xvec });
+        const mirrored = right.transformedMul(Matrix4.createMirrorWithPlane(plane));
+        const rest = shapeFactory.booleanCut([mirrored], [left]);
+        expect(rest.isOk).toBe(true);
+        expect(rest.isOk && rest.value.volume()).toBeLessThan(1e-3);
     });
 
     test("clearance cuts an external thread deeper", () => {
