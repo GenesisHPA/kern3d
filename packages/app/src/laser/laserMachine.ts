@@ -2,13 +2,16 @@
 // See LICENSE file in the project root for full license information.
 
 import { PubSub } from "@chili3d/core";
+import { importMarkcfg, importMarkParam } from "./ezcadImport";
 import type { Pt } from "./geometry";
 import { GrblDriver } from "./grblDriver";
+import { JczDriver } from "./jczDriver";
 import type { DriverEvent, DriverStatus, LaserDriver, LaserProgram } from "./laserDriver";
 import style from "./laserEditor.module.css";
-import { button, el, heading, numberField, row, select, t, textField } from "./laserUi";
+import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
 import { FRAME_MODES, type FrameMode, LASER_CONTROLLERS, type MachineProfile } from "./machineProfile";
 import { webSerialAvailable } from "./webSerial";
+import { openLmcUsb, UsbOpenError, webUsbAvailable } from "./webUsb";
 
 const CONSOLE_LINES = 400;
 
@@ -124,53 +127,180 @@ export class LaserMachine {
         return controls;
     }
 
+    /** The panel's own buttons, dropped from the shared lists when the panel is rebuilt. */
+    private panelButtons = new Set<HTMLButtonElement>();
+
+    private buttonLists(): HTMLButtonElement[][] {
+        return [
+            this.redButtons,
+            this.toolpathButtons,
+            this.markButtons,
+            this.pauseButtons,
+            this.stopButtons,
+            this.idleOnly,
+        ];
+    }
+
     private build() {
+        const lists = this.buttonLists();
+        for (const list of lists) {
+            const keep = list.filter((b) => !this.panelButtons.has(b));
+            list.splice(0, list.length, ...keep);
+        }
+        const before = new Set(lists.flat());
+        const jcz = this.host.profile.controller === "jcz";
         const parts: HTMLElement[] = [heading("laser.machine.connection")];
         parts.push(row("laser.machine.controller", this.controllerSelect()));
-        if (!webSerialAvailable()) {
-            parts.push(el("div", { className: style.warning, textContent: t("laser.machine.noSerial") }));
+        if (jcz) {
+            if (!webUsbAvailable()) {
+                parts.push(el("div", { className: style.warning, textContent: t("laser.machine.noUsb") }));
+            }
+            parts.push(el("div", { className: style.muted, textContent: t("laser.machine.jcz.driverHint") }));
+        } else {
+            if (!webSerialAvailable()) {
+                parts.push(el("div", { className: style.warning, textContent: t("laser.machine.noSerial") }));
+            }
+            parts.push(
+                row(
+                    "laser.machine.baud",
+                    select(
+                        [9600, 57600, 115200, 230400, 250000].map((b) => ({
+                            value: String(b),
+                            label: String(b),
+                        })),
+                        String(this.host.profile.baud),
+                        (v) => this.host.setProfile((p) => (p.baud = Number(v))),
+                    ),
+                ),
+            );
         }
         parts.push(
-            row(
-                "laser.machine.baud",
-                select(
-                    [9600, 57600, 115200, 230400, 250000].map((b) => ({
-                        value: String(b),
-                        label: String(b),
-                    })),
-                    String(this.host.profile.baud),
-                    (v) => this.host.setProfile((p) => (p.baud = Number(v))),
-                ),
-            ),
             el("div", { className: style.buttons }, this.connectButton, this.badge),
             this.position,
             this.lastError,
+        );
+        if (jcz) {
+            parts.push(...this.jczSection());
+        } else {
+            parts.push(
+                el(
+                    "div",
+                    { className: style.buttons },
+                    this.idle(
+                        button(
+                            "laser.machine.unlock",
+                            () => this.driver?.unlock(),
+                            "laser.machine.unlock.hint",
+                        ),
+                    ),
+                    this.idle(
+                        button("laser.machine.home", () => this.driver?.home(), "laser.machine.home.hint"),
+                    ),
+                    this.idle(button("laser.machine.reset", () => this.driver?.reset())),
+                ),
+            );
+        }
+        parts.push(...this.pointerSection(), ...this.jogSection(), ...this.jobSection());
+        // the galvo board takes no typed commands
+        if (!jcz) parts.push(...this.consoleSection());
+        this.element.replaceChildren(...parts);
+        this.panelButtons = new Set(lists.flat().filter((b) => !before.has(b)));
+    }
+
+    /** The panel again (another controller, imported settings). */
+    private rebuild() {
+        this.build();
+        this.update();
+    }
+
+    /** The galvo board's field and red-pointer alignment, and the import of EzCAD's own files. */
+    private jczSection(): HTMLElement[] {
+        const j = this.host.profile.jcz;
+        const set = (edit: (q: MachineProfile["jcz"]) => void) => this.host.setProfile((p) => edit(p.jcz));
+        const file = el("input", { type: "file" });
+        file.multiple = true;
+        file.style.display = "none";
+        file.onchange = () => {
+            const files = Array.from(file.files ?? []);
+            file.value = "";
+            void this.importEzcad(files);
+        };
+        return [
+            heading("laser.machine.jcz"),
             el(
                 "div",
                 { className: style.buttons },
-                this.idle(
-                    button("laser.machine.unlock", () => this.driver?.unlock(), "laser.machine.unlock.hint"),
-                ),
-                this.idle(button("laser.machine.home", () => this.driver?.home(), "laser.machine.home.hint")),
-                this.idle(button("laser.machine.reset", () => this.driver?.reset())),
+                button("laser.machine.jcz.import", () => file.click(), "laser.machine.jcz.import.hint"),
+                file,
             ),
-            ...this.pointerSection(),
-            ...this.jogSection(),
-            ...this.jobSection(),
-            ...this.consoleSection(),
-        );
-        this.element.replaceChildren(...parts);
+            row(
+                "laser.machine.jcz.field",
+                numberField(j.field, (v) => set((q) => (q.field = v)), { min: 1, max: 1000 }),
+            ),
+            row(
+                "laser.machine.jcz.offset",
+                numberField(j.offsetX, (v) => set((q) => (q.offsetX = v))),
+                numberField(j.offsetY, (v) => set((q) => (q.offsetY = v))),
+            ),
+            row(
+                "laser.machine.jcz.angle",
+                numberField(j.angle, (v) => set((q) => (q.angle = v))),
+            ),
+            row(
+                "laser.machine.jcz.swapXY",
+                checkbox(j.swapXY, (v) => set((q) => (q.swapXY = v))),
+            ),
+            row(
+                "laser.machine.jcz.lightOffset",
+                numberField(j.lightOffsetX, (v) => set((q) => (q.lightOffsetX = v))),
+                numberField(j.lightOffsetY, (v) => set((q) => (q.lightOffsetY = v))),
+            ),
+        ];
     }
 
-    /** GRBL works; the JCZ (EzCAD) board is listed, not yet selectable. */
+    /** EzCAD's `plug/markcfgN` and `PARAM/MarkParam.lib`, whichever were picked. */
+    private async importEzcad(files: File[]) {
+        let jcz = this.host.profile.jcz;
+        const applied: string[] = [];
+        for (const f of files) {
+            const text = await f.text();
+            const result = /\[LMC_CFG\]/i.test(text) ? importMarkcfg(text, jcz) : importMarkParam(text, jcz);
+            if (result.applied.length === 0) {
+                this.log(t("laser.machine.jcz.importNothing", f.name), "err");
+                continue;
+            }
+            jcz = result.jcz;
+            applied.push(...result.applied);
+            if (result.correctionFile)
+                this.log(t("laser.machine.jcz.correction", result.correctionFile), "err");
+            if (result.notApplied.length > 0)
+                this.log(t("laser.machine.jcz.notApplied", result.notApplied.join(", ")), "err");
+        }
+        if (applied.length === 0) return;
+        this.host.setProfile((p) => (p.jcz = jcz));
+        this.rebuild();
+        this.log(`${t("laser.machine.jcz.imported", applied.length)}: ${applied.join(", ")}`);
+        PubSub.default.pub("showToast", "laser.machine.jcz.imported", applied.length);
+    }
+
+    /** GRBL over a serial port or a JCZ (EzCAD) galvo board over USB. */
     private controllerSelect(): HTMLSelectElement {
-        const s = select(
+        return select(
             LASER_CONTROLLERS.map((c) => ({ value: c, label: t(`laser.machine.controller.${c}`) })),
-            this.host.profile.controller === "jcz" ? "grbl" : this.host.profile.controller,
-            (v) => this.host.setProfile((p) => (p.controller = v)),
+            this.host.profile.controller,
+            (v) => void this.switchController(v),
         );
-        for (const option of s.options) option.disabled = option.value === "jcz";
-        return s;
+    }
+
+    /** Another board: the connected one is let go (laser off) before its driver is dropped. */
+    private async switchController(controller: MachineProfile["controller"]) {
+        if (controller === this.host.profile.controller) return;
+        if (this.driver?.connected) await this.disconnect();
+        this.unsubscribe?.();
+        this.unsubscribe = undefined;
+        this.driver = undefined;
+        this.host.setProfile((p) => (p.controller = controller));
+        this.rebuild();
     }
 
     private idle(b: HTMLButtonElement): HTMLButtonElement {
@@ -389,7 +519,7 @@ export class LaserMachine {
     // ---- actions --------------------------------------------------------------------------
 
     private createDriver(): LaserDriver {
-        // only GRBL is wired up; the JCZ board gets its driver behind the same interface
+        if (this.host.profile.controller === "jcz") return new JczDriver(() => this.host.profile, openLmcUsb);
         return new GrblDriver(() => this.host.profile);
     }
 
@@ -406,7 +536,11 @@ export class LaserMachine {
             await driver.connect();
         } catch (error) {
             // the user closed the port chooser, or the port is busy
-            if ((error as Error)?.name !== "NotFoundError")
+            if (error instanceof UsbOpenError) {
+                // worded for the help it needs: no WebUSB, EzCAD's driver holds the board, or busy
+                this.log(`${t(`laser.machine.usb.${error.failure}`)} (${error.message})`, "err");
+                PubSub.default.pub("showToast", `laser.machine.usb.${error.failure}`);
+            } else if ((error as Error)?.name !== "NotFoundError")
                 this.log(String((error as Error)?.message ?? error), "err");
         }
         this.update();

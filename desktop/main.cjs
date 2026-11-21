@@ -106,12 +106,30 @@ function enableWebSerial(win) {
             .then(({ response }) => callback(response < portList.length ? portList[response].portId : ""))
             .catch(() => callback(""));
     });
+    // WebUSB for a JCZ (EzCAD) galvo board: the page asks for VID 0x9588 / PID 0x9899 only,
+    // so the first device offered is the board; none offered means a driver other than WinUSB
+    ses.on("select-usb-device", (event, details, callback) => {
+        event.preventDefault();
+        if (details.deviceList.length === 0) {
+            dialog.showMessageBox(win, {
+                type: "warning",
+                title: "Kern3D",
+                message: "Плата JCZ (EzCAD) не найдена.",
+                detail:
+                    "Подключите станок по USB. Если установлен драйвер EzCAD (Lmcv4u), замените его на WinUSB программой Zadig (устройство USB\\VID_9588&PID_9899).",
+            });
+            callback();
+            return;
+        }
+        callback(details.deviceList[0].deviceId);
+    });
+    const allowed = (origin) => isInternal(origin) || origin === ORIGIN;
     ses.setPermissionCheckHandler((_webContents, permission, origin) => {
-        if (permission === "serial") return isInternal(origin) || origin === ORIGIN;
+        if (permission === "serial" || permission === "usb") return allowed(origin);
         return true;
     });
     ses.setDevicePermissionHandler((details) => {
-        if (details.deviceType === "serial") return isInternal(details.origin) || details.origin === ORIGIN;
+        if (details.deviceType === "serial" || details.deviceType === "usb") return allowed(details.origin);
         return false;
     });
 }

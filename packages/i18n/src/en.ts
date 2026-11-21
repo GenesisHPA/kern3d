@@ -1292,7 +1292,7 @@ export default {
         "laser.machine.laserModeHint":
             "The controller must be in laser mode ($32=1): then G0 never burns and the power follows the speed.",
         "laser.panel.machine": "Machine",
-        "laser.machine.connection": "Connection (GRBL)",
+        "laser.machine.connection": "Connection",
         "laser.machine.noSerial":
             "This browser cannot open serial ports (Web Serial). Use Chrome or Edge, or the Kern3D desktop app; the G-code can still be saved to a file.",
         "laser.machine.baud": "Baud rate",
@@ -1386,7 +1386,28 @@ export default {
         "laser.origin.corner": "Lower-left corner",
         "laser.machine.controller": "Controller",
         "laser.machine.controller.grbl": "GRBL (serial port)",
-        "laser.machine.controller.jcz": "JCZ (EzCAD) — coming soon",
+        "laser.machine.controller.jcz": "JCZ / EzCAD (fiber, USB)",
+        "laser.machine.noUsb":
+            "This browser cannot talk to USB devices (WebUSB). Use Chrome or Edge, or the Kern3D desktop app.",
+        "laser.machine.jcz.driverHint":
+            "The JCZ board is reached over USB through the WinUSB driver. EzCAD's driver (Lmcv4u) does not share it: install WinUSB once with Zadig; EzCAD's driver can be restored in Device Manager.",
+        "laser.machine.jcz": "JCZ board (EzCAD)",
+        "laser.machine.jcz.import": "Import EzCAD settings",
+        "laser.machine.jcz.import.hint":
+            "Pick plug\\markcfg7 (field, offset, galvo, laser) and, if needed, PARAM\\MarkParam.lib (pens) from the EzCAD folder",
+        "laser.machine.jcz.field": "Lens field, mm",
+        "laser.machine.jcz.offset": "Field offset X / Y, mm",
+        "laser.machine.jcz.angle": "Field rotation, °",
+        "laser.machine.jcz.swapXY": "Swap X and Y",
+        "laser.machine.jcz.lightOffset": "Red pointer offset X / Y, mm",
+        "laser.machine.jcz.imported": "Values taken from EzCAD: {0}",
+        "laser.machine.jcz.importNothing": "No EzCAD settings found in {0}",
+        "laser.machine.jcz.correction": "EzCAD uses the correction file {0}: it is not loaded yet",
+        "laser.machine.jcz.notApplied": "Read but not applied (the board has no command for them): {0}",
+        "laser.machine.usb.unavailable": "WebUSB is not available in this browser",
+        "laser.machine.usb.notListed":
+            "Board not found. If EzCAD's driver holds it, install WinUSB with Zadig (USB\\VID_9588&PID_9899)",
+        "laser.machine.usb.openFailed": "The board is busy: close EzCAD and connect again",
         "laser.machine.pointer": "Red pointer",
         "laser.machine.red": "Red (F1)",
         "laser.machine.red.hint":

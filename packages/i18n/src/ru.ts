@@ -1129,7 +1129,7 @@ export default {
         "laser.machine.laserModeHint":
             "Контроллер должен быть в режиме лазера ($32=1): тогда G0 не прожигает, а мощность следует за скоростью.",
         "laser.panel.machine": "Станок",
-        "laser.machine.connection": "Подключение (GRBL)",
+        "laser.machine.connection": "Подключение",
         "laser.machine.noSerial":
             "Этот браузер не умеет открывать последовательные порты (Web Serial). Используйте Chrome или Edge либо программу Kern3D для компьютера; G-code по-прежнему можно сохранить в файл.",
         "laser.machine.baud": "Скорость порта",
@@ -1222,7 +1222,28 @@ export default {
         "laser.origin.corner": "Левый нижний угол",
         "laser.machine.controller": "Контроллер",
         "laser.machine.controller.grbl": "GRBL (последовательный порт)",
-        "laser.machine.controller.jcz": "JCZ (EzCAD) — скоро",
+        "laser.machine.controller.jcz": "JCZ / EzCAD (волоконный, USB)",
+        "laser.machine.noUsb":
+            "Этот браузер не умеет работать с USB-устройствами (WebUSB). Используйте Chrome или Edge либо программу Kern3D для компьютера.",
+        "laser.machine.jcz.driverHint":
+            "Плата JCZ подключается по USB через драйвер WinUSB. Драйвер EzCAD (Lmcv4u) её не отдаёт: один раз поставьте WinUSB через Zadig, вернуть драйвер EzCAD можно в «Диспетчере устройств».",
+        "laser.machine.jcz": "Плата JCZ (EzCAD)",
+        "laser.machine.jcz.import": "Импорт настроек EzCAD",
+        "laser.machine.jcz.import.hint":
+            "Выберите файл plug\\markcfg7 (поле, смещение, гальво, лазер) и, если нужно, PARAM\\MarkParam.lib (перья) из папки EzCAD",
+        "laser.machine.jcz.field": "Поле линзы, мм",
+        "laser.machine.jcz.offset": "Смещение поля X / Y, мм",
+        "laser.machine.jcz.angle": "Поворот поля, °",
+        "laser.machine.jcz.swapXY": "Поменять оси X и Y",
+        "laser.machine.jcz.lightOffset": "Сдвиг красного луча X / Y, мм",
+        "laser.machine.jcz.imported": "Из EzCAD взято значений: {0}",
+        "laser.machine.jcz.importNothing": "В файле {0} не нашлось настроек EzCAD",
+        "laser.machine.jcz.correction": "EzCAD использует файл коррекции {0}: он пока не загружается",
+        "laser.machine.jcz.notApplied": "Прочитано, но не применено (у платы нет такой команды): {0}",
+        "laser.machine.usb.unavailable": "WebUSB недоступен в этом браузере",
+        "laser.machine.usb.notListed":
+            "Плата не найдена. Если её держит драйвер EzCAD, поставьте WinUSB через Zadig (USB\\VID_9588&PID_9899)",
+        "laser.machine.usb.openFailed": "Плата занята: закройте EzCAD и подключите снова",
         "laser.machine.pointer": "Красный луч",
         "laser.machine.red": "Красный (F1)",
         "laser.machine.red.hint":
