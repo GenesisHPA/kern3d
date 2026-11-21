@@ -5,6 +5,7 @@ import "../assembly/componentCommands";
 import "../assembly/jointCommands";
 import "./alignCommand";
 import "./makeEditableCommand";
+import "./rebuildFromMeshCommand";
 import "./recoverCylindersCommand";
 import "./axisCommand";
 import "./booleanCommand";

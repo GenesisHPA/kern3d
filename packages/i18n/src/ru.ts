@@ -219,6 +219,11 @@ export default {
         "command.modify.moveCopy": "Переместить/Копировать",
         "command.modify.makeEditable": "Сделать редактируемым",
         "command.modify.recoverCylinders": "Распознать цилиндры",
+        "command.modify.rebuildFromMesh": "Перестроить операциями",
+        "toast.rebuildFromMesh{0}{1}":
+            "Перестроено тел: {0}, отклонение от исходного до {1} %; исходное тело скрыто",
+        "toast.rebuildFromMesh.failed{0}":
+            "Не удалось перестроить достаточно точно (отклонение {0} %); тело оставлено как было",
         "toast.recoverCylinders{0}": "Тел с восстановленными цилиндрами: {0}",
         "toast.recoverCylinders.none": "Выберите импортированное тело без последующих операций",
         "toast.import.facetedLarge":
