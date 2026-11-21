@@ -26,6 +26,7 @@ import { DefaultDataExchange } from "./defaultDataExchange";
 import {
     DefaultRibbon,
     DrawingRibbonProfiles,
+    LaserRibbonProfiles,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
@@ -110,6 +111,7 @@ export class AppBuilder {
                 ...ParametricRibbonProfiles,
                 ...parametric.SketchRibbonProfiles,
                 ...DrawingRibbonProfiles,
+                ...LaserRibbonProfiles,
             );
         });
         return this;

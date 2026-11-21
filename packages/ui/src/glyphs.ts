@@ -22,6 +22,7 @@ const PATHS = {
     display: "M2.5 5 8 2l5.5 3v6L8 14l-5.5-3zM2.5 5 8 8l5.5-3M8 8v6",
     design: "M2.5 5 8 2l5.5 3v6L8 14l-5.5-3zM2.5 5 8 8l5.5-3M8 8v6",
     drawing: "M3 1.5h7l3 3v10H3zM10 1.5v3h3M5 8h6M5 10.5h6M5 5.5h3",
+    laser: "M5 1.5h6v5H5zM6.5 6.5 7 8.5h2l.5-2M8 8.5v3M5.5 14.5h5M8 11.5l-2.5 3M8 11.5l2.5 3",
     pin: "M6 2h4l-.5 4 2.5 2.5H4L6.5 6zM8 8.5V14",
     plane: "M1.5 10 6 4h8.5L10 10z",
     document: "M3.5 1.5h6l3 3v10h-9zM9.5 1.5v3h3",

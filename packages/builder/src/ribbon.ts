@@ -278,6 +278,24 @@ export const DrawingRibbonProfiles: RibbonProfileExtra[] = [
 ];
 
 /**
+ * The laser workspace: a job opens on the bed editor (import, operations, G-code, the
+ * machine); the tab only starts one or reopens the job selected in the tree.
+ */
+export const LaserRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.laser",
+        before: "ribbon.tab.manager",
+        workspace: "ribbon.workspace.laser",
+        groups: [
+            {
+                groupName: "ribbon.group.laser",
+                items: ["laser.create", "laser.open"],
+            },
+        ],
+    },
+];
+
+/**
  * Returns a new profile list with `extras` merged into a copy of `base`: extra
  * items are prepended to the matching group (contributions land first), unknown
  * groups are appended, and new tabs are inserted before their `before` tab or

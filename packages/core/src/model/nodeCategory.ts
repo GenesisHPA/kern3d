@@ -14,6 +14,7 @@ export type NodeCategory =
     | "component"
     | "joint"
     | "drawing"
+    | "laser"
     | "annotation"
     | "other";
 

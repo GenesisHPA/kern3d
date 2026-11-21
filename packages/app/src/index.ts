@@ -6,6 +6,7 @@ export * from "./bodys";
 export * from "./commands";
 export * from "./document";
 export * from "./drawing";
+export * from "./laser";
 export * from "./pluginManager";
 export * from "./services";
 export * from "./showPropertyEventHandler";

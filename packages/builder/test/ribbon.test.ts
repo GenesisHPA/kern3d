@@ -6,6 +6,7 @@ import { SketchRibbonProfiles } from "@chili3d/parametric";
 import {
     DefaultRibbon,
     DrawingRibbonProfiles,
+    LaserRibbonProfiles,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
@@ -344,6 +345,16 @@ describe("DrawingRibbonProfiles", () => {
     test("the drawing tab lives in its own workspace", () => {
         const tab = DrawingRibbonProfiles.find((t) => t.tabName === "ribbon.tab.drawing");
         expect(tab?.workspace).toBe("ribbon.workspace.drawing");
+    });
+});
+
+describe("LaserRibbonProfiles", () => {
+    test("the laser tab lives in its own workspace, after the drawing's", () => {
+        const tab = LaserRibbonProfiles.find((t) => t.tabName === "ribbon.tab.laser");
+        expect(tab?.workspace).toBe("ribbon.workspace.laser");
+        const merged = mergeRibbonProfiles(DefaultRibbon, [...DrawingRibbonProfiles, ...LaserRibbonProfiles]);
+        const names = merged.map((t) => t.tabName);
+        expect(names.indexOf("ribbon.tab.laser")).toBe(names.indexOf("ribbon.tab.drawing") + 1);
     });
 });
 

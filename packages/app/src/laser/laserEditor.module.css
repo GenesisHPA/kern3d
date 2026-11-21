@@ -1,0 +1,324 @@
+/* under the app bar (30px, the document/workspace tabs), over everything else */
+.dialog {
+    position: fixed;
+    inset: 30px 0 0 0;
+    z-index: 1500;
+    width: 100vw;
+    height: calc(100vh - 30px);
+    max-width: 100vw;
+    max-height: calc(100vh - 30px);
+    margin: 0;
+    padding: 0;
+    border: none;
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    font-size: 13px;
+}
+
+.root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    outline: none;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--panel-background-color);
+}
+
+.separator {
+    width: 1px;
+    align-self: stretch;
+    margin: 0 4px;
+    background-color: var(--border-color);
+}
+
+.toolbar button,
+.panel button {
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--panel-background-color);
+    color: var(--foreground-color);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.toolbar button:hover,
+.panel button:hover {
+    background-color: var(--hover-background-color);
+}
+
+.toolbar button:disabled,
+.panel button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.active {
+    background-color: var(--primary-color) !important;
+    color: var(--title-checked, #fff) !important;
+}
+
+.danger {
+    background-color: #c92a2a !important;
+    border-color: #a51111 !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+
+.toolbar select,
+.panel select {
+    padding: 3px;
+    background-color: var(--panel-background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.canvas {
+    flex: 1 1 auto;
+    min-width: 0;
+    background-color: #5c6370;
+    cursor: default;
+    touch-action: none;
+    user-select: none;
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    width: 330px;
+    flex-shrink: 0;
+    min-height: 0;
+    border-left: 1px solid var(--border-color);
+    background-color: var(--panel-background-color);
+}
+
+.panelTabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panelTabs > div {
+    flex: 1 1 0;
+    padding: 6px 8px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0.75;
+}
+
+.panelTabs > div.current {
+    opacity: 1;
+    font-weight: 600;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.panelBody {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 4px 10px 10px;
+}
+
+.panel h3 {
+    margin: 10px 0 6px;
+    font-size: 13px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+}
+
+.row > span {
+    width: 130px;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.row input[type="text"],
+.row input[type="number"],
+.row select {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 3px 4px;
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-family: inherit;
+}
+
+.pair {
+    display: flex;
+    gap: 6px;
+}
+
+.pair > .row {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.pair > .row > span {
+    width: auto;
+}
+
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 6px 0;
+}
+
+.list {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.listRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    cursor: pointer;
+}
+
+.listRow:hover {
+    background-color: var(--hover-background-color);
+}
+
+.listRow.current {
+    background-color: var(--primary-color);
+    color: var(--title-checked, #fff);
+}
+
+.listRow > .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.listRow > .name {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.muted {
+    opacity: 0.7;
+    font-size: 12px;
+    margin: 4px 0;
+}
+
+.warning {
+    color: #e8590c;
+    font-size: 12px;
+    margin: 4px 0;
+}
+
+.stateBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    background-color: var(--border-color);
+}
+
+.stateIdle {
+    background-color: #2f9e44;
+    color: #fff;
+}
+
+.stateRun {
+    background-color: #1971c2;
+    color: #fff;
+}
+
+.stateHold {
+    background-color: #f08c00;
+    color: #fff;
+}
+
+.stateAlarm {
+    background-color: #c92a2a;
+    color: #fff;
+}
+
+.jog {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    gap: 4px;
+    margin: 6px 0;
+}
+
+.jog button {
+    padding: 6px 0;
+}
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: var(--border-color);
+    overflow: hidden;
+    margin: 6px 0;
+}
+
+.progress > div {
+    height: 100%;
+    background-color: var(--primary-color);
+    width: 0;
+}
+
+.console {
+    height: 180px;
+    overflow-y: auto;
+    padding: 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--background-color);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.console .out {
+    opacity: 0.65;
+}
+
+.console .err {
+    color: #e03131;
+}
+
+.status {
+    display: flex;
+    gap: 16px;
+    padding: 4px 10px;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--panel-background-color);
+    opacity: 0.85;
+    min-height: 18px;
+}
+
+.status > span:first-child {
+    flex: 1 1 auto;
+}

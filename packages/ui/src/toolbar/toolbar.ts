@@ -19,7 +19,7 @@ import {
     workspaceTabs,
 } from "@chili3d/core";
 import { collection, div, span, svg } from "@chili3d/element";
-import { glyph } from "../glyphs";
+import { type GlyphName, glyph } from "../glyphs";
 import { DropdownController } from "../ribbon/dropdownController";
 import { QuickButton } from "../ribbon/ribbon";
 import { RibbonPushButton } from "../ribbon/ribbonButton";
@@ -33,9 +33,14 @@ class ActiveViewConverter implements IConverter<IView> {
     }
 }
 
+const WORKSPACE_GLYPHS: Partial<Record<RibbonWorkspaceKeys, GlyphName>> = {
+    "ribbon.workspace.drawing": "drawing",
+    "ribbon.workspace.laser": "laser",
+};
+
 /** The glyph a workspace shows in the switcher; any plugin workspace falls back to design's. */
 function workspaceGlyph(workspace: RibbonWorkspaceKeys) {
-    return glyph(workspace === "ribbon.workspace.drawing" ? "drawing" : "design", style.workspaceIcon);
+    return glyph(WORKSPACE_GLYPHS[workspace] ?? "design", style.workspaceIcon);
 }
 
 /**
