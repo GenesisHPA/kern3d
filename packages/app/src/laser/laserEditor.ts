@@ -141,6 +141,9 @@ const CORNER_SIGNS: [number, number][] = [
  * document tabs, over the 3D view, and writes every change back to its node in one transaction,
  * so undo/redo are the document's.
  */
+/** A new object's speed on a galvo (JCZ) machine: 300 mm/s, in the job's mm/min. */
+const GALVO_DEFAULT_SPEED = 300 * 60;
+
 export class LaserEditor {
     private static readonly editors = new Map<string, LaserEditor>();
 
@@ -452,6 +455,10 @@ export class LaserEditor {
     }
 
     private add(o: LaserObject) {
+        // a galvo marks hundreds of mm per second: a new object starts at EzCAD's usual
+        // 300 mm/s rather than the gantry default meant for GRBL
+        if (this.profile.controller === "jcz" && o.op.speed === defaultOperation(o.op.mode).speed)
+            o.op.speed = GALVO_DEFAULT_SPEED;
         this.data.objects.push(o);
         this.selection = o.id;
         this.commit();

@@ -1254,6 +1254,7 @@ export default {
         "laser.power": "Power, %",
         "laser.frequency": "Frequency, kHz",
         "laser.speed": "Speed, mm/min",
+        "laser.speedPerSecond": "Speed, mm/s",
         "laser.passes": "Passes",
         "laser.air": "Air assist (M8)",
         "laser.fillInterval": "Line interval, mm",

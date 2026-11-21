@@ -1091,6 +1091,7 @@ export default {
         "laser.power": "Мощность, %",
         "laser.frequency": "Частота, кГц",
         "laser.speed": "Скорость, мм/мин",
+        "laser.speedPerSecond": "Скорость, мм/с",
         "laser.passes": "Проходы",
         "laser.air": "Обдув (M8)",
         "laser.fillInterval": "Шаг линий, мм",

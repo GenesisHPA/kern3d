@@ -652,8 +652,14 @@ export class LaserJobPanel {
         }
         rows.push(
             row(
-                "laser.speed",
-                numberField(op.speed, (v) => edit((x) => (x.speed = v)), { min: 1 }),
+                jcz !== undefined ? "laser.speedPerSecond" : "laser.speed",
+                // a galvo's speed reads in mm/s, as EzCAD shows it; the job keeps mm/min
+                jcz !== undefined
+                    ? numberField(op.speed / 60, (v) => edit((x) => (x.speed = v * 60)), {
+                          min: 0.1,
+                          digits: 1,
+                      })
+                    : numberField(op.speed, (v) => edit((x) => (x.speed = v)), { min: 1 }),
             ),
             row(
                 "laser.passes",
