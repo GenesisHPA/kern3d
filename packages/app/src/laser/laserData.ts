@@ -148,7 +148,7 @@ export function defaultOperation(mode: LaserMode): LaserOperation {
         fillInterval: 0.1,
         fillAngle: 0,
         raster: defaultRaster(),
-        frequency: 30,
+        frequency: 50,
         pen: "",
     };
 }

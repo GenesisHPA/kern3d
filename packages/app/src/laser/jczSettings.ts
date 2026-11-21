@@ -77,7 +77,7 @@ export function defaultPen(): JczPen {
         name: "Default",
         speed: 1000,
         power: 50,
-        frequency: 30,
+        frequency: 50,
         pulseWidth: 0,
         laserOnDelay: 100,
         laserOffDelay: 100,
