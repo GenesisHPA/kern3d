@@ -13,7 +13,8 @@ import {
     ShapeNode,
     type VisualNode,
 } from "@chili3d/core";
-import { makeEditable, solidifyMeshes } from "@chili3d/parametric";
+import { makeEditable } from "@chili3d/parametric";
+import { importStlNode } from "./stlImport";
 import { buildThreeMf, type ThreeMfObject } from "./threeMf";
 
 export class DefaultDataExchange implements IDataExchange {
@@ -61,15 +62,9 @@ export class DefaultDataExchange implements IDataExchange {
         const node = nodeResult.value;
         node.name = name;
         document.modelManager.addNode(node);
-        // an STL's triangles become a solid with merged planar faces first; then every imported
-        // body becomes a parametric one starting with the imported shape, so holes, cuts and
-        // fillets apply to it
-        if (name.toLowerCase().endsWith(".stl")) {
-            solidifyMeshes([node]);
-            // the file holds one body with no name of its own: it takes the file's
-            const only = (node as { firstChild?: INode }).firstChild;
-            if (only !== undefined && only.nextSibling === undefined) only.name = name.replace(/\.stl$/i, "");
-        }
+        // every imported body becomes a parametric one starting with the imported shape, so
+        // holes, cuts and fillets apply to it (an STL's triangles were made a solid on the way
+        // in, see `importStlNode`; one that would not comes as a mesh, which this leaves alone)
         makeEditable([node]);
         document.visual.update();
     }
@@ -82,9 +77,9 @@ export class DefaultDataExchange implements IDataExchange {
         return Result.ok(new EditableShapeNode({ document, name: file.name, shape: shape.value }));
     }
 
-    private async importStl(document: IDocument, file: File) {
+    private async importStl(document: IDocument, file: File): Promise<Result<INode>> {
         const content = new Uint8Array(await file.arrayBuffer());
-        return shapeConverter.convertFromSTL(document, content);
+        return importStlNode(document, file.name, content);
     }
 
     private async importIges(document: IDocument, file: File) {

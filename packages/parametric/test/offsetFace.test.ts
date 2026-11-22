@@ -52,14 +52,14 @@ describe("offset face feature", () => {
         const body = bodyWith([offsetFeature({ distance: 0 })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Offset Face: the distance is 0, so nothing moves");
+        expect(body.featureItems()[0].error).toBe("error.offsetFace.zero");
     });
 
     test("a negative distance passes the sign check and fails only for the missing chain", () => {
         const body = bodyWith([offsetFeature({ distance: -5 })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Offset Face requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.offsetFace.noInput");
     });
 
     test("setParameter writes the distance back", () => {

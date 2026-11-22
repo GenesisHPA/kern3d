@@ -204,7 +204,7 @@ describe("DefaultDataExchange", () => {
             { file: "model.stp", method: "convertFromSTEP" },
             { file: "model.iges", method: "convertFromIGES" },
             { file: "model.igs", method: "convertFromIGES" },
-            { file: "model.stl", method: "convertFromSTL" },
+            // an STL goes through a sandbox kernel instead: `stlImport.kernel.test.ts`
         ] as const)("should route $file to shapeConverter.$method", async ({ file, method }) => {
             const { converter, node, doc, addNodeSpy } = setup();
 

@@ -19,6 +19,27 @@ import type { ShapeNode } from "../lib/chili-wasm";
 import { OccShape } from "./shape";
 import { shapesToStl } from "./stlWriter";
 
+/**
+ * An STL's triangles as one kernel shape (a compound of triangular faces), with no document
+ * nodes made — what an import converts in a sandbox kernel (`runInSandboxKernel`) before it
+ * hands the result over to the shared one.
+ */
+export function stlToShape(stl: Uint8Array): Result<IShape> {
+    const node = wasm.Converter.convertFromStl(stl);
+    if (node === undefined) return Result.err("can not convert");
+    try {
+        const shape = node.shape;
+        if (shape === undefined) return Result.err("can not convert");
+        if (shape.isNull()) {
+            shape.delete();
+            return Result.err("can not convert");
+        }
+        return Result.ok(OccShape.wrap(shape));
+    } finally {
+        node.delete();
+    }
+}
+
 export class OccShapeConverter implements IShapeConverter {
     private readonly addShapeNode = (
         collector: (d: Deletable | IDisposable) => any,

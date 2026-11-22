@@ -15,4 +15,5 @@ export * from "./mockShapeFactory";
 export * from "./mockView";
 export * from "./mockVisual";
 export * from "./shapeAssert";
+export * from "./stlMeshes";
 export * from "./testDocument";

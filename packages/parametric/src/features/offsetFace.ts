@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IFace,
     type IShape,
     LENGTH_UNITS,
@@ -19,6 +20,7 @@ import {
     trackedFaceIds,
     trackedIds,
 } from "./feature";
+import { CAVITY_WALL_STATUS, offsetFacesKeepingCavities, SEVERAL_SOLIDS_STATUS } from "./offsetCavity";
 import { captureProfileRef } from "./profileRef";
 import { matchSourceFaceIndexes } from "./sourceFaceMatcher";
 import { ID_COMPONENT_SEPARATOR } from "./trackedId";
@@ -80,13 +82,13 @@ const offsetFaceHandler: FeatureHandler<OffsetFaceFeatureData> = {
         // 0 is not a small move, it is no move at all. The kernel would report success with the
         // body unchanged, which reads as a feature that silently did nothing.
         if (Math.abs(distance.value) < 1e-9) {
-            return Result.err("Offset Face: the distance is 0, so nothing moves");
+            return Result.err(I18n.translate("error.offsetFace.zero"));
         }
         const input = context.input;
-        if (input === undefined) return Result.err("Offset Face requires a preceding feature");
+        if (input === undefined) return Result.err(I18n.translate("error.offsetFace.noInput"));
         const moved = resolveMovedFaces(feature, context, input);
         if (!moved.isOk) return Result.err(moved.error);
-        if (moved.value.length === 0) return Result.err("Offset Face requires at least one face");
+        if (moved.value.length === 0) return Result.err(I18n.translate("error.offsetFace.noFaces"));
 
         return buildOffsetFace(input, moved.value, distance.value, feature.keepRounds === true, context);
     },
@@ -150,12 +152,14 @@ function buildOffsetFace(
     keepRounds: boolean,
     context: FeatureContext,
 ): Result<IShape> {
-    const offset = shapeFactory.offsetFacesTracked;
-    if (offset === undefined) return Result.err("The kernel cannot offset faces");
+    if (shapeFactory.offsetFacesTracked === undefined) {
+        return Result.err(I18n.translate("error.offsetFace.noKernel"));
+    }
     const rounds = keepRounds ? roundFaces(input, context.tracking?.inputFaceIds) : [];
     // `keepRounds` is a REQUIREMENT, not a hint: a round the move would re-radius and the kernel
     // cannot re-make is a refusal (status 7), not a body that comes back at another radius.
-    const built = offset(input, faces, distance, rounds, keepRounds);
+    // A body with a sealed cavity goes through the outer skin alone (`offsetCavity.ts`).
+    const built = offsetFacesKeepingCavities(input, faces, distance, rounds, keepRounds);
     if (!built.isOk) return Result.err(problemMessage(built.error, distance));
 
     const tracking = context.tracking;
@@ -200,34 +204,42 @@ function isRoundName(id: string | undefined): boolean {
     return id.split(ID_COMPONENT_SEPARATOR).every((leaf) => leaf.endsWith(":f"));
 }
 
-/** A length as the messages print it: millimetres, at most two decimals, no trailing zeros. */
+/** A length as the messages print it: millimetres (the unit is in the message), at most two decimals. */
 function formatLength(value: number): string {
-    return `${parseFloat(value.toFixed(2))} mm`;
+    return `${parseFloat(value.toFixed(2))}`;
 }
 
 /**
  * What to tell the user about a failed offset, from the kernel's classification (see
- * `OffsetFaceProblem`). Worded here rather than in the kernel because two of the seven need a
- * number the kernel only reports, not a sentence.
+ * `OffsetFaceProblem`), in the user's language. Worded here rather than in the kernel because
+ * two of the seven need a number the kernel only reports, not a sentence.
  */
-function problemMessage(problem: OffsetFaceProblem, distance: number): string {
+export function problemMessage(problem: OffsetFaceProblem, distance: number): string {
     switch (problem.status) {
         case 1:
             return problem.maxDistance > 0
-                ? `Offset Face: ${formatLength(Math.abs(distance))} is too far for this body (max ≈ ${formatLength(problem.maxDistance)}). Try a smaller distance.`
-                : `Offset Face: ${formatLength(Math.abs(distance))} is too far, and so is anything smaller. Check the faces around it.`;
+                ? I18n.translate(
+                      "error.offsetFace.tooFar{0}{1}",
+                      formatLength(Math.abs(distance)),
+                      formatLength(problem.maxDistance),
+                  )
+                : I18n.translate("error.offsetFace.tooFarAny{0}", formatLength(Math.abs(distance)));
         case 2:
-            return "Offset Face: these faces can't be offset at any distance. Faces that run into fillets or other curved faces often stop this — try moving a flat face, or offset before rounding the edges.";
+            return I18n.translate("error.offsetFace.blocked");
         case 3:
-            return "Offset Face needs a solid body.";
+            return I18n.translate("error.offsetFace.notSolid");
         case 4:
-            return "Offset Face: this body has a sealed cavity inside, which it can't handle yet. Offset the faces before hollowing the body closed, or open the cavity with a shell.";
+            return I18n.translate("error.offsetFace.cavity");
         case 6:
-            return "Offset Face: this body has rounded edges meeting at a sharp corner, which OCCT can't offset without corrupting its memory. Offset the faces before rounding the edges, or round every edge at the corner so they blend.";
+            return I18n.translate("error.offsetFace.sharpChain");
         case 7:
-            return "Offset Face: the rounds beside the moved face can't be re-made at their radius. Turn Keep rounds off, or move a face without rounds beside it.";
+            return I18n.translate("error.offsetFace.rounds");
+        case CAVITY_WALL_STATUS:
+            return I18n.translate("error.offsetFace.cavityWall");
+        case SEVERAL_SOLIDS_STATUS:
+            return I18n.translate("error.offsetFace.severalSolids");
         default:
-            return "Offset Face failed. Try a smaller distance, or other faces.";
+            return I18n.translate("error.offsetFace.failed");
     }
 }
 

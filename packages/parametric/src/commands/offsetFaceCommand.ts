@@ -23,6 +23,7 @@ import {
 } from "@chili3d/core";
 import type { OffsetFaceFeatureData } from "../features/feature";
 import { reportSilentIdLoss } from "../features/idDiagnostics";
+import { offsetFacesKeepingCavities } from "../features/offsetCavity";
 import { roundFaces } from "../features/offsetFace";
 import { captureProfileRef } from "../features/profileRef";
 import { matchSourceFaceIndexes } from "../features/sourceFaceMatcher";
@@ -263,17 +264,16 @@ export function offsetPreview(
     if (indexes === undefined || indexes.length === 0) return undefined;
     const shape = node.shape.value;
     const faces = shape.findSubShapes(ShapeTypes.face) as IFace[];
-    const offset = shapeFactory.offsetFacesTracked;
-    if (offset === undefined) return undefined;
-    // The same rounds the feature will keep, by the same name rule: the preview has to show the
-    // shape that is about to be committed.
+    if (shapeFactory.offsetFacesTracked === undefined) return undefined;
+    // The same rounds the feature will keep, by the same name rule, and the same path for a body
+    // with a cavity: the preview has to show the shape that is about to be committed.
     const rounds = keepRounds
         ? roundFaces(
               shape,
               faces.map((_, index) => node.faceIdAt(index)),
           )
         : [];
-    const result = offset(
+    const result = offsetFacesKeepingCavities(
         shape,
         indexes.map((index) => faces[index]),
         distance,

@@ -33,7 +33,16 @@ interface KernelHandle {
 const registry =
     typeof FinalizationRegistry === "undefined"
         ? undefined
-        : new FinalizationRegistry<KernelHandle>((handle) => handle.delete());
+        : new FinalizationRegistry<KernelHandle>((handle) => {
+              // A handle of a sandbox kernel that crashed (`runInSandboxKernel`) points into a
+              // heap nobody uses any more; freeing it there can trap, and a throw out of a
+              // finalizer would only surface as an uncaught error with nothing to act on.
+              try {
+                  handle.delete();
+              } catch {
+                  // the heap it lived in is gone or broken: nothing left to free
+              }
+          });
 const claimed = new WeakSet<KernelHandle>();
 
 /** Claims `handle` for `wrapper`; false when another wrapper already owns it (see the header). */

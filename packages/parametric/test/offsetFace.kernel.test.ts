@@ -188,7 +188,8 @@ describe("offset face — the rebuilt body", () => {
         // carries it, rather than the user being told only that it did not work.
         const body = withOffset(plate(scene()), -30);
 
-        expect(errors(body)[1]).toContain("max ≈");
+        // the identity test locale echoes the key with its arguments: the distance, then the bound
+        expect(errors(body)[1]).toMatch(/^error\.offsetFace\.tooFar30\d/);
     });
 });
 
@@ -254,7 +255,7 @@ describe("offset face — keepRounds", () => {
 
         // The plain path would answer — with every 3 mm round turned into 0.5. `keepRounds` is a
         // requirement now, so the feature reports the refusal instead of silently re-radiusing.
-        expect(errors(body)[2]).toContain("can't be re-made at their radius");
+        expect(errors(body)[2]).toBe("error.offsetFace.rounds");
     });
 
     test("too far still reports the distance bound, not the rounds", () => {
@@ -264,7 +265,7 @@ describe("offset face — keepRounds", () => {
 
         // The reblend fails here for a distance reason too, but so does the plain path — the
         // actionable answer is the bound, and "turn Keep rounds off" would lead straight back.
-        expect(errors(body)[2]).toContain("max ≈");
+        expect(errors(body)[2]).toMatch(/^error\.offsetFace\.tooFar30\d/);
     });
 
     test("the preview asks for the same rounds policy the feature commits with", () => {

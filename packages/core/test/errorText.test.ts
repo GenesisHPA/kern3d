@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { describe, expect, test } from "@rstest/core";
-import { errorText } from "../src";
+import { errorText, isKernelCrash } from "../src";
 
 describe("errorText", () => {
     test("should use the message of an Error", () => {
@@ -29,5 +29,24 @@ describe("errorText", () => {
         expect(errorText({ name: "AbortError" })).toBe("AbortError");
         expect(errorText(undefined)).toBe("undefined");
         expect(errorText({})).toBe("[object Object]");
+    });
+});
+
+describe("isKernelCrash", () => {
+    test.each([
+        new WebAssembly.RuntimeError("memory access out of bounds"),
+        "RuntimeError: null function or function signature mismatch",
+        "Aborted(). Build with -sASSERTIONS for more info.",
+        "unreachable",
+    ])("a wasm trap or abort is a crash: %s", (error) => {
+        expect(isKernelCrash(error)).toBe(true);
+    });
+
+    test.each([
+        "can not convert",
+        new Error("Sewing Error"),
+        "the distance is 0",
+    ])("an ordinary failure is not: %s", (error) => {
+        expect(isKernelCrash(error)).toBe(false);
     });
 });
