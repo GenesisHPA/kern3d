@@ -89,6 +89,12 @@ export type FeatureData =
 export interface ImportedFeatureData extends FeatureBase {
     readonly type: "imported";
     readonly brep: string;
+    /**
+     * Combined with the chain input instead of replacing it: a piece of an imported part kept
+     * as it was inside a body rebuilt as features (the stretch no feature describes). Absent,
+     * the shape is the body's first step.
+     */
+    readonly operation?: "fuse" | "cut";
 }
 
 /**

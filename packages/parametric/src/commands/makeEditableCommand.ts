@@ -10,6 +10,7 @@ import {
     type IDocument,
     Id,
     type INode,
+    Matrix4,
     PubSub,
     type ShapeType,
     ShapeTypes,
@@ -17,6 +18,8 @@ import {
 } from "@chili3d/core";
 import type { ImportedFeatureData } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
+import { moveSourceTriangles, rememberSourceTriangles } from "../stlRebuild/sourceMesh";
+import { trianglesOf } from "../stlRebuild/verify";
 import { meshToSolid, RECOVER_ON_IMPORT_FACES } from "./meshToSolid";
 
 /** The shapes a body can grow from: solids and the shells and faces an IGES file brings. */
@@ -76,6 +79,7 @@ export function makeEditable(nodes: readonly INode[]): number {
             if (body === undefined || parent === undefined) return;
             parent.insertAfter(node, body);
             parent.remove(node);
+            moveSourceTriangles(node.id, body.id);
             count++;
             return;
         }
@@ -135,6 +139,10 @@ export function solidifyMeshes(nodes: readonly INode[]): void {
     const visit = (node: INode) => {
         if (node instanceof EditableShapeNode && node.shape.isOk) {
             try {
+                // the STL's own triangles, kept for a later rebuild as features (`sourceMesh.ts`)
+                if (node.transform.equals(Matrix4.identity())) {
+                    rememberSourceTriangles(node.id, trianglesOf(node.shape.value));
+                }
                 const solid = meshToSolid(node.shape.value);
                 if (solid.isOk) {
                     node.shape = solid;

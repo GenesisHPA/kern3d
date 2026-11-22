@@ -299,6 +299,11 @@ export default {
         "command.modify.moveCopy": "Move/Copy",
         "command.modify.makeEditable": "Make Editable",
         "command.modify.recoverCylinders": "Recover Cylinders",
+        "command.modify.rebuildFromMesh": "Rebuild as Features",
+        "toast.rebuildFromMesh{0}{1}":
+            "Bodies rebuilt: {0}, off the original by up to {1} %; the original is hidden",
+        "toast.rebuildFromMesh.failed{0}":
+            "Could not rebuild closely enough ({0} % off); the body is left as it was",
         "toast.recoverCylinders{0}": "Bodies with recovered cylinders: {0}",
         "toast.recoverCylinders.none": "Pick an imported body with no features after the import",
         "toast.import.facetedLarge":
