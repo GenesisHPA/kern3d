@@ -303,9 +303,23 @@ function createWindow() {
 function setupUpdates(win) {
     if (!app.isPackaged) return;
     const { autoUpdater } = require("electron-updater");
+    const fs = require("node:fs");
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
+    const updaterLog = path.join(app.getPath("userData"), "updater.log");
+    const log = (line) => {
+        try {
+            fs.appendFileSync(updaterLog, `${new Date().toISOString()} ${line}\n`);
+        } catch {}
+    };
+    const setProgress = (value) => {
+        if (!win.isDestroyed()) win.setProgressBar(value);
+    };
+    autoUpdater.on("update-available", (info) => log(`available ${info.version}, downloading`));
+    autoUpdater.on("download-progress", (p) => setProgress(Math.max(0.01, (p.percent ?? 0) / 100)));
     autoUpdater.on("update-downloaded", async (info) => {
+        setProgress(-1);
+        log(`downloaded ${info.version}`);
         const { response } = await dialog.showMessageBox(win, {
             type: "info",
             buttons: ["Перезапустить сейчас", "Позже"],
@@ -319,7 +333,11 @@ function setupUpdates(win) {
         });
         if (response === 0) autoUpdater.quitAndInstall();
     });
-    autoUpdater.on("error", (error) => console.error("[updater]", error?.message ?? error));
+    autoUpdater.on("error", (error) => {
+        setProgress(-1);
+        log(`error ${error?.message ?? error}`);
+        console.error("[updater]", error?.message ?? error);
+    });
     const check = () => autoUpdater.checkForUpdates().catch(() => {});
     check();
     setInterval(check, UPDATE_CHECK_INTERVAL_MS);

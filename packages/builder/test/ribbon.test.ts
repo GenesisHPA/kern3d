@@ -239,6 +239,7 @@ describe("ParametricRibbonProfiles", () => {
             "feature.removeFeature",
             "modify.makeEditable",
             "modify.recoverCylinders",
+            "modify.rebuildFromMesh",
             "feature.fuse",
             "feature.cut",
             "feature.common",
