@@ -213,11 +213,18 @@ async function subscribe(ctx, message, on) {
     if (on) chats.add(id);
     else chats.delete(id);
     ctx.state.chats = [...chats];
-    if (had !== on) await ctx.save();
-    const where = isGroup(message.chat) ? "в этот чат" : "вам";
+    // a forum group: releases go to the topic /here was sent in (none → "General")
+    const threads = { ...(ctx.state.threads ?? {}) };
+    const thread = on && message.is_topic_message ? message.message_thread_id : undefined;
+    const threadChanged = (threads[id] ?? undefined) !== thread;
+    if (thread) threads[id] = thread;
+    else delete threads[id];
+    ctx.state.threads = threads;
+    if (had !== on || threadChanged) await ctx.save();
+    const where = !isGroup(message.chat) ? "вам" : thread ? "в эту тему" : "в этот чат";
     if (on)
         return had
-            ? `Уже подписано: новости о релизах приходят ${where}.`
+            ? `${threadChanged ? "Готово" : "Уже подписано"}: новости о релизах приходят ${where}.`
             : `Готово: новости о релизах Kern3D будут приходить ${where}.`;
     return had ? "Подписка отключена: новостей о релизах больше не будет." : "Подписки и не было.";
 }

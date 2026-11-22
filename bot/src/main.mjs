@@ -44,13 +44,15 @@ const sleep = (ms) =>
 
 async function broadcast(html) {
     for (const chatId of [...state.chats]) {
+        const thread = state.threads?.[chatId];
+        const extra = thread ? { message_thread_id: thread } : {};
         try {
-            await tg.sendMessage(chatId, html);
+            await tg.sendMessage(chatId, html, extra);
         } catch (error) {
             const migrated = error.parameters?.migrate_to_chat_id;
             if (migrated) {
                 state.chats = state.chats.map((id) => (id === chatId ? migrated : id));
-                await tg.sendMessage(migrated, html).catch((e) => log(`[release] ${migrated}: ${e.message}`));
+                await tg.sendMessage(migrated, html, extra).catch((e) => log(`[release] ${migrated}: ${e.message}`));
             } else if (error.code === 403 || /chat not found/i.test(error.description ?? "")) {
                 state.chats = state.chats.filter((id) => id !== chatId);
                 log(`[release] chat ${chatId} is gone, unsubscribed`);

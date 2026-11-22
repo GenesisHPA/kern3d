@@ -4,13 +4,13 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export function emptyState() {
-    return { offset: 0, lastTag: null, etag: null, latest: null, chats: [] };
+    return { offset: 0, lastTag: null, etag: null, latest: null, chats: [], threads: {} };
 }
 
 export async function loadState(dir) {
     try {
         const raw = JSON.parse(await readFile(join(dir, "state.json"), "utf8"));
-        return { ...emptyState(), ...raw, chats: Array.isArray(raw.chats) ? raw.chats : [] };
+        return { ...emptyState(), ...raw, chats: Array.isArray(raw.chats) ? raw.chats : [], threads: raw.threads && typeof raw.threads === "object" ? raw.threads : {} };
     } catch (error) {
         if (error.code !== "ENOENT")
             console.error(`[state] unreadable state.json, starting fresh: ${error.message}`);
