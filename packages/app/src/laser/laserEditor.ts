@@ -50,6 +50,7 @@ import style from "./laserEditor.module.css";
 import { defaultLaserFont, loadLaserFont } from "./laserFonts";
 import { toolIcon } from "./laserIcons";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
+import { newLaserJob } from "./laserJobs";
 import { LaserMachine } from "./laserMachine";
 import { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
@@ -71,6 +72,7 @@ import {
 import { type RotaryStep, rotarySteps } from "./rotary";
 import { Rotary3DView } from "./rotary3d";
 import { rotary3dSource } from "./rotary3dSource";
+import { defaultScale } from "./scaleShape";
 import {
     type Align,
     alignObjects,
@@ -84,6 +86,7 @@ import {
     scaleAll,
 } from "./selection";
 import { bakeSize, convertToPath, pathObject, rebuildPath, regenerate, shapeObject } from "./shapeObject";
+import type { LaserFontRef } from "./shapes";
 import { defaultQuiet, type LaserShape, needsFont } from "./shapes";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
@@ -151,6 +154,9 @@ const CORNER_SIGNS: [number, number][] = [
  */
 /** A new object's speed on a galvo (JCZ) machine: 300 mm/s, in the job's mm/min. */
 const GALVO_DEFAULT_SPEED = 300 * 60;
+
+/** The job list's last entry: a new job of the open mode. */
+const NEW_JOB = "__new__";
 
 export class LaserEditor {
     private static readonly editors = new Map<string, LaserEditor>();
@@ -454,6 +460,7 @@ export class LaserEditor {
         this.chosen = this.chosen.filter((id) => known.has(id));
         this.changed();
         this.render();
+        this.schedule3d();
     };
 
     // ---- data -----------------------------------------------------------------------------
@@ -468,6 +475,7 @@ export class LaserEditor {
         });
         LaserEditor.remember(this.node);
         this.changed();
+        this.schedule3d();
     }
 
     /** The job changed (an edit, undo): whatever was computed from it is stale. Subclass hook. */
@@ -504,7 +512,7 @@ export class LaserEditor {
     alignSelected(align: Align, toBed: boolean) {
         const objects = this.selectedObjects();
         if (objects.length === 0) return;
-        const target = toBed || objects.length === 1 ? bedRect(this.profile) : boundsOf(objects);
+        const target = toBed || objects.length === 1 ? this.bedBounds() : boundsOf(objects);
         alignObjects(objects, align, target);
         this.commit();
         this.render();
@@ -772,7 +780,6 @@ export class LaserEditor {
                 edit(this.data);
                 this.commit();
                 this.render();
-                void this.refresh3d();
             },
             editShape: (edit) => void this.editShape(edit),
             convertToCurves: () => {
@@ -863,7 +870,6 @@ export class LaserEditor {
             button("laser.delete", () => this.deleteSelected()),
             this.separator(),
             button("laser.fit", () => this.fit()),
-            this.view3dButton,
             this.separator(),
             ...this.gcodeOnly(
                 button("laser.generate", () => void this.output.generate()),
@@ -875,23 +881,17 @@ export class LaserEditor {
         ];
     }
 
-    /** «3D»: the part in the rotary chuck, shown when the job is marked round a part. */
-    private readonly view3dButton = button(
-        "laser.rotary.3d.open",
-        () => void this.toggle3d(),
-        "laser.rotary.3d.hint",
-    );
+    /** A rotary job: the part in 3D, docked beside the bed, made again after each change. */
     private view3d: Rotary3DView | undefined;
+    private refresh3dTimer: ReturnType<typeof setTimeout> | undefined;
 
-    private async toggle3d() {
-        if (this.view3d !== undefined) {
-            this.close3d();
-            return;
-        }
-        const view = new Rotary3DView(() => this.close3d());
+    private open3d() {
+        if (this.view3d !== undefined) return;
+        const view = new Rotary3DView(undefined);
+        view.element.classList.add(style.view3dDocked);
         this.view3d = view;
-        this.svg.parentElement?.append(view.element);
-        await this.refresh3d();
+        this.svg.after(view.element);
+        void this.refresh3d();
     }
 
     private close3d() {
@@ -899,20 +899,23 @@ export class LaserEditor {
         this.view3d = undefined;
     }
 
+    /** After an edit: the 3D part made again a moment later (not on every keystroke). */
+    private schedule3d() {
+        if (this.view3d === undefined) return;
+        clearTimeout(this.refresh3dTimer);
+        this.refresh3dTimer = setTimeout(() => void this.refresh3d(), 300);
+    }
+
     /** The 3D part made again from the job (opened, or the job / its rotary settings changed). */
     private async refresh3d() {
         const view = this.view3d;
         const rotary = this.data.rotary;
         if (view === undefined || rotary === undefined) return;
-        const images = this.output.current?.images ?? (await this.output.generate())?.images ?? new Map();
+        const images = this.output.current?.images ?? (await this.output.readImages());
         const job = withOrigin(this.data, this.profile);
         const centerY = this.profile.origin === "center" ? 0 : this.profile.bedHeight / 2;
-        const source = rotary3dSource(job, rotary, images, centerY);
-        if (source === undefined) {
-            this.setStatus(t("toast.laser.nothingToEngrave"));
-            return;
-        }
-        await view.show(source);
+        // an empty job still shows the part (its size from the settings)
+        await view.show(rotary3dSource(job, rotary, images, centerY, this.bedBounds()));
     }
 
     private gcodeOnly(...buttons: HTMLButtonElement[]): HTMLButtonElement[] {
@@ -924,24 +927,34 @@ export class LaserEditor {
     private readonly jobPicker = el("select", { title: t("laser.jobs") });
 
     private laserJobs(): LaserNode[] {
-        return this.node.document.modelManager.findNodes((n) => n instanceof LaserNode) as LaserNode[];
+        // the open mode's jobs only: a rotary job and a flat one have nothing to share
+        const rotary = this.rotary;
+        return (
+            this.node.document.modelManager.findNodes((n) => n instanceof LaserNode) as LaserNode[]
+        ).filter((n) => (n.data.rotary?.enabled === true) === rotary);
     }
 
     private updateJobPicker() {
         const jobs = this.laserJobs();
-        this.jobPicker.style.display = jobs.length > 1 ? "" : "none";
+        this.jobPicker.style.display = "";
         this.jobPicker.replaceChildren(
             ...jobs.map((job) => {
                 const option = el("option", { value: job.id, textContent: job.name });
                 option.selected = job.id === this.node.id;
                 return option;
             }),
+            el("option", { value: NEW_JOB, textContent: `+ ${t("laser.newJob")}` }),
         );
     }
 
     private createToolbar(): HTMLDivElement {
         const bar = el("div", { className: style.toolbar });
         this.jobPicker.onchange = () => {
+            if (this.jobPicker.value === NEW_JOB) {
+                this.jobPicker.value = this.node.id;
+                LaserEditor.open(newLaserJob(this.node.document, this.rotary ? "rotary" : "flat"));
+                return;
+            }
             const job = this.laserJobs().find((n) => n.id === this.jobPicker.value);
             if (job !== undefined && job !== this.node) LaserEditor.open(job);
         };
@@ -961,9 +974,8 @@ export class LaserEditor {
         this.updateJobPicker();
         const gcode = this.profile.controller !== "jcz";
         for (const b of this.gcodeButtons) b.style.display = gcode ? "" : "none";
-        const rotary = !gcode && this.data.rotary?.enabled === true;
-        this.view3dButton.style.display = rotary ? "" : "none";
-        if (!rotary && this.view3d !== undefined) this.close3d();
+        if (this.rotary) this.open3d();
+        else if (this.view3d !== undefined) this.close3d();
         this.world.setAttribute("transform", "matrix(1 0 0 -1 0 0)");
         this.renderBed();
         this.renderObjects();
@@ -977,8 +989,69 @@ export class LaserEditor {
      * figures every 50 mm along the bottom and left edges, and the origin's blue X/Y arrows — in
      * the middle of the bed for a centre origin, at its lower-left corner for a corner one.
      */
+    /** A rotary job: the part's surface unrolled is the bed. */
+    get rotary(): boolean {
+        return this.data.rotary?.enabled === true;
+    }
+
+    /**
+     * The bed: the machine's, or for a rotary job the part unrolled — its length along X, its
+     * circumference (π·D) along Y — placed by the machine's origin like the bed.
+     */
+    bedBounds(): Bounds {
+        const r = this.data.rotary;
+        if (r?.enabled !== true) return bedRect(this.profile);
+        const w = Math.max(1, r.length);
+        const h = Math.PI * Math.max(0.5, r.diameter);
+        return this.profile.origin === "center"
+            ? { minX: -w / 2, minY: -h / 2, maxX: w / 2, maxY: h / 2 }
+            : { minX: 0, minY: 0, maxX: w, maxY: h };
+    }
+
+    /** Rotary bed: the seam (the same line of the part, top and bottom) and the angle marks round it. */
+    private renderTurnMarks(b: Bounds): SVGGElement {
+        const g = svgElement("g", {});
+        const h = b.maxY - b.minY;
+        const seam = svgElement("path", {
+            d: `M${b.minX} ${b.minY}H${b.maxX}M${b.minX} ${b.maxY}H${b.maxX}`,
+            stroke: "#e8590c",
+            "stroke-width": 2,
+            "stroke-dasharray": "6 4",
+            "vector-effect": "non-scaling-stroke",
+            fill: "none",
+        });
+        const ticks = svgElement("path", {
+            stroke: "#f08c00",
+            "stroke-width": 1,
+            "vector-effect": "non-scaling-stroke",
+            fill: "none",
+        });
+        const labels = svgElement("g", { fill: "#e8590c", "font-family": "sans-serif" });
+        const size = Math.max(b.maxX - b.minX, h) / 70;
+        labels.setAttribute("font-size", String(size));
+        let d = "";
+        for (let a = 0; a <= 360; a += 45) {
+            const y = b.minY + (h * a) / 360;
+            d += `M${b.maxX} ${y}h${-size * (a % 90 === 0 ? 1.6 : 0.8)}`;
+            if (a % 90 !== 0) continue;
+            // inside the bed's right edge: outside it the 3D column would cut the figures
+            const e = svgElement("text", {
+                x: b.maxX - size * 0.4,
+                y: -Math.min(b.maxY - size * 0.7, Math.max(b.minY + size * 0.7, y)),
+                transform: "scale(1 -1)",
+                "text-anchor": "end",
+                "dominant-baseline": "middle",
+            });
+            e.textContent = `${a}°`;
+            labels.append(e);
+        }
+        ticks.setAttribute("d", d);
+        g.append(seam, ticks, labels);
+        return g;
+    }
+
     private renderBed() {
-        const b = bedRect(this.profile);
+        const b = this.bedBounds();
         const g = this.bedGroup;
         const w = b.maxX - b.minX;
         const h = b.maxY - b.minY;
@@ -1017,6 +1090,7 @@ export class LaserEditor {
         frame.setAttribute("stroke-width", "1");
         frame.setAttribute("vector-effect", "non-scaling-stroke");
         g.append(minor, major, frame, this.rulers(b), axes);
+        if (this.rotary) g.append(this.renderTurnMarks(b));
     }
 
     /** Figures every 50 mm outside the bottom and left edges, upright on screen. */
@@ -1228,7 +1302,7 @@ export class LaserEditor {
     }
 
     fit() {
-        const b = bedRect(this.profile);
+        const b = this.bedBounds();
         const width = b.maxX - b.minX;
         const height = b.maxY - b.minY;
         const rect = this.svg.getBoundingClientRect();
@@ -1270,7 +1344,7 @@ ${t(hint)}`;
             ["select", "nodes"],
             ["line", "curve", "pencil"],
             ["rect", "ellipse", "polygon"],
-            ["text", "barcode"],
+            ["text", "barcode", "scale"],
         ];
         const palette = el("div", { className: style.palette });
         groups.forEach((group, i) => {
@@ -1301,7 +1375,13 @@ ${t(hint)}`;
         this.tool = tool;
         this.keepTool = keep;
         this.svg.style.cursor =
-            tool === "select" ? "" : tool === "text" ? "text" : tool === "barcode" ? "copy" : "crosshair";
+            tool === "select"
+                ? ""
+                : tool === "text"
+                  ? "text"
+                  : tool === "barcode" || tool === "scale"
+                    ? "copy"
+                    : "crosshair";
         this.showTool();
         this.setStatus(
             tool === "select"
@@ -1633,10 +1713,34 @@ ${t(hint)}`;
         this.jobPanel.focusText();
     }
 
-    /** The font a figure is drawn with: a text's own, a barcode's digits in the default one. */
+    /**
+     * A click with the scale tool. On a rotary job a dial ring round the whole part — 0…360°,
+     * its 0 on the seam, at the clicked place along the axis; on a flat job a 100 mm ruler.
+     */
+    private async placeScale(at: Pt) {
+        const font: LaserFontRef = { family: "ГОСТ тип Б", stroke: "gost-b" };
+        const bed = this.bedBounds();
+        const rotary = this.rotary;
+        const span = rotary ? bed.maxY - bed.minY : 100;
+        const shape: LaserShape = { type: "scale", ...defaultScale(span, rotary, font) };
+        const outline = await this.fontFor(shape);
+        this.addFigure({ shape, at: { corner: rotary ? { x: at.x, y: bed.minY } : at } }, outline);
+        const o = this.selected();
+        if (o !== undefined) {
+            // ticks are open strokes: traced, never filled
+            o.op.mode = "line";
+            this.commit();
+            this.render();
+        }
+        this.showPanel("job");
+    }
+
+    /** The font a figure is drawn with: a text's or a scale's own, a barcode's digits in the default one. */
     private async fontFor(shape: LaserShape): Promise<FontOutline | undefined> {
         if (!needsFont(shape)) return undefined;
-        return loadLaserFont(shape.type === "text" ? shape.font : defaultLaserFont());
+        return loadLaserFont(
+            shape.type === "text" || shape.type === "scale" ? shape.font : defaultLaserFont(),
+        );
     }
 
     /**
@@ -1739,6 +1843,10 @@ ${t(hint)}`;
         }
         if (this.tool === "barcode") {
             void this.placeBarcode(p);
+            return;
+        }
+        if (this.tool === "scale") {
+            void this.placeScale(p);
             return;
         }
         if (this.tool === "line") {

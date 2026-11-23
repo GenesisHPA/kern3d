@@ -98,9 +98,9 @@ export class LaserJobPanel {
                 ? [focused.selectionStart, focused.selectionEnd]
                 : undefined;
         this.element.replaceChildren(
+            ...this.rotarySection(),
             ...this.bedSection(),
             ...this.objectsSection(),
-            ...this.rotarySection(),
             ...this.modelSection(),
             ...this.arrangeSection(),
             ...this.objectSection(),
@@ -127,42 +127,56 @@ export class LaserJobPanel {
                     (v) => this.host.setProfile((q) => (q.origin = v)),
                 ),
             ),
-            el(
-                "div",
-                { className: style.pair },
-                row(
-                    "laser.bedWidth",
-                    numberField(p.bedWidth, (v) => this.host.setProfile((q) => (q.bedWidth = v)), { min: 1 }),
-                ),
-                row(
-                    "laser.bedHeight",
-                    numberField(p.bedHeight, (v) => this.host.setProfile((q) => (q.bedHeight = v)), {
-                        min: 1,
-                    }),
-                ),
-            ),
+            // a rotary job's bed is the part unrolled: its size comes from the part, not the table
+            ...(this.host.data.rotary?.enabled === true
+                ? []
+                : [
+                      el(
+                          "div",
+                          { className: style.pair },
+                          row(
+                              "laser.bedWidth",
+                              numberField(p.bedWidth, (v) => this.host.setProfile((q) => (q.bedWidth = v)), {
+                                  min: 1,
+                              }),
+                          ),
+                          row(
+                              "laser.bedHeight",
+                              numberField(
+                                  p.bedHeight,
+                                  (v) => this.host.setProfile((q) => (q.bedHeight = v)),
+                                  {
+                                      min: 1,
+                                  },
+                              ),
+                          ),
+                      ),
+                  ]),
         ];
     }
 
-    /** Marking round a part in the rotary chuck (a galvo board's extension axis). */
+    /** A rotary job: the part (its size sets the unrolled bed) and how it is marked round. */
     private rotarySection(): HTMLElement[] {
-        if (this.host.profile.controller !== "jcz") return [];
-        const r = this.host.data.rotary ?? defaultRotaryJob();
+        const r = this.host.data.rotary;
+        if (r?.enabled !== true) return [];
         const set = (change: (q: RotaryJob) => void) =>
             this.host.editJob((job) => {
-                const next = { ...(job.rotary ?? defaultRotaryJob()) };
+                const next = { ...(job.rotary ?? defaultRotaryJob()), enabled: true };
                 change(next);
                 job.rotary = next;
             });
-        const parts: HTMLElement[] = [
-            heading("laser.rotary"),
-            row(
-                "laser.rotary.enabled",
-                checkbox(r.enabled, (v) => set((q) => (q.enabled = v))),
-            ),
-        ];
-        if (!r.enabled) return parts;
+        const parts: HTMLElement[] = [heading("laser.rotary.part")];
+        if (this.host.profile.controller !== "jcz")
+            parts.push(el("div", { className: style.warning, textContent: t("laser.rotary.needsJcz") }));
         parts.push(
+            row(
+                "laser.rotary.diameter",
+                numberField(r.diameter, (v) => set((q) => (q.diameter = Math.max(0.5, v))), { min: 0.5 }),
+            ),
+            row(
+                "laser.rotary.length",
+                numberField(r.length, (v) => set((q) => (q.length = Math.max(1, v))), { min: 1 }),
+            ),
             row(
                 "laser.rotary.mode",
                 select(
@@ -173,10 +187,6 @@ export class LaserJobPanel {
                     r.mode,
                     (v) => set((q) => (q.mode = v)),
                 ),
-            ),
-            row(
-                "laser.rotary.diameter",
-                numberField(r.diameter, (v) => set((q) => (q.diameter = Math.max(0.5, v))), { min: 0.5 }),
             ),
         );
         if (r.mode === "strips")
@@ -485,6 +495,8 @@ export class LaserJobPanel {
             rows.push(...this.textRows(shape, this.editAs(shape)));
         } else if (shape.type === "barcode") {
             rows.push(...this.barcodeRows(shape, this.editAs(shape)));
+        } else if (shape.type === "scale") {
+            rows.push(...this.scaleRows(shape, this.editAs(shape)));
         }
         rows.push(
             el(
@@ -584,6 +596,112 @@ export class LaserJobPanel {
                 checkbox(shape.invert, (v) => edit((s) => (s.invert = v))),
             ),
         );
+        return rows;
+    }
+
+    /** A scale's settings: range and step, tick lengths, figures and their look. */
+    private scaleRows(
+        shape: Extract<LaserShape, { type: "scale" }>,
+        edit: (f: (s: Extract<LaserShape, { type: "scale" }>) => void) => void,
+    ): HTMLElement[] {
+        const num = (
+            key: string,
+            value: number,
+            apply: (s: Extract<LaserShape, { type: "scale" }>, v: number) => void,
+            options: { min?: number; step?: number } = {},
+        ) =>
+            row(
+                key,
+                numberField(value, (v) => edit((s) => apply(s, v)), options),
+            );
+        const check = (
+            key: string,
+            value: boolean,
+            apply: (s: Extract<LaserShape, { type: "scale" }>, v: boolean) => void,
+        ) =>
+            row(
+                key,
+                checkbox(value, (v) => edit((s) => apply(s, v))),
+            );
+        const suffix = el("input", { type: "text", value: shape.suffix });
+        suffix.onchange = () => edit((s) => (s.suffix = suffix.value));
+        const fonts = strokeFonts();
+        const fontSelect = select(
+            fonts.map((f) => ({ value: f.stroke ?? f.family, label: f.family })),
+            shape.font.stroke ?? shape.font.family,
+            (v) =>
+                edit((s) => {
+                    const f = fonts.find((x) => (x.stroke ?? x.family) === v);
+                    if (f !== undefined) s.font = f;
+                }),
+        );
+        const rows: HTMLElement[] = [
+            heading("laser.scale.range"),
+            num("laser.scale.span", shape.span, (s, v) => (s.span = Math.max(0.1, v)), { min: 0.1 }),
+            el(
+                "div",
+                { className: style.pair },
+                num("laser.scale.from", shape.from, (s, v) => (s.from = v)),
+                num("laser.scale.to", shape.to, (s, v) => (s.to = v)),
+            ),
+            num("laser.scale.step", shape.step, (s, v) => (s.step = Math.max(1e-6, v)), { min: 0 }),
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "laser.scale.majorEvery",
+                    shape.majorEvery,
+                    (s, v) => (s.majorEvery = Math.max(0, Math.round(v))),
+                    { min: 0, step: 1 },
+                ),
+                num(
+                    "laser.scale.midEvery",
+                    shape.midEvery,
+                    (s, v) => (s.midEvery = Math.max(0, Math.round(v))),
+                    { min: 0, step: 1 },
+                ),
+            ),
+            check("laser.scale.reverse", shape.reverse, (s, v) => (s.reverse = v)),
+            check("laser.scale.skipLast", shape.skipLast, (s, v) => (s.skipLast = v)),
+            heading("laser.scale.ticks"),
+            num("laser.scale.majorLength", shape.majorLength, (s, v) => (s.majorLength = Math.max(0, v)), {
+                min: 0,
+            }),
+            num("laser.scale.midLength", shape.midLength, (s, v) => (s.midLength = Math.max(0, v)), {
+                min: 0,
+            }),
+            num("laser.scale.minorLength", shape.minorLength, (s, v) => (s.minorLength = Math.max(0, v)), {
+                min: 0,
+            }),
+            check("laser.scale.flip", shape.flip, (s, v) => (s.flip = v)),
+            check("laser.scale.baseline", shape.baseline, (s, v) => (s.baseline = v)),
+            heading("laser.scale.labels"),
+            check("laser.scale.showLabels", shape.labels, (s, v) => (s.labels = v)),
+        ];
+        if (shape.labels)
+            rows.push(
+                num(
+                    "laser.scale.labelEvery",
+                    shape.labelEvery,
+                    (s, v) => (s.labelEvery = Math.max(1, Math.round(v))),
+                    { min: 1, step: 1 },
+                ),
+                num("laser.scale.labelSize", shape.labelSize, (s, v) => (s.labelSize = Math.max(0.1, v)), {
+                    min: 0.1,
+                }),
+                num("laser.scale.labelGap", shape.labelGap, (s, v) => (s.labelGap = Math.max(0, v)), {
+                    min: 0,
+                }),
+                row("laser.scale.suffix", suffix),
+                num(
+                    "laser.scale.decimals",
+                    shape.decimals,
+                    (s, v) => (s.decimals = Math.max(0, Math.min(6, Math.round(v)))),
+                    { min: 0, step: 1 },
+                ),
+                check("laser.scale.labelsAlong", shape.labelsAlong, (s, v) => (s.labelsAlong = v)),
+                row("laser.scale.font", fontSelect),
+            );
         return rows;
     }
 

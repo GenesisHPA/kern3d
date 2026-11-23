@@ -14,61 +14,49 @@ import {
     Transaction,
 } from "@chili3d/core";
 import { LaserEditor } from "./laserEditor";
+import { type LaserJobMode, modeOf, newLaserJob } from "./laserJobs";
 import { LaserNode } from "./laserNode";
 
-/** A new, empty job in `document`, added in one undo step. */
-function newLaserJob(document: IDocument): LaserNode {
-    const name = NodeUtils.generateName(document, I18n.translate("laser.defaultName"));
-    const node = new LaserNode({ document, name });
-    Transaction.execute(document, "laser.create", () => document.modelManager.addNode(node));
-    return node;
+function jobsOf(document: IDocument): LaserNode[] {
+    return document.modelManager.findNodes((n) => n instanceof LaserNode) as LaserNode[];
 }
 
 /**
- * What choosing the «Лазер» workspace does, as in EzCAD where the program is the job: the
- * document's job last opened or edited comes up, else its last job, else a new one.
+ * Opens the document's job for `mode` — the last one opened or edited in it, else its last
+ * job of that mode, else a new one. (With no mode: the last job of either kind.)
  */
-export function openLaserWorkspace(document: IDocument): LaserNode {
-    const jobs = document.modelManager.findNodes((n) => n instanceof LaserNode) as LaserNode[];
+export function openLaserWorkspace(document: IDocument, mode?: LaserJobMode): LaserNode {
+    const jobs = jobsOf(document).filter((n) => mode === undefined || modeOf(n) === mode);
     const lastId = LaserEditor.lastEdited(document);
-    const job = jobs.find((n) => n.id === lastId) ?? jobs[jobs.length - 1] ?? newLaserJob(document);
+    const job =
+        jobs.find((n) => n.id === lastId) ?? jobs[jobs.length - 1] ?? newLaserJob(document, mode ?? "flat");
     LaserEditor.open(job);
     return job;
 }
 
-/** A new, empty laser job in the document, opened on the bed. */
+/** «2D-гравировка»: a job on the flat bed. */
 @command({
-    key: "laser.create",
+    key: "laser.flat",
     icon: "icon-layer-group",
 })
-export class CreateLaserJob implements ICommand {
+export class FlatLaserJob implements ICommand {
     async execute(app: IApplication): Promise<void> {
         const document = app.activeView?.document;
-        if (document === undefined) return;
-        LaserEditor.open(newLaserJob(document));
+        if (document !== undefined) openLaserWorkspace(document, "flat");
     }
 }
 
-/** Opens the selected laser job; a double-click on one in the tree does the same. */
+/** «Гравировка на оси»: a job round a part in the rotary chuck, on its unrolled surface. */
 @command({
-    key: "laser.open",
-    icon: "icon-edit",
+    key: "laser.rotary",
+    icon: "icon-history",
 })
-export class OpenLaserJob implements ICommand {
+export class RotaryLaserJob implements ICommand {
     async execute(app: IApplication): Promise<void> {
         const document = app.activeView?.document;
-        const node = document?.selection.getSelectedNodes().find((n) => n instanceof LaserNode);
-        if (node === undefined) {
-            PubSub.default.pub("showToast", "toast.laser.selectJob");
-            return;
-        }
-        LaserEditor.open(node as LaserNode);
+        if (document !== undefined) openLaserWorkspace(document, "rotary");
     }
 }
-
-PubSub.default.sub("nodeDoubleClicked", (node) => {
-    if (node instanceof LaserNode) LaserEditor.open(node);
-});
 
 PubSub.default.sub("workspaceSelected", (workspace) => {
     if (workspace !== "ribbon.workspace.laser") return;

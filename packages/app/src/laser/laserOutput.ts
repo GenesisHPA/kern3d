@@ -81,20 +81,26 @@ export class LaserOutput {
         this.host.previewGroup.replaceChildren();
     }
 
+    /** The job's pictures as lightness, by object id (read once per picture, then cached). */
+    async readImages(): Promise<Map<string, GrayImage>> {
+        const images = new Map<string, GrayImage>();
+        for (const o of this.host.data.objects) {
+            if (o.kind !== "image" || o.hidden) continue;
+            let gray = this.grays.get(o.dataUrl);
+            if (gray === undefined) {
+                gray = await readGray(o.dataUrl);
+                if (gray !== undefined) this.grays.set(o.dataUrl, gray);
+            }
+            if (gray !== undefined) images.set(o.id, gray);
+        }
+        return images;
+    }
+
     async generate(): Promise<GeneratedJob | undefined> {
         if (this.busy) return undefined;
         this.busy = true;
         try {
-            const images = new Map<string, GrayImage>();
-            for (const o of this.host.data.objects) {
-                if (o.kind !== "image" || o.hidden) continue;
-                let gray = this.grays.get(o.dataUrl);
-                if (gray === undefined) {
-                    gray = await readGray(o.dataUrl);
-                    if (gray !== undefined) this.grays.set(o.dataUrl, gray);
-                }
-                if (gray !== undefined) images.set(o.id, gray);
-            }
+            const images = await this.readImages();
             const profile = this.host.profile;
             const gcode = generateGcode(this.host.data, profile, images);
             const moves = parseToolpath(gcode.lines, profile.rapid);

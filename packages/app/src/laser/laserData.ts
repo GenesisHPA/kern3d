@@ -336,6 +336,7 @@ function parseRotary(raw: any): RotaryJob | undefined {
         enabled: raw.enabled === true,
         mode: raw.mode === "index" ? "index" : "strips",
         diameter: n(raw.diameter, base.diameter),
+        length: n(raw.length, base.length),
         stripWidth: n(raw.stripWidth, base.stripWidth),
     };
 }

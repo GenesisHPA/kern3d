@@ -1,0 +1,63 @@
+{
+    "//": "Rotary engraving without a machine: «Гравировка на оси» opens a rotary job — the bed is the part unrolled (length × π·D, the seam dashed, angle marks), the part settings first in the panel, the 3D part docked beside the bed. A square outline and a ring of text-like strokes are put on it; «▶ Просмотр» plays the job on the 3D part.",
+    "start": "document",
+    "steps": [
+        {
+            "kind": "eval",
+            "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); return true; })()"
+        },
+        {
+            "kind": "waitFor",
+            "selector": "dialog[open] svg"
+        },
+        {
+            "kind": "runCommand",
+            "name": "laser.rotary"
+        },
+        {
+            "kind": "wait",
+            "ms": 800
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const jobs = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group'); const node = jobs.find((n) => n.data.rotary && n.data.rotary.enabled); if (!node) throw new Error('no rotary job'); const op = (mode) => ({ mode, power: 50, speed: 1000, passes: 1, air: false, fillInterval: 0.3, fillAngle: 45, pen: '', raster: { mode: 'grayscale', dither: 'floyd', resolution: 5, brightness: 0, contrast: 0, gamma: 1, invert: false, threshold: 50, whiteClip: 5, minPower: 0, overscan: 2 } }); const square = { id: 'sq', name: 'square', kind: 'vector', x: -20, y: -15, width: 40, height: 30, angle: 0, lockAspect: true, sourceWidth: 10, sourceHeight: 10, paths: [{ closed: true, points: [{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}] }, { closed: true, points: [{x:2,y:2},{x:8,y:2},{x:5,y:8}] }], op: op('fill') }; const data = node.data; data.objects = [square]; node.content = JSON.stringify(data); return node.name; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 1500
+        },
+        {
+            "kind": "screenshot",
+            "name": "01-rotary-bed"
+        },
+        {
+            "kind": "key",
+            "text": "k"
+        },
+        {
+            "kind": "clickAt",
+            "x": 200,
+            "y": 420
+        },
+        {
+            "kind": "wait",
+            "ms": 1500
+        },
+        {
+            "kind": "screenshot",
+            "name": "01b-scale"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const b = [...document.querySelectorAll('dialog[open] button')].find((x) => x.textContent.includes('Просмотр') || x.textContent.includes('Preview')); if (!b) throw new Error('no preview button'); b.click(); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 4000
+        },
+        {
+            "kind": "screenshot",
+            "name": "02-preview"
+        }
+    ]
+}

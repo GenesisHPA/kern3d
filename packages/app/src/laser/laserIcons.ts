@@ -31,6 +31,10 @@ const ICONS: Record<DrawTool | "snap", string> = {
         '<rect x="6" y="6" width="2" height="2" fill="currentColor"/><rect x="16" y="6" width="2" height="2" fill="currentColor"/>' +
         '<rect x="6" y="16" width="2" height="2" fill="currentColor"/>' +
         '<path d="M14 14 L16 14 M18 14 L20 14 M14 17 L17 17 M19 17 L20 17 M14 20 L15 20 M17 20 L20 20"/>',
+    // a scale: a line with ticks, long every few
+    scale:
+        '<path d="M5 3 L5 21"/><path d="M5 4 L13 4 M5 8 L9 8 M5 12 L13 12 M5 16 L9 16 M5 20 L13 20"/>' +
+        '<path d="M16 5 L18 3 L18 9 M16 13 L19 13 L16 17 L19 17" stroke-width="1.2"/>',
     // a grid with a point caught on it
     snap:
         '<path d="M4 8 L20 8 M4 16 L20 16 M8 4 L8 20 M16 4 L16 20" stroke-opacity="0.55"/>' +

@@ -56,11 +56,11 @@
         },
         {
             "kind": "runCommand",
-            "name": "laser.create"
+            "name": "laser.flat"
         },
         {
             "kind": "eval",
-            "expression": "(() => { const jobs = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group'); if (jobs.length !== 2) throw new Error('expected two jobs, got ' + jobs.length); const picker = document.querySelector('dialog[open] select'); if (!picker || picker.options.length !== 2 || picker.style.display === 'none') throw new Error('no job picker'); document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); const again = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group'); if (again.length !== 2) throw new Error('the workspace made another job'); return picker.value === again[1].id; })()",
+            "expression": "(() => { const jobs = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group'); if (jobs.length !== 2) throw new Error('expected two jobs, got ' + jobs.length); const picker = document.querySelector('dialog[open] select'); if (!picker || picker.options.length !== 3 || picker.style.display === 'none') throw new Error('no job picker'); document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); const again = globalThis.activeDocument.modelManager.findNodes((n) => n.icon === 'icon-layer-group'); if (again.length !== 2) throw new Error('the workspace made another job'); return picker.value === again[1].id; })()",
             "log": true
         },
         {

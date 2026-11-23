@@ -35,7 +35,13 @@ const job = (...objects: LaserObject[]): LaserJobData => ({ version: 1, origin: 
 
 describe("rotary chuck", () => {
     test("strips: the job's Y range in bands, each turned to its centre and moved onto the field's centre line", () => {
-        const rotary: RotaryJob = { enabled: true, mode: "strips", diameter: 360 / Math.PI, stripWidth: 4 };
+        const rotary: RotaryJob = {
+            enabled: true,
+            mode: "strips",
+            diameter: 360 / Math.PI,
+            length: 100,
+            stripWidth: 4,
+        };
         // one turn = 360 mm, so 1 mm = 1°
         expect(mmPerDegree(rotary.diameter)).toBeCloseTo(1, 9);
         const steps = rotarySteps(job(box("a", 0, 10)), rotary, 0);
@@ -47,7 +53,7 @@ describe("rotary chuck", () => {
     });
 
     test("index: objects grouped by their angle, in order", () => {
-        const rotary: RotaryJob = { enabled: true, mode: "index", diameter: 20, stripWidth: 4 };
+        const rotary: RotaryJob = { enabled: true, mode: "index", diameter: 20, length: 100, stripWidth: 4 };
         const steps = rotarySteps(
             job(box("a", 0, 5, 180), box("b", 0, 5), box("c", 0, 5, 90), box("d", 0, 5, 180)),
             rotary,

@@ -7,6 +7,7 @@ import { QR_LEVELS } from "./barcodes";
 import { arcSegments, ellipsePath, flattenCubic, flattenQuadratic } from "./flatten";
 import { type LaserPath, type Pt, pathsBounds } from "./geometry";
 import { flattenSubPaths, parseSubPaths, type SubPath } from "./pathShape";
+import { defaultScale, type ScaleSpec, scalePaths } from "./scaleShape";
 import { isStrokeFont } from "./strokeFonts";
 
 /**
@@ -57,6 +58,8 @@ export type LaserShape =
           arcRadius: number;
       }
     | ({ type: "barcode" } & BarcodeSpec)
+    /** A graduated scale: a dial ring round a rotary part, a ruler on a flat one (scaleShape.ts). */
+    | ({ type: "scale" } & ScaleSpec)
     /** Bézier nodes: drawn with the pen or the pencil, or any outline opened for node editing. */
     | { type: "path"; subpaths: SubPath[] };
 
@@ -115,6 +118,22 @@ function rawPaths(shape: LaserShape, font: FontOutline | undefined): LaserPath[]
             return font === undefined ? [] : textPaths(shape, font);
         case "barcode":
             return [];
+        case "scale":
+            return scalePaths(shape, font, (text, size, f) =>
+                textPaths(
+                    {
+                        type: "text",
+                        text,
+                        font: shape.font,
+                        size,
+                        letterSpacing: 0,
+                        lineSpacing: 1.2,
+                        align: "left",
+                        arcRadius: 0,
+                    },
+                    f,
+                ),
+            );
         case "path":
             return flattenSubPaths(shape.subpaths);
     }
@@ -124,6 +143,7 @@ function rawPaths(shape: LaserShape, font: FontOutline | undefined): LaserPath[]
 export function needsFont(shape: LaserShape): boolean {
     return (
         shape.type === "text" ||
+        (shape.type === "scale" && shape.labels) ||
         (shape.type === "barcode" && shape.showText && /^(code128|ean13)$/.test(shape.format))
     );
 }
@@ -367,6 +387,47 @@ export function parseShape(raw: any): LaserShape | undefined {
                 barHeight: Math.max(num(raw.barHeight, 15), 0.1),
                 showText: raw.showText !== false,
                 invert: raw.invert === true,
+            };
+        }
+        case "scale": {
+            const base = defaultScale(num(raw.span, 100), false, { family: "ГОСТ тип Б", stroke: "gost-b" });
+            const f = raw.font ?? {};
+            const n = (key: keyof typeof base, min = Number.NEGATIVE_INFINITY) =>
+                Math.max(min, num(raw[key], base[key] as number));
+            return {
+                type: "scale",
+                span: n("span", 0.1),
+                from: n("from"),
+                to: n("to"),
+                step: n("step", 1e-6),
+                majorEvery: Math.round(n("majorEvery", 0)),
+                midEvery: Math.round(n("midEvery", 0)),
+                minorLength: n("minorLength", 0),
+                midLength: n("midLength", 0),
+                majorLength: n("majorLength", 0),
+                labels: raw.labels !== false,
+                labelEvery: Math.round(n("labelEvery", 1)),
+                labelSize: n("labelSize", 0.1),
+                labelGap: n("labelGap", 0),
+                suffix: typeof raw.suffix === "string" ? raw.suffix : "",
+                decimals: Math.round(n("decimals", 0)),
+                labelsAlong: raw.labelsAlong === true,
+                flip: raw.flip === true,
+                reverse: raw.reverse === true,
+                baseline: raw.baseline === true,
+                skipLast: raw.skipLast === true,
+                font: {
+                    family: typeof f.family === "string" ? f.family : base.font.family,
+                    url: typeof f.url === "string" ? f.url : undefined,
+                    local: f.local === true ? true : undefined,
+                    system: f.system === true ? true : undefined,
+                    stroke:
+                        typeof f.stroke === "string"
+                            ? f.stroke
+                            : typeof f.family === "string"
+                              ? undefined
+                              : base.font.stroke,
+                },
             };
         }
         case "text": {

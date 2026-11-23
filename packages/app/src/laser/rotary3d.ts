@@ -30,8 +30,8 @@ const PREVIEW_SECONDS = 20;
 
 /**
  * The part in the rotary chuck in 3D: a cylinder of the job's diameter with the job wrapped
- * round it (the planned lines faint), turning as the job goes so the place being marked is on
- * top under the beam, the burned lines dark behind it. Driven by the job's progress — the
+ * round it (the planned lines black), turning as the job goes so the place being marked is on
+ * top under the beam, the burned lines red behind it. Driven by the job's progress — the
  * machine's (the same as the 2D beam) or «Просмотр», which plays it without a machine.
  */
 export class Rotary3DView {
@@ -56,7 +56,8 @@ export class Rotary3DView {
     private pitch = 0.35;
     private playing = 0;
 
-    constructor(private readonly onClose: () => void) {
+    /** `onClose`: a close button in the title (none when the view is docked). */
+    constructor(private readonly onClose: (() => void) | undefined) {
         this.host = el("div", { className: style.view3dCanvas });
         const play = button("laser.rotary.3d.play", () => this.play());
         this.element = el(
@@ -67,7 +68,7 @@ export class Rotary3DView {
                 { className: style.view3dHead },
                 el("span", { textContent: t("laser.rotary.3d") }),
                 play,
-                button("laser.close", () => this.onClose()),
+                ...(this.onClose === undefined ? [] : [button("laser.close", () => this.onClose?.())]),
             ),
             this.host,
         );
@@ -146,14 +147,30 @@ export class Rotary3DView {
         this.turn.add(body);
         scene.add(this.turn);
 
-        // the chuck's jaws at the left end, for the look of it
-        const chuck = new THREE.Mesh(
-            new THREE.CylinderGeometry(r * 1.6, r * 1.6, Math.max(4, r * 0.8), 48),
-            new THREE.MeshStandardMaterial({ color: 0x3b4248, metalness: 0.6, roughness: 0.4 }),
-        );
+        // the chuck at the left end, turning with the part: degree marks round its rim (0° on
+        // the part's seam), and a fixed red pointer above it reading the angle
+        const chuckR = r * 1.6 + 3;
+        const chuckH = Math.max(6, r * 0.8);
+        const rim = new THREE.CanvasTexture(dialCanvas());
+        rim.colorSpace = THREE.SRGBColorSpace;
+        rim.anisotropy = 4;
+        const chuckSide = new THREE.MeshStandardMaterial({ map: rim, metalness: 0.5, roughness: 0.45 });
+        const chuckFace = new THREE.MeshStandardMaterial({ color: 0x3b4248, metalness: 0.6, roughness: 0.4 });
+        const chuck = new THREE.Mesh(new THREE.CylinderGeometry(chuckR, chuckR, chuckH, 96), [
+            chuckSide,
+            chuckFace,
+            chuckFace,
+        ]);
         chuck.rotation.z = Math.PI / 2;
-        chuck.position.x = -len / 2 - Math.max(2, r * 0.4);
-        scene.add(chuck);
+        chuck.position.x = -len / 2 - chuckH / 2 - 1;
+        this.turn.add(chuck);
+        const pointer = new THREE.Mesh(
+            new THREE.ConeGeometry(Math.max(1, chuckR * 0.08), Math.max(2, chuckR * 0.22), 16),
+            new THREE.MeshBasicMaterial({ color: 0xe03131 }),
+        );
+        pointer.rotation.z = Math.PI; // tip down, onto the rim
+        pointer.position.set(chuck.position.x, chuckR + Math.max(1.2, chuckR * 0.12), 0);
+        scene.add(pointer);
 
         // the beam: a line from above and a bright spot where it meets the part
         this.beam = new THREE.Group();
@@ -182,6 +199,8 @@ export class Rotary3DView {
 
         this.scene = scene;
         this.camera = new THREE.PerspectiveCamera(35, 1, 0.1, 10000);
+        // the app makes Z «up» for every object (CAD); this scene is Y-up
+        this.camera.up.set(0, 1, 0);
         this.dirty = true;
         this.setFraction(0);
         cancelAnimationFrame(this.frame);
@@ -204,7 +223,7 @@ export class Rotary3DView {
         // whole lines finished
         const ctx = this.canvas.getContext("2d");
         while (this.drawn < source.lines.length && this.starts[this.drawn + 1] <= time) {
-            if (ctx) this.stroke(ctx, source.lines[this.drawn].points, "#1d1f21", 1.6);
+            if (ctx) this.stroke(ctx, source.lines[this.drawn].points, "#e03131", 1.6);
             this.drawn++;
         }
         // the line being marked: its part done so far, and where the beam is on it
@@ -215,7 +234,7 @@ export class Rotary3DView {
             const k = span > 0 ? (time - this.starts[this.drawn]) / span : 1;
             const partial = partOf(line.points, k);
             at = partial[partial.length - 1];
-            if (ctx && partial.length > 1) this.stroke(ctx, partial, "#1d1f21", 1.6);
+            if (ctx && partial.length > 1) this.stroke(ctx, partial, "#e03131", 1.6);
         } else {
             const last = source.lines.at(-1)?.points.at(-1);
             at = last;
@@ -261,7 +280,7 @@ export class Rotary3DView {
         if (ctx === null || this.source === undefined) return;
         ctx.fillStyle = "#c9ced3";
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        for (const l of this.source.lines) this.stroke(ctx, l.points, "rgba(120, 128, 136, 0.55)", 1);
+        for (const l of this.source.lines) this.stroke(ctx, l.points, "#111315", 1.2);
         if (this.texture) this.texture.needsUpdate = true;
     }
 
@@ -346,4 +365,37 @@ function partOf(points: readonly Pt[], k: number): Pt[] {
         left -= d;
     }
     return out;
+}
+
+/**
+ * The chuck's rim: ticks every 10° (long every 30°, figures every 30°) round it, 0° where the
+ * part's seam is. The canvas runs round the rim along x (as the part's texture does), across
+ * the rim along y.
+ */
+function dialCanvas(): HTMLCanvasElement {
+    const canvas = document.createElement("canvas");
+    canvas.width = 2048;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    if (ctx === null) return canvas;
+    ctx.fillStyle = "#4a525a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#f1f3f5";
+    ctx.fillStyle = "#f1f3f5";
+    ctx.font = "bold 34px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let a = 0; a < 360; a += 5) {
+        // same direction round as the part's surface coordinate (u = θ / 2π)
+        const u = (a / 360) * canvas.width;
+        const long = a % 30 === 0;
+        const mid = a % 10 === 0;
+        ctx.lineWidth = long ? 4 : 2;
+        ctx.beginPath();
+        ctx.moveTo(u, 0);
+        ctx.lineTo(u, long ? 46 : mid ? 30 : 18);
+        ctx.stroke();
+        if (long) ctx.fillText(`${a}°`, u, 86);
+    }
+    return canvas;
 }

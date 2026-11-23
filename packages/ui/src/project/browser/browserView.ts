@@ -39,7 +39,6 @@ const SECTIONS: readonly { category: NodeCategory; title: I18nKeys }[] = [
     { category: "joint", title: "browser.joints" },
     { category: "component", title: "browser.components" },
     { category: "drawing", title: "browser.drawings" },
-    { category: "laser", title: "browser.laserJobs" },
     { category: "annotation", title: "ribbon.group.annotation" },
     { category: "other", title: "browser.other" },
 ];

@@ -24,6 +24,7 @@ export const DRAW_TOOLS = [
     "polygon",
     "text",
     "barcode",
+    "scale",
 ] as const;
 export type DrawTool = (typeof DRAW_TOOLS)[number];
 
@@ -39,6 +40,7 @@ export const TOOL_KEYS: Record<string, DrawTool> = {
     p: "polygon",
     t: "text",
     b: "barcode",
+    k: "scale",
 };
 
 export type Draft =

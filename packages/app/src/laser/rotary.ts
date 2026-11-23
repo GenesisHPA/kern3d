@@ -20,6 +20,8 @@ export interface RotaryJob {
     mode: "strips" | "index";
     /** Diameter of the part where it is marked, mm. */
     diameter: number;
+    /** Length of the part along the axis, mm: the unrolled field's width. */
+    length: number;
     /** Band width in "strips" mode, mm on the surface. Narrow = less distortion on the curve. */
     stripWidth: number;
 }
@@ -39,7 +41,7 @@ export interface RotaryAxis {
 }
 
 export function defaultRotaryJob(): RotaryJob {
-    return { enabled: false, mode: "strips", diameter: 30, stripWidth: 4 };
+    return { enabled: false, mode: "strips", diameter: 30, length: 100, stripWidth: 4 };
 }
 
 export function defaultRotaryAxis(): RotaryAxis {

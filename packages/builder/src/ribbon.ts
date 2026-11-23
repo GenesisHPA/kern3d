@@ -289,7 +289,7 @@ export const LaserRibbonProfiles: RibbonProfileExtra[] = [
         groups: [
             {
                 groupName: "ribbon.group.laser",
-                items: ["laser.create", "laser.open"],
+                items: ["laser.flat", "laser.rotary"],
             },
         ],
     },

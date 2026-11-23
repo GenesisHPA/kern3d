@@ -4,7 +4,7 @@
 import { burnPolylines } from "./jczProgram";
 import type { LaserJobData } from "./laserData";
 import type { GrayImage } from "./raster";
-import { jobYRange, mmPerDegree, type RotaryJob } from "./rotary";
+import { mmPerDegree, type RotaryJob } from "./rotary";
 import type { Rotary3DSource, SurfaceLine } from "./rotary3d";
 
 /**
@@ -18,9 +18,9 @@ export function rotary3dSource(
     rotary: RotaryJob,
     images: ReadonlyMap<string, GrayImage>,
     centerY: number,
-): Rotary3DSource | undefined {
-    const range = jobYRange(job);
-    if (range === undefined) return undefined;
+    /** The unrolled bed: the part's length when there is nothing to mark yet. */
+    bed: { minX: number; maxX: number; minY: number },
+): Rotary3DSource {
     const perDegree = mmPerDegree(rotary.diameter);
     const lines: SurfaceLine[] = [];
     let xMin = Number.POSITIVE_INFINITY;
@@ -30,7 +30,7 @@ export function rotary3dSource(
         const image = o.kind === "image" ? images.get(o.id) : undefined;
         if (o.kind === "image" && image === undefined) continue;
         const speed = Math.max(1e-6, o.op.speed / 60);
-        const shift = rotary.mode === "index" ? (o.rotaryAngle ?? 0) * perDegree - centerY : -range[0];
+        const shift = rotary.mode === "index" ? (o.rotaryAngle ?? 0) * perDegree - centerY : -bed.minY;
         const own = burnPolylines(o, image).filter((l) => l.length > 1);
         for (let pass = 0; pass < Math.max(1, o.op.passes); pass++) {
             for (const l of own) {
@@ -45,7 +45,11 @@ export function rotary3dSource(
             }
         }
     }
-    if (lines.length === 0) return undefined;
-    const margin = Math.max(2, (xMax - xMin) * 0.08);
-    return { diameter: rotary.diameter, xMin: xMin - margin, xMax: xMax + margin, lines };
+    // the part as long as the bed says, or longer when the job goes past it
+    return {
+        diameter: rotary.diameter,
+        xMin: Math.min(bed.minX, xMin),
+        xMax: Math.max(bed.maxX, xMax),
+        lines,
+    };
 }
