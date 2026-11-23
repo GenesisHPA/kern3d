@@ -1459,6 +1459,7 @@ export const I18N_KEYS = [
     "laser.panel.preview",
     "laser.output.galvo",
     "laser.output.calculate",
+    "laser.beam.progress",
     "laser.summary.galvo",
     "laser.machine.confirmStart.galvo",
     "laser.tool.select",

@@ -1547,6 +1547,7 @@ export default {
         "laser.panel.preview": "Preview",
         "laser.output.galvo": "Toolpath and time",
         "laser.output.calculate": "Calculate",
+        "laser.beam.progress": "Marking: {0} % · ≈ {1} left",
         "laser.summary.galvo": "Time ≈ {0} · burning {1} m · travel {2} m",
         "laser.machine.confirmStart.galvo":
             "Start marking? About {0} min. Put on safety glasses and keep STOP at hand.",

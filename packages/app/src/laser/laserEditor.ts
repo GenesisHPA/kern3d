@@ -21,6 +21,7 @@ import { importEzd } from "./ezdImport";
 import { framePaths } from "./framePaths";
 import { bodyOutline, drawingSheet, faceOutline, type ModelView } from "./fromModel";
 import { type Affine, apply, type Bounds, invert, type LaserPath, type Pt } from "./geometry";
+import { BeamAnimation, type BeamProgress } from "./laserBeam";
 import {
     defaultOperation,
     type LaserJobData,
@@ -44,6 +45,7 @@ import {
     snapToGrid,
     TOOL_KEYS,
 } from "./laserDraw";
+import type { DriverEvent } from "./laserDriver";
 import style from "./laserEditor.module.css";
 import { defaultLaserFont, loadLaserFont } from "./laserFonts";
 import { toolIcon } from "./laserIcons";
@@ -82,6 +84,7 @@ import { bakeSize, convertToPath, pathObject, rebuildPath, regenerate, shapeObje
 import { defaultQuiet, type LaserShape, needsFont } from "./shapes";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
+import { formatDuration } from "./toolpath";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -189,6 +192,9 @@ export class LaserEditor {
     private readonly jobPanel: LaserJobPanel;
     protected readonly output: LaserOutput;
     private readonly machine: LaserMachine;
+    /** The beam over the preview while the machine runs the job. */
+    private readonly beam: BeamAnimation;
+    private beamPercent = -1;
     private readonly objectElements = new Map<string, SVGGraphicsElement>();
     data: LaserJobData;
     private committed: string;
@@ -261,6 +267,7 @@ export class LaserEditor {
         this.svg.append(this.world);
         this.statusText = el("span");
         this.statusPosition = el("span");
+        this.beam = new BeamAnimation(this.world, (p) => this.showBeamProgress(p));
         this.jobPanel = new LaserJobPanel(this.jobPanelHost());
         const editor = this;
         this.output = new LaserOutput({
@@ -296,6 +303,8 @@ export class LaserEditor {
             },
             framePaths: (mode) => framePaths(this.data, mode),
             showMachinePanel: () => this.showPanel("machine"),
+            jobStarted: () => this.startBeam(),
+            driverEvent: (event) => this.beamEvent(event),
         });
         this.panelTabs = el("div", { className: style.panelTabs });
         this.panelBody = el("div", { className: style.panelBody });
@@ -347,7 +356,47 @@ export class LaserEditor {
         if (this.dialog.open) this.dialog.close();
     }
 
+    /** The job went to the machine: the beam follows it over the preview. */
+    private startBeam() {
+        const r = this.output.current;
+        if (r === undefined) return;
+        this.beamPercent = -1;
+        // a galvo board reports no position while marking: the beam keeps the job's time
+        this.beam.start(r.moves, r.stats.seconds, this.profile.controller === "jcz" ? "time" : "position");
+    }
+
+    private beamEvent(event: DriverEvent) {
+        if (!this.beam.active) return;
+        switch (event.type) {
+            case "job":
+                if (event.state === "running") this.beam.resume();
+                else if (event.state === "paused") this.beam.pause();
+                else if (event.state === "done") {
+                    this.beam.finish();
+                    this.setStatus(this.output.summary());
+                } else if (event.state === "stopped" || event.state === "error") {
+                    this.beam.halt();
+                    this.setStatus(this.output.summary());
+                }
+                break;
+            case "progress":
+                this.beam.lists(event.done, event.total);
+                break;
+            case "status":
+                if (event.status.position !== undefined) this.beam.position(event.status.position);
+                break;
+        }
+    }
+
+    private showBeamProgress(p: BeamProgress) {
+        const percent = Math.floor(p.fraction * 100);
+        if (percent === this.beamPercent || p.fraction >= 1) return;
+        this.beamPercent = percent;
+        this.setStatus(t("laser.beam.progress", percent, formatDuration(p.remaining)));
+    }
+
     close() {
+        this.beam.dispose();
         // the laser off and the port free before the editor goes
         if (this.machine.connected) void this.machine.disconnect();
         this.node.removePropertyChanged(this.onNodeChanged);

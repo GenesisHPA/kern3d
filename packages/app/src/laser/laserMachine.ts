@@ -27,6 +27,10 @@ export interface LaserMachineHost {
     framePaths(mode: FrameMode | "toolpath"): Pt[][];
     /** Brings the machine tab to the front (to connect). */
     showMachinePanel(): void;
+    /** The job was handed to the machine (the editor starts the beam on the preview). */
+    jobStarted?(program: LaserProgram): void;
+    /** Every event of the driver (job state, lists sent, position) — for the beam. */
+    driverEvent?(e: DriverEvent): void;
 }
 
 /** A job is confirmed once per session; after that «Маркировка» starts at once, as in EzCAD. */
@@ -579,6 +583,7 @@ export class LaserMachine {
     }
 
     private readonly onEvent = (e: DriverEvent) => {
+        this.host.driverEvent?.(e);
         switch (e.type) {
             case "log":
                 this.log(e.text, e.kind);
@@ -707,7 +712,7 @@ export class LaserMachine {
             markConfirmed = true;
         }
         this.lastError.textContent = "";
-        d.run(program);
+        if (d.run(program)) this.host.jobStarted?.(program);
         this.update();
     }
 

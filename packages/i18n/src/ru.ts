@@ -1383,6 +1383,7 @@ export default {
         "laser.panel.preview": "Расчёт",
         "laser.output.galvo": "Траектория и время",
         "laser.output.calculate": "Рассчитать",
+        "laser.beam.progress": "Маркировка: {0} % · осталось ≈ {1}",
         "laser.summary.galvo": "Время ≈ {0} · прожиг {1} м · холостой ход {2} м",
         "laser.machine.confirmStart.galvo":
             "Запустить маркировку? Примерно {0} мин. Наденьте защитные очки и держите под рукой «СТОП».",
