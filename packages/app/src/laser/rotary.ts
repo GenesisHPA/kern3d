@@ -41,7 +41,7 @@ export interface RotaryAxis {
 }
 
 export function defaultRotaryJob(): RotaryJob {
-    return { enabled: false, mode: "strips", diameter: 30, length: 100, stripWidth: 4 };
+    return { enabled: false, mode: "strips", diameter: 100, length: 100, stripWidth: 4 };
 }
 
 export function defaultRotaryAxis(): RotaryAxis {
