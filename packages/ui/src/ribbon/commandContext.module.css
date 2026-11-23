@@ -347,7 +347,8 @@
     align-items: stretch;
     padding: 0;
     gap: 0;
-    max-height: calc(100vh - 370px);
+    /* the real cap is set from the panel's place (fitDockedHeight); this is only before that */
+    max-height: calc(100vh - 200px);
     overflow-y: auto;
 
     & > * {

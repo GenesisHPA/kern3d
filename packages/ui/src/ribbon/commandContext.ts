@@ -64,6 +64,33 @@ export function resetDockedPosition() {
 }
 
 /** Puts a docked panel at (left, top) inside its viewport, keeping its title row reachable. */
+/** Gap kept between a docked panel and the bottom of the viewport, px. */
+const DOCKED_BOTTOM_GAP = 12;
+
+/**
+ * A docked panel grows with its parameters down to the bottom of the viewport; only what does not
+ * fit there scrolls. (It used to be capped at the window height less 370 px wherever it stood, so
+ * even a short dialog such as Extrude scrolled on a big screen.)
+ */
+export function fitDockedHeight(panel: HTMLElement) {
+    const host = panel.offsetParent as HTMLElement | null;
+    const content = panel.querySelector<HTMLElement>(`.${style.container}`);
+    if (!host || !content) return;
+    const chrome = panel.offsetHeight - content.offsetHeight;
+    const room = host.clientHeight - panel.offsetTop - DOCKED_BOTTOM_GAP - chrome;
+    content.style.maxHeight = `${Math.max(120, room)}px`;
+}
+
+let resizeHooked = false;
+function hookResize() {
+    if (resizeHooked || typeof window === "undefined") return;
+    resizeHooked = true;
+    window.addEventListener("resize", () => {
+        for (const panel of document.querySelectorAll<HTMLElement>(`.${style.docked}`))
+            fitDockedHeight(panel);
+    });
+}
+
 export function placeDockedPanel(panel: HTMLElement, left: number, top: number) {
     const host = panel.offsetParent as HTMLElement | null;
     if (!host) return;
@@ -75,11 +102,16 @@ export function placeDockedPanel(panel: HTMLElement, left: number, top: number) 
     panel.style.top = `${y}px`;
     panel.style.right = "auto";
     dockedPosition = { left: x, top: y };
+    fitDockedHeight(panel);
 }
 
 /** Opens a docked panel where the last one was dragged to (nothing when none was). */
 export function restoreDockedPanel(panel: HTMLElement) {
+    hookResize();
     if (dockedPosition) placeDockedPanel(panel, dockedPosition.left, dockedPosition.top);
+    else fitDockedHeight(panel);
+    // the parameters are laid out in the next frame (fonts, wrapped rows): fit again then
+    requestAnimationFrame?.(() => fitDockedHeight(panel));
 }
 
 /** A docked panel is moved over the viewport by its title row; the place is kept for the next one. */
