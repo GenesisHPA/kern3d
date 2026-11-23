@@ -606,6 +606,9 @@ export default {
         "home.changes": "Что нового",
         "home.recent": "Недавние проекты",
         "home.recent.empty": "Пока нет недавних документов. Создайте или откройте документ, чтобы начать.",
+        "home.community": "Вопросы, тесты и новости —",
+        "home.community.telegram": "группа в Telegram",
+        "laser.rotary.timeout": "Поворотная ось не дошла до угла за 30 с — проверьте настройки оси",
         "home.credits":
             "Kern3D от Genesis Tactical · на основе Chili3D, автор xiangechen (仙阁) · лицензия AGPL-3.0",
         "home.welcome": "Добро пожаловать в Kern3D",

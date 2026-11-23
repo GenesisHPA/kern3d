@@ -12,11 +12,14 @@ import {
     PubSub,
     type RecentDocumentDTO,
 } from "@chili3d/core";
-import { button, collection, div, img, span, svg } from "@chili3d/element";
+import { a, button, collection, div, img, span, svg } from "@chili3d/element";
 import { type ChangelogRelease, parseChangelog } from "./changelog";
 import style from "./home.module.css";
 import { LanguageSelector } from "./languageSelector";
 import { ThemeSelector } from "./themeSelector";
+
+/** The users' group: questions, testing, release news. */
+const TELEGRAM_GROUP = "https://t.me/HPA_AirSoft_System_Development/71332";
 
 interface ApplicationCommand {
     display: I18nKeys;
@@ -159,6 +162,16 @@ export class Home extends HTMLElement {
                         this.documentCollection(documents),
                     ),
                     this.changesColumn(),
+                ),
+                div(
+                    { className: style.community },
+                    span({ textContent: new Localize("home.community") }),
+                    a({
+                        href: TELEGRAM_GROUP,
+                        target: "_blank",
+                        rel: "noopener",
+                        textContent: new Localize("home.community.telegram"),
+                    }),
                 ),
                 div({ className: style.credits, textContent: new Localize("home.credits") }),
             ),

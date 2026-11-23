@@ -692,6 +692,9 @@ export default {
         "home.changes": "What's new",
         "home.recent": "Recent Projects",
         "home.recent.empty": "No recent documents yet. Create or open a document to get started.",
+        "home.community": "Questions, testing and news —",
+        "home.community.telegram": "Telegram group",
+        "laser.rotary.timeout": "The rotary axis did not reach its angle in 30 s — check the axis settings",
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",
         "home.welcome": "Welcome to Kern3D",
