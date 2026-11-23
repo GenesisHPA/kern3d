@@ -14,6 +14,7 @@ import {
     translation,
 } from "./geometry";
 import type { BedOrigin, MachineProfile } from "./machineProfile";
+import { defaultRotaryJob, type RotaryJob } from "./rotary";
 import { type LaserShape, parseShape } from "./shapes";
 
 /**
@@ -87,6 +88,8 @@ interface LaserObjectBase {
     /** Counter-clockwise about the box centre, degrees. */
     angle: number;
     lockAspect: boolean;
+    /** Rotary "index" mode: the chuck's angle this object is marked at, degrees. */
+    rotaryAngle?: number;
     /** Left out of the job and the preview, but kept. */
     hidden?: boolean;
     op: LaserOperation;
@@ -120,6 +123,8 @@ export interface LaserJobData {
      */
     origin: BedOrigin;
     objects: LaserObject[];
+    /** Marking round a part in a rotary chuck (see rotary.ts); absent = flat. */
+    rotary?: RotaryJob;
 }
 
 export function defaultRaster(): RasterSettings {
@@ -269,6 +274,10 @@ function parseObject(raw: any): LaserObject | undefined {
         angle: finite(raw.angle, 0),
         lockAspect: raw.lockAspect !== false,
         hidden: raw.hidden === true ? true : undefined,
+        rotaryAngle:
+            typeof raw.rotaryAngle === "number" && Number.isFinite(raw.rotaryAngle)
+                ? raw.rotaryAngle
+                : undefined,
     };
     if (raw.kind === "image" && typeof raw.dataUrl === "string") {
         return {
@@ -311,10 +320,24 @@ export function parseLaserJob(json: string | undefined): LaserJobData {
             version: 1,
             origin: raw?.origin === "center" ? "center" : "corner",
             objects: objects.filter((o: LaserObject | undefined) => o !== undefined),
+            rotary: parseRotary(raw?.rotary),
         };
     } catch {
         return defaultLaserJob();
     }
+}
+
+function parseRotary(raw: any): RotaryJob | undefined {
+    if (raw === undefined || raw === null || typeof raw !== "object") return undefined;
+    const base = defaultRotaryJob();
+    const n = (v: unknown, fallback: number) =>
+        typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback;
+    return {
+        enabled: raw.enabled === true,
+        mode: raw.mode === "index" ? "index" : "strips",
+        diameter: n(raw.diameter, base.diameter),
+        stripWidth: n(raw.stripWidth, base.stripWidth),
+    };
 }
 
 /** Coordinates rounded to a micron keep the stored JSON small. */

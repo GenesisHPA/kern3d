@@ -31,6 +31,7 @@ import {
 import { bedRect, type MachineProfile } from "./machineProfile";
 import { orderPaths } from "./pathOrder";
 import { type GrayImage, powerMap, resampleGray } from "./raster";
+import { clipPolylineY, type RotaryStep } from "./rotary";
 
 /** Galvo units across one millimetre of the field (MeerK40t: 0xFFFF / lens size). */
 export function galvosPerMm(jcz: JczSettings): number {
@@ -217,6 +218,8 @@ export function jczProgram(
     stored: LaserJobData,
     profile: MachineProfile,
     images: ReadonlyMap<string, GrayImage> = new Map(),
+    /** A stop of the rotary chuck: only its band / objects, shifted onto the field's centre line. */
+    step?: RotaryStep,
 ): JczProgram {
     const job = withOrigin(stored, profile);
     const jcz = profile.jcz;
@@ -231,6 +234,7 @@ export function jczProgram(
     let head: Pt = { x: 0, y: 0 };
     for (const o of job.objects) {
         if (o.hidden) continue;
+        if (step?.objects !== undefined && !step.objects.has(o.id)) continue;
         const image = o.kind === "image" ? images.get(o.id) : undefined;
         if (o.kind === "image" && image === undefined) {
             if (!warnings.includes("laser.warn.imageMissing")) warnings.push("laser.warn.imageMissing");
@@ -239,7 +243,7 @@ export function jczProgram(
         for (const c of settingsCommands(o, jcz)) w.push(c);
         const pen = penOf(jcz, o.op.pen);
         const speed = Math.max(1e-6, o.op.speed / 60);
-        const lines = burnPolylines(o, image);
+        const lines = rotaryLines(burnPolylines(o, image), step);
         for (let pass = 0; pass < Math.max(1, o.op.passes); pass++) {
             for (const line of lines) {
                 if (line.length < 2) continue;
@@ -260,6 +264,17 @@ export function jczProgram(
     w.push([List.EndOfList]);
     if (mapper.clipped) warnings.push("laser.warn.outsideField");
     return { commands: w.commands, seconds, warnings };
+}
+
+/** The burn lines of one chuck stop: cut to its band, moved onto the field's centre line. */
+function rotaryLines(lines: Pt[][], step: RotaryStep | undefined): Pt[][] {
+    if (step === undefined) return lines;
+    const clipped =
+        step.clipY === undefined
+            ? lines
+            : lines.flatMap((l) => clipPolylineY(l, step.clipY![0], step.clipY![1]));
+    if (step.shiftY === 0) return clipped;
+    return clipped.map((l) => l.map((p) => ({ x: p.x, y: p.y + step.shiftY })));
 }
 
 /**

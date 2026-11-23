@@ -26,6 +26,7 @@ import {
     STATUS_READY,
 } from "./lmc";
 import type { MachineProfile } from "./machineProfile";
+import { anglePulses, type RotaryStep } from "./rotary";
 
 /** The board's USB pipe: 12-byte commands and 0xC00-byte lists out, 8-byte replies in. */
 export interface LmcTransport {
@@ -317,31 +318,57 @@ export class JczDriver implements LaserDriver {
 
     run(program: LaserProgram): boolean {
         if (this.transport === undefined || this.state === "running" || this.state === "paused") return false;
-        const job = jczProgram(program.job, this.profile(), program.images);
-        for (const w of job.warnings) this.log(t(w), "err");
+        const profile = this.profile();
+        // flat: one program; rotary: one per stop of the chuck (a band, or the objects at an angle)
+        const stops: (RotaryStep | undefined)[] = program.rotary?.steps.length
+            ? program.rotary.steps
+            : [undefined];
+        const plans = stops.map((step) => ({
+            step,
+            job: jczProgram(program.job, profile, program.images, step),
+        }));
+        const warnings = new Set(plans.flatMap((p) => p.job.warnings));
+        for (const w of warnings) this.log(t(w), "err");
         const start = async () => {
             await this.stopping;
             if (this.framingActive) await this.stopFramingNow();
-            const packets = packLists(job.commands);
-            this.total = packets.length;
+            const lists = plans.map((p) => packLists(p.job.commands));
+            const total = lists.reduce((n, l) => n + l.length, 0);
+            this.total = total;
             this.done = 0;
             this.aborting = false;
             this.setJob("running");
-            const j = this.profile().jcz;
-            // program mode: a fresh list, the laser enable bit, the fiber MO open
-            await this.send([Cmd.ResetList]);
-            this.portBits = 1 << j.laserPin;
-            await this.send([Cmd.WritePort, this.portBits]);
-            await this.send([Cmd.FiberSetMo, 1]);
-            await this.streamLists(packets, (count) => {
-                this.done = count;
-                this.emit({ type: "progress", done: count, total: packets.length });
-            });
-            await this.waitIdle();
-            if (this.aborting) return;
-            await this.send([Cmd.FiberSetMo, 0]);
+            const j = profile.jcz;
+            // the job starts where the chuck stands now
+            const base = this.axisAngle;
+            let sent = 0;
+            for (const [index, packets] of lists.entries()) {
+                if (this.aborting) return;
+                const step = plans[index].step;
+                if (step !== undefined) {
+                    // the chuck turns with the laser off
+                    await this.turnTo(base + step.angle);
+                    while (this.paused && !this.aborting) await this.sleep(100);
+                    if (this.aborting) return;
+                }
+                if (packets.length === 0) continue;
+                // program mode: a fresh list, the laser enable bit, the fiber MO open
+                await this.send([Cmd.ResetList]);
+                this.portBits = 1 << j.laserPin;
+                await this.send([Cmd.WritePort, this.portBits]);
+                await this.send([Cmd.FiberSetMo, 1]);
+                await this.streamLists(packets, (count) => {
+                    this.done = sent + count;
+                    this.emit({ type: "progress", done: this.done, total });
+                });
+                sent += packets.length;
+                await this.waitIdle();
+                if (this.aborting) return;
+                await this.send([Cmd.FiberSetMo, 0]);
+            }
             this.portBits = 0;
             await this.send([Cmd.WritePort, 0]);
+            if (program.rotary !== undefined && j.rotary.returnToStart) await this.turnTo(base);
             await this.park();
             this.setJob("done");
         };
@@ -354,6 +381,33 @@ export class JczDriver implements LaserDriver {
                 this.streaming = undefined;
             });
         return true;
+    }
+
+    /** The chuck's angle from the job's start, degrees (the axis's own zero is where the job began). */
+    private axisAngle = 0;
+
+    /** Turns the rotary chuck to `angle` and waits until it is there (or a timeout) and settled. */
+    private async turnTo(angle: number) {
+        const axis = this.profile().jcz.rotary;
+        const target = anglePulses(angle, axis);
+        // the position as two 16-bit words, low first (to be checked on a board with a chuck)
+        await this.send([Cmd.MoveAxisTo, axis.axis, target & 0xffff, (target >>> 16) & 0xffff]);
+        const deadline = Date.now() + 30_000;
+        while (!this.aborting && Date.now() < deadline) {
+            const r = await this.send([Cmd.GetAxisPos, axis.axis]);
+            const pos = (r[1] & 0xffff) | ((r[2] & 0xffff) << 16) | 0;
+            if (pos === (target | 0)) break;
+            await this.sleep(50);
+        }
+        if (Date.now() >= deadline) this.log(t("laser.rotary.timeout"), "err");
+        this.axisAngle = angle;
+        if (axis.settleMs > 0) await this.sleep(axis.settleMs);
+    }
+
+    async turnAxis(degrees: number): Promise<void> {
+        if (this.transport === undefined || this.state === "running" || this.state === "paused") return;
+        this.aborting = false;
+        await this.turnTo(this.axisAngle + degrees);
     }
 
     pause() {

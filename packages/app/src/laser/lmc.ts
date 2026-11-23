@@ -79,6 +79,13 @@ export const Cmd = {
     WritePort: 0x0021,
     WriteAnalogPort1: 0x0022,
     ReadPort: 0x0025,
+    /** The extension (rotary) axis, as MeerK40t's balor lists them; the arguments' layout is
+     *  this module's best reading and is to be checked on a board with a chuck. */
+    SetAxisMotionParam: 0x0026,
+    SetAxisOriginParam: 0x0027,
+    AxisGoOrigin: 0x0028,
+    MoveAxisTo: 0x0029,
+    GetAxisPos: 0x002a,
     SetFpkParam2: 0x002e,
     FiberSetMo: 0x0033,
     DisableZ: 0x0039,

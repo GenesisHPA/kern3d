@@ -6,6 +6,7 @@ import type { JobState } from "./grblController";
 import type { LaserJobData } from "./laserData";
 import type { LaserController, MachineProfile } from "./machineProfile";
 import type { GrayImage } from "./raster";
+import type { RotaryStep } from "./rotary";
 
 /**
  * A laser controller as the machine tab and the editor's buttons see it, whatever board is
@@ -45,6 +46,8 @@ export interface LaserProgram {
     images: ReadonlyMap<string, GrayImage>;
     gcode: string[];
     seconds: number;
+    /** Marking round a part in the rotary chuck: the chuck's stops, in order. */
+    rotary?: { steps: RotaryStep[] };
 }
 
 export interface DriverCapabilities {
@@ -90,4 +93,6 @@ export interface LaserDriver {
     resume(): void;
     /** Stops at once: the rest is dropped and the laser goes off. */
     stop(): void;
+    /** Turns the rotary chuck by `degrees` (the axis test); absent when the board has no axis. */
+    turnAxis?(degrees: number): Promise<void>;
 }

@@ -1,5 +1,6 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
+import { defaultRotaryAxis, type RotaryAxis } from "./rotary";
 
 /**
  * A JCZ (EzCAD) galvo machine's settings: the lens field and how the board's two galvo
@@ -70,6 +71,8 @@ export interface JczSettings {
     correction: string;
     /** Marking pens (EzCAD MarkParam.lib), the first is the default for new objects. */
     pens: JczPen[];
+    /** The rotary chuck on the board's extension axis (see rotary.ts). */
+    rotary: RotaryAxis;
 }
 
 export function defaultPen(): JczPen {
@@ -117,6 +120,7 @@ export function defaultJczSettings(): JczSettings {
         standby2: 20,
         correction: "",
         pens: [defaultPen()],
+        rotary: defaultRotaryAxis(),
     };
 }
 
@@ -155,5 +159,14 @@ export function normalizeJczSettings(raw: Partial<JczSettings> | undefined): Jcz
         out.distortion = [num(raw.distortion[0], 1), num(raw.distortion[1], 1)];
     if (Array.isArray(raw.pens) && raw.pens.length > 0) out.pens = raw.pens.map(normalizePen);
     if (!(out.field > 0)) out.field = base.field;
+    out.rotary = { ...base.rotary };
+    const r = raw.rotary as Partial<RotaryAxis> | undefined;
+    if (r !== undefined && r !== null && typeof r === "object") {
+        out.rotary.axis = num(r.axis, out.rotary.axis);
+        out.rotary.pulsesPerRev = num(r.pulsesPerRev, out.rotary.pulsesPerRev) || base.rotary.pulsesPerRev;
+        out.rotary.settleMs = num(r.settleMs, out.rotary.settleMs);
+        out.rotary.invert = r.invert === true;
+        out.rotary.returnToStart = r.returnToStart !== false;
+    }
     return out;
 }
