@@ -778,6 +778,11 @@ export default {
         "laser.home.deleteConfirm": "Delete the project «{0}»? Undo (Ctrl+Z) brings it back.",
         "laser.home.rename": "Rename the project",
         "laser.home.renamePrompt": "New project name",
+        "laser.rotary.toZero": "⟲ Chuck to 0°",
+        "laser.rotary.toZero.hint": "Turn the chuck back to 0° (the unrolled seam)",
+        "laser.rotary.zeroHere": "Zero here",
+        "laser.rotary.zeroHere.hint": "The chuck's present place becomes 0° — after setting the part in, say",
+        "laser.rotary.zeroSet": "Axis: the chuck's present place is now 0°",
         "laser.rotary.timeout": "The rotary axis did not reach its angle in 30 s — check the axis settings",
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",

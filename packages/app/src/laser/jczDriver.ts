@@ -385,11 +385,13 @@ export class JczDriver implements LaserDriver {
 
     /** The chuck's angle from the job's start, degrees (the axis's own zero is where the job began). */
     private axisAngle = 0;
+    /** The board's axis position (pulses) taken as 0° — «Ноль здесь». */
+    private axisZero = 0;
 
     /** Turns the rotary chuck to `angle` and waits until it is there (or a timeout) and settled. */
     private async turnTo(angle: number) {
         const axis = this.profile().jcz.rotary;
-        const target = anglePulses(angle, axis);
+        const target = this.axisZero + anglePulses(angle, axis);
         // the position as two 16-bit words, low first (to be checked on a board with a chuck)
         await this.send([Cmd.MoveAxisTo, axis.axis, target & 0xffff, (target >>> 16) & 0xffff]);
         const deadline = Date.now() + 30_000;
@@ -402,6 +404,21 @@ export class JczDriver implements LaserDriver {
         if (Date.now() >= deadline) this.log(t("laser.rotary.timeout"), "err");
         this.axisAngle = angle;
         if (axis.settleMs > 0) await this.sleep(axis.settleMs);
+    }
+
+    async axisToZero(): Promise<void> {
+        if (this.transport === undefined || this.state === "running" || this.state === "paused") return;
+        this.aborting = false;
+        await this.turnTo(0);
+    }
+
+    async setAxisZero(): Promise<void> {
+        if (this.transport === undefined || this.state === "running" || this.state === "paused") return;
+        const axis = this.profile().jcz.rotary;
+        const r = await this.send([Cmd.GetAxisPos, axis.axis]);
+        this.axisZero = (r[1] & 0xffff) | ((r[2] & 0xffff) << 16) | 0;
+        this.axisAngle = 0;
+        this.log(t("laser.rotary.zeroSet"), "out");
     }
 
     async turnAxis(degrees: number): Promise<void> {

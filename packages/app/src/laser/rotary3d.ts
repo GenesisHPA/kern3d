@@ -57,7 +57,11 @@ export class Rotary3DView {
     private playing = 0;
 
     /** `onClose`: a close button in the title (none when the view is docked). */
-    constructor(private readonly onClose: (() => void) | undefined) {
+    constructor(
+        private readonly onClose: (() => void) | undefined,
+        /** More buttons beside «Просмотр» (the chuck's «в 0°» and «Ноль здесь»). */
+        extra: HTMLElement[] = [],
+    ) {
         this.host = el("div", { className: style.view3dCanvas });
         const play = button("laser.rotary.3d.play", () => this.play());
         this.element = el(
@@ -68,6 +72,7 @@ export class Rotary3DView {
                 { className: style.view3dHead },
                 el("span", { textContent: t("laser.rotary.3d") }),
                 play,
+                ...extra,
                 ...(this.onClose === undefined ? [] : [button("laser.close", () => this.onClose?.())]),
             ),
             this.host,

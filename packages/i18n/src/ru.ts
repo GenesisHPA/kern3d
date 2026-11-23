@@ -691,6 +691,12 @@ export default {
         "laser.home.deleteConfirm": "Удалить проект «{0}»? Вернуть можно отменой (Ctrl+Z).",
         "laser.home.rename": "Переименовать проект",
         "laser.home.renamePrompt": "Новое имя проекта",
+        "laser.rotary.toZero": "⟲ Патрон в 0°",
+        "laser.rotary.toZero.hint": "Повернуть патрон в нулевое положение (0° = шов развёртки)",
+        "laser.rotary.zeroHere": "Ноль здесь",
+        "laser.rotary.zeroHere.hint":
+            "Текущее положение патрона станет 0° — например, после установки детали",
+        "laser.rotary.zeroSet": "Ось: текущее положение патрона принято за 0°",
         "laser.rotary.timeout": "Поворотная ось не дошла до угла за 30 с — проверьте настройки оси",
         "home.credits":
             "Kern3D от Genesis Tactical · на основе Chili3D, автор xiangechen (仙阁) · лицензия AGPL-3.0",

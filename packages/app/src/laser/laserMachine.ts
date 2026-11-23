@@ -401,6 +401,20 @@ export class LaserMachine {
         return b;
     }
 
+    /** «Патрон в 0°»: the chuck back to its zero (a machine is needed: says so otherwise). */
+    axisToZero() {
+        const d = this.requireConnection();
+        if (d?.axisToZero === undefined) return;
+        void d.axisToZero();
+    }
+
+    /** «Ноль здесь»: the chuck's present place becomes its 0°. */
+    setAxisZero() {
+        const d = this.requireConnection();
+        if (d?.setAxisZero === undefined) return;
+        void d.setAxisZero();
+    }
+
     /** The rotary chuck on the board's extension axis: its settings and a test turn. */
     private rotarySection(): HTMLElement[] {
         const r = this.host.profile.jcz.rotary;
@@ -451,6 +465,10 @@ export class LaserMachine {
                 { className: style.buttons },
                 this.idle(button("laser.rotary.test90", turn(90), "laser.rotary.test.hint")),
                 this.idle(button("laser.rotary.testBack", turn(-90), "laser.rotary.test.hint")),
+                this.idle(button("laser.rotary.toZero", () => this.axisToZero(), "laser.rotary.toZero.hint")),
+                this.idle(
+                    button("laser.rotary.zeroHere", () => this.setAxisZero(), "laser.rotary.zeroHere.hint"),
+                ),
             ),
             el("div", { className: style.muted, textContent: t("laser.rotary.hint") }),
         ];

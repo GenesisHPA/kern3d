@@ -95,4 +95,8 @@ export interface LaserDriver {
     stop(): void;
     /** Turns the rotary chuck by `degrees` (the axis test); absent when the board has no axis. */
     turnAxis?(degrees: number): Promise<void>;
+    /** Turns the chuck back to its 0° (the place «Ноль здесь» set, else where the board started). */
+    axisToZero?(): Promise<void>;
+    /** The chuck's present place becomes its 0°. */
+    setAxisZero?(): Promise<void>;
 }

@@ -892,7 +892,10 @@ export class LaserEditor {
 
     private open3d() {
         if (this.view3d !== undefined) return;
-        const view = new Rotary3DView(undefined);
+        const view = new Rotary3DView(undefined, [
+            button("laser.rotary.toZero", () => this.machine.axisToZero(), "laser.rotary.toZero.hint"),
+            button("laser.rotary.zeroHere", () => this.machine.setAxisZero(), "laser.rotary.zeroHere.hint"),
+        ]);
         view.element.classList.add(style.view3dDocked);
         this.view3d = view;
         this.svg.after(view.element);
