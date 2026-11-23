@@ -66,6 +66,18 @@
         {
             "kind": "screenshot",
             "name": "02-preview"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 800
+        },
+        {
+            "kind": "screenshot",
+            "name": "03-home-with-projects"
         }
     ]
 }

@@ -624,7 +624,13 @@
     gap: 6px;
 }
 
+.homeJobRow {
+    display: flex;
+    gap: 6px;
+}
+
 .homeJob {
+    flex: 1;
     text-align: left;
     padding: 8px 12px;
     border: 1px solid var(--border-color);
@@ -635,5 +641,39 @@
 }
 
 .homeJob:hover {
+    border-color: var(--primary-color, #ff6a13);
+}
+
+.homeDelete {
+    flex: none;
+    width: 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.homeDelete:hover {
+    opacity: 1;
+    color: #fff;
+    background: #e03131;
+    border-color: #e03131;
+}
+
+.homeRename {
+    flex: none;
+    width: 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.homeRename:hover {
+    opacity: 1;
     border-color: var(--primary-color, #ff6a13);
 }

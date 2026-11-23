@@ -164,6 +164,11 @@ export class LaserEditor {
     /** The job last opened or edited in each document: what the «Лазер» workspace opens. */
     private static readonly lastJob = new WeakMap<IDocument, string>();
 
+    /** Closes the job's editor if it is open (the job is being deleted). */
+    static closeFor(id: string) {
+        LaserEditor.editors.get(id)?.close();
+    }
+
     static lastEdited(document: IDocument): string | undefined {
         return LaserEditor.lastJob.get(document);
     }

@@ -1,7 +1,7 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { getCurrentApplication, type IDocument, workspaceTabs } from "@chili3d/core";
+import { getCurrentApplication, type IDocument, Transaction, workspaceTabs } from "@chili3d/core";
 import { LaserEditor } from "./laserEditor";
 import style from "./laserEditor.module.css";
 import { type LaserJobMode, modeOf, newLaserJob, setLaserHomeOpener } from "./laserJobs";
@@ -71,6 +71,25 @@ class LaserStartPage {
         if (!this.dialog.open) this.dialog.show();
     }
 
+    /** Renames a project (one undo step); the open job's tab follows. */
+    private rename(job: LaserNode) {
+        const name = window.prompt(t("laser.home.renamePrompt"), job.name)?.trim();
+        if (!name || name === job.name) return;
+        Transaction.execute(job.document, "laser.rename", () => {
+            job.name = name;
+        });
+        this.render();
+    }
+
+    /** Deletes a project after asking (one undo step: Ctrl+Z brings it back). */
+    private remove(job: LaserNode) {
+        if (!window.confirm(t("laser.home.deleteConfirm", job.name))) return;
+        LaserEditor.closeFor(job.id);
+        const document = job.document;
+        Transaction.execute(document, "laser.delete", () => job.parent?.remove(job));
+        this.render();
+    }
+
     private render() {
         const document = this.document;
         const jobs = document
@@ -89,11 +108,27 @@ class LaserStartPage {
                 mine.length === 0
                     ? [el("div", { className: style.muted, textContent: t("laser.home.none") })]
                     : mine.slice(0, 6).map((job) =>
-                          el("button", {
-                              className: style.homeJob,
-                              textContent: job.name,
-                              onclick: () => LaserEditor.open(job),
-                          }),
+                          el(
+                              "div",
+                              { className: style.homeJobRow },
+                              el("button", {
+                                  className: style.homeJob,
+                                  textContent: job.name,
+                                  onclick: () => LaserEditor.open(job),
+                              }),
+                              el("button", {
+                                  className: style.homeRename,
+                                  textContent: "✎",
+                                  title: t("laser.home.rename"),
+                                  onclick: () => this.rename(job),
+                              }),
+                              el("button", {
+                                  className: style.homeDelete,
+                                  textContent: "✕",
+                                  title: t("laser.home.delete"),
+                                  onclick: () => this.remove(job),
+                              }),
+                          ),
                       );
             return el(
                 "div",
