@@ -330,10 +330,10 @@ function group(w: EzdWriter, pen: number, label: string, b: Bounds, children: ((
 const HATCH_ARGS =
     "NgAAAAQAAAAAAAAABAAAAAEAAAAEAAAAAAAAAAQAAABMAAAACAAAAAAAAAAAAAAACAAAALgehetRuJ4/CAAAAAAAAAAAAAAACAAAAAAAAAAAAAAACAAAAAAAAAAA0HRABAAAAAAAAAAEAAAAAAAAAAQAAADNAAAACAAAAAAAAAAAAAAACAAAAAAAAAAAAPA/CAAAAAAAAAAAAAAACAAAAAAAAAAAAAAACAAAAAAAAAAA0HRABAAAAAEAAAAIAAAAAAAAAACAQkAIAAAAAAAAAACAQkAEAAAAAAAAAAQAAAAAAAAABAAAAM0AAAAIAAAAAAAAAAAAAAAIAAAAAAAAAAAA8D8IAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAIAAAAAAAAAADQdEAIAAAAAAAAAACAQkAIAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAAA4D8IAAAAAAAAAAAA4D8IAAAAAAAAAAAA4D8IAAAAn9m0xsaJZT8IAAAAGQAZABkAWT8IAAAAGQAZABkAWT8EAAAAAAAAAAQAAAABAAAABAAAAAEAAAAEAAAAAQAAAAQAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAA==";
 
-/** Hatch 1 only: on, our pen, spacing and angle, no outline pass, no per-mark rotation. */
-export function hatchArgs(pen: number, interval: number, angle: number): Uint8Array[] {
+/** Hatch 1 only: on, our pen, spacing and angle, the outline pass when asked, no per-mark rotation. */
+export function hatchArgs(pen: number, interval: number, angle: number, outline = false): Uint8Array[] {
     const f = splitStruct(base64Bytes(HATCH_ARGS));
-    f[0] = i32Field(0); // mark the contour: our fill is the hatch alone
+    f[0] = i32Field(outline ? 1 : 0); // «обвести контур»: the outline marked with the hatch
     f[1] = i32Field(1);
     f[2] = i32Field(pen);
     f[5] = f64Field(interval);
@@ -385,7 +385,7 @@ function writeHatch(w: EzdWriter, p: Placed) {
         b,
         p.paths.map((path) => () => curve(w, p.pen, "", path)),
     );
-    w.struct(hatchArgs(p.pen, op.fillInterval, angle));
+    w.struct(hatchArgs(p.pen, op.fillInterval, angle, op.fillOutline === true));
     const lines = hatchPaths(p.paths, op.fillInterval, angle).map(
         (s): LaserPath => ({ points: [s.from, s.to], closed: false }),
     );

@@ -825,12 +825,13 @@ function hatchObject(
     }
     if (hatch.guessed) warnings.push(`hatch-settings-guessed:${name}`);
     if (hatch.crosshatch) warnings.push(`hatch-crosshatch-single-angle:${name}`);
-    if (hatch.markContours) warnings.push(`hatch-contour-not-marked:${name}`);
     if (hatch.enabled > 1) warnings.push(`hatch-extra-patterns-ignored:${name}`);
     if (hatch.angleStep !== 0) warnings.push(`hatch-auto-rotate-ignored:${name}`);
     const op = operationOf(pens[hatch.pen], "fill");
     op.fillInterval = hatch.interval > 0 ? hatch.interval : op.fillInterval;
     op.fillAngle = hatch.angle;
+    // EzCAD's «обвести контур»: the outline traced with the hatch
+    if (hatch.markContours) op.fillOutline = true;
     return vectorObject(name, got.paths, op, o.hidden);
 }
 

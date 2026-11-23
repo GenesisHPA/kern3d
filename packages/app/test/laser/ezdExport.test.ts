@@ -177,6 +177,16 @@ describe("EZD export", () => {
         expect(r.counts).toEqual({ curve: 4, group: 1, hatch: 1 });
     });
 
+    test("a hatch with «обвести контур» keeps it both ways", () => {
+        const j = job();
+        const fill = j.objects.find((o) => o.op.mode === "fill")!;
+        fill.op.fillOutline = true;
+        const back = importEzd(exportEzd(j, jczProfile()).bytes)!;
+        const read = back.objects.find((o) => o.op.mode === "fill")!;
+        expect(read.op.fillOutline).toBe(true);
+        expect(back.warnings).toEqual([]);
+    });
+
     test("a corner-origin job lands at the same place on the field", () => {
         const corner = job();
         corner.origin = "corner";
