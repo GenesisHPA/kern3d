@@ -685,6 +685,8 @@ export default {
         "laser.home.none": "Пока нет — создайте новый",
         "laser.home.back": "← Режимы",
         "laser.home.back.hint": "К выбору режима: 2D-гравировка или на поворотной оси",
+        "laser.scale.lineWidth": "Толщина линии, мм (0 — один проход)",
+        "laser.scale.linePitch": "Шаг проходов, мм",
         "laser.rotary.timeout": "Поворотная ось не дошла до угла за 30 с — проверьте настройки оси",
         "home.credits":
             "Kern3D от Genesis Tactical · на основе Chili3D, автор xiangechen (仙阁) · лицензия AGPL-3.0",

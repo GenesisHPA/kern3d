@@ -664,6 +664,20 @@ export class LaserJobPanel {
             check("laser.scale.reverse", shape.reverse, (s, v) => (s.reverse = v)),
             check("laser.scale.skipLast", shape.skipLast, (s, v) => (s.skipLast = v)),
             heading("laser.scale.ticks"),
+            num("laser.scale.lineWidth", shape.lineWidth, (s, v) => (s.lineWidth = Math.max(0, v)), {
+                min: 0,
+                step: 0.05,
+            }),
+            ...(shape.lineWidth > 0
+                ? [
+                      num(
+                          "laser.scale.linePitch",
+                          shape.linePitch,
+                          (s, v) => (s.linePitch = Math.max(0.005, v)),
+                          { min: 0.005, step: 0.01 },
+                      ),
+                  ]
+                : []),
             num("laser.scale.majorLength", shape.majorLength, (s, v) => (s.majorLength = Math.max(0, v)), {
                 min: 0,
             }),

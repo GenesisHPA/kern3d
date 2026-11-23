@@ -658,6 +658,8 @@ export const I18N_KEYS = [
     "home.community",
     "home.community.telegram",
     "laser.rotary.timeout",
+    "laser.scale.lineWidth",
+    "laser.scale.linePitch",
     "laser.home.tab",
     "laser.home.heading",
     "laser.home.flat",

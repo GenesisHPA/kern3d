@@ -402,6 +402,8 @@ export function parseShape(raw: any): LaserShape | undefined {
                 step: n("step", 1e-6),
                 majorEvery: Math.round(n("majorEvery", 0)),
                 midEvery: Math.round(n("midEvery", 0)),
+                lineWidth: n("lineWidth", 0),
+                linePitch: n("linePitch", 0.005),
                 minorLength: n("minorLength", 0),
                 midLength: n("midLength", 0),
                 majorLength: n("majorLength", 0),

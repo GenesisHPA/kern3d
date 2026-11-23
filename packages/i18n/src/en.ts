@@ -772,6 +772,8 @@ export default {
         "laser.home.none": "None yet — make a new one",
         "laser.home.back": "← Modes",
         "laser.home.back.hint": "Back to the modes: 2D or rotary engraving",
+        "laser.scale.lineWidth": "Line width, mm (0 — one pass)",
+        "laser.scale.linePitch": "Pass spacing, mm",
         "laser.rotary.timeout": "The rotary axis did not reach its angle in 30 s — check the axis settings",
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",

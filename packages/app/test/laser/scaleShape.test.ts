@@ -56,4 +56,23 @@ describe("engraved scale", () => {
         expect(scaleLabel(90, { decimals: 0, suffix: "°" })).toBe("90°");
         expect(scaleLabel(-2.5, { decimals: 1, suffix: " мм" })).toBe("−2.5 мм");
     });
+
+    test("a thick line: passes side by side across the tick, the figures untouched", () => {
+        const spec = {
+            ...defaultScale(10, false, font),
+            to: 10,
+            step: 10,
+            majorEvery: 1,
+            labels: false,
+            baseline: false,
+            lineWidth: 0.2,
+            linePitch: 0.05,
+        };
+        const paths = scalePaths(spec, undefined, () => []);
+        // two ticks (0 and 10), each 0.2 / 0.05 + 1 = 5 passes
+        expect(paths.length).toBe(10);
+        const ys = paths.slice(0, 5).map((p) => p.points[0].y);
+        expect(Math.min(...ys)).toBeCloseTo(-0.1, 9);
+        expect(Math.max(...ys)).toBeCloseTo(0.1, 9);
+    });
 });

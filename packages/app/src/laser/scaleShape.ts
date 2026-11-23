@@ -23,6 +23,12 @@ export interface ScaleSpec {
     /** A long tick every this many ticks, a middle one every `midEvery` (0 = none). */
     majorEvery: number;
     midEvery: number;
+    /**
+     * Thickness of the ticks and the baseline, mm: 0 is one pass of the beam; thicker lines are
+     * that many passes side by side, `linePitch` apart (the figures stay single strokes).
+     */
+    lineWidth: number;
+    linePitch: number;
     /** Tick lengths, mm. */
     minorLength: number;
     midLength: number;
@@ -62,6 +68,8 @@ export function defaultScale(span: number, rotary: boolean, font: LaserFontRef):
               step: 5,
               majorEvery: 2,
               midEvery: 0,
+              lineWidth: 0,
+              linePitch: 0.05,
               minorLength: 1.5,
               midLength: 2.2,
               majorLength: 3,
@@ -85,6 +93,8 @@ export function defaultScale(span: number, rotary: boolean, font: LaserFontRef):
               step: 1,
               majorEvery: 10,
               midEvery: 5,
+              lineWidth: 0,
+              linePitch: 0.05,
               minorLength: 2,
               midLength: 3,
               majorLength: 4.5,
@@ -101,6 +111,32 @@ export function defaultScale(span: number, rotary: boolean, font: LaserFontRef):
               skipLast: false,
               font,
           };
+}
+
+/**
+ * A straight stroke from `a` to `b` as thick as `width`: passes side by side across it,
+ * `pitch` apart (one pass when the width is under the pitch), alternating direction.
+ */
+function thickStroke(
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    width: number,
+    pitch: number,
+): LaserPath[] {
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!(width > 0) || len === 0) return [{ closed: false, points: [a, b] }];
+    const step = Math.max(0.005, pitch);
+    const passes = Math.max(1, Math.round(width / step) + 1);
+    const nx = -(b.y - a.y) / len;
+    const ny = (b.x - a.x) / len;
+    const out: LaserPath[] = [];
+    for (let i = 0; i < passes; i++) {
+        const off = passes === 1 ? 0 : -width / 2 + (width * i) / (passes - 1);
+        const p = { x: a.x + nx * off, y: a.y + ny * off };
+        const q = { x: b.x + nx * off, y: b.y + ny * off };
+        out.push({ closed: false, points: i % 2 === 0 ? [p, q] : [q, p] });
+    }
+    return out;
 }
 
 /** The value written at a tick. */
@@ -142,13 +178,7 @@ export function scalePaths(
     const dir = spec.flip ? -1 : 1;
     const paths: LaserPath[] = [];
     if (spec.baseline)
-        paths.push({
-            closed: false,
-            points: [
-                { x: 0, y: 0 },
-                { x: 0, y: spec.span },
-            ],
-        });
+        paths.push(...thickStroke({ x: 0, y: 0 }, { x: 0, y: spec.span }, spec.lineWidth, spec.linePitch));
     const ticks = scaleTicks(spec);
     let majors = 0;
     for (const tick of ticks) {
@@ -158,13 +188,9 @@ export function scalePaths(
                 : tick.kind === "mid"
                   ? spec.midLength
                   : spec.minorLength;
-        paths.push({
-            closed: false,
-            points: [
-                { x: 0, y: tick.y },
-                { x: dir * len, y: tick.y },
-            ],
-        });
+        paths.push(
+            ...thickStroke({ x: 0, y: tick.y }, { x: dir * len, y: tick.y }, spec.lineWidth, spec.linePitch),
+        );
         if (tick.kind !== "major") continue;
         const labelled =
             spec.labels && font !== undefined && majors % Math.max(1, Math.round(spec.labelEvery)) === 0;
