@@ -7,12 +7,20 @@
             "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); return true; })()"
         },
         {
-            "kind": "waitFor",
-            "selector": "dialog[open] svg"
+            "kind": "wait",
+            "ms": 800
+        },
+        {
+            "kind": "screenshot",
+            "name": "00-home"
         },
         {
             "kind": "runCommand",
             "name": "laser.rotary"
+        },
+        {
+            "kind": "waitFor",
+            "selector": "dialog[open] svg"
         },
         {
             "kind": "wait",

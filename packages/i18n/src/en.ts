@@ -750,6 +750,28 @@ export default {
         "laser.scale.decimals": "Decimals",
         "laser.scale.labelsAlong": "Figures along the scale",
         "laser.scale.font": "Font",
+        "laser.home.tab": "Laser",
+        "laser.home.heading": "Laser engraving — choose a mode",
+        "laser.home.flat": "2D engraving",
+        "laser.home.flat.lead":
+            "Flat parts and plates on the machine's bed: a fiber galvo (JCZ / EzCAD) or a gantry machine (GRBL).",
+        "laser.home.flat.p1":
+            "Text (Windows and single-line fonts), shapes, QR / DataMatrix / Code 128 / EAN-13 barcodes",
+        "laser.home.flat.p2":
+            "Import SVG, pictures, EzCAD projects (.ezd), outlines from the 3D model and drawings",
+        "laser.home.flat.p3": "Outline, fill, raster; power, speed, frequency, passes",
+        "laser.home.flat.p4": "Red pointer, marking, toolpath preview with the beam animated",
+        "laser.home.rotary": "Rotary engraving",
+        "laser.home.rotary.lead":
+            "Round parts in the rotary chuck: rings, handles, barrels, sleeves. Draw on the unrolled surface — the part shows in 3D at once.",
+        "laser.home.rotary.p1": "The bed is the part unrolled (length × π·D) with the seam and degrees",
+        "laser.home.rotary.p2": "Marking in strips (as EzCAD) or a turn to each object's angle",
+        "laser.home.rotary.p3": "Dials and scales with ticks and figures set as you like",
+        "laser.home.rotary.p4": "The part in the chuck in 3D: turning and burning in step with the marking",
+        "laser.home.recent": "Projects in this document",
+        "laser.home.none": "None yet — make a new one",
+        "laser.home.back": "← Modes",
+        "laser.home.back.hint": "Back to the modes: 2D or rotary engraving",
         "laser.rotary.timeout": "The rotary axis did not reach its angle in 30 s — check the axis settings",
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",

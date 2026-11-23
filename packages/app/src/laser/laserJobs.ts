@@ -25,3 +25,14 @@ export function newLaserJob(document: IDocument, mode: LaserJobMode): LaserNode 
     Transaction.execute(document, "laser.create", () => document.modelManager.addNode(node));
     return node;
 }
+
+let homeOpener: (() => void) | undefined;
+
+/** The «Лазер» page registers how it is opened (the editor's «Режимы» button calls it). */
+export function setLaserHomeOpener(open: () => void) {
+    homeOpener = open;
+}
+
+export function openLaserHome() {
+    homeOpener?.();
+}

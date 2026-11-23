@@ -523,3 +523,117 @@
     box-shadow: none;
     flex: 0 0 auto;
 }
+
+/* the «Лазер» page: the two modes as large cards */
+.home {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    padding: 24px 32px;
+    box-sizing: border-box;
+}
+
+.homeTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.homeHeading {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.homeCards {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    align-content: start;
+}
+
+.homeCard {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px;
+    min-height: 420px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--panel-background-color, rgba(128, 128, 128, 0.06));
+}
+
+.homeCard:hover {
+    border-color: var(--primary-color, #ff6a13);
+}
+
+.homeHead {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.homeIcon {
+    font-size: 34px;
+    line-height: 1;
+    color: var(--primary-color, #ff6a13);
+}
+
+.homeTitle {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.homeLead {
+    font-size: 14px;
+    opacity: 0.85;
+}
+
+.homePoints {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.homePrimary {
+    margin-top: 8px;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary-color, #ff6a13);
+    color: #fff;
+    cursor: pointer;
+}
+
+.homeRecentTitle {
+    margin-top: 8px;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.homeRecent {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.homeJob {
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.homeJob:hover {
+    border-color: var(--primary-color, #ff6a13);
+}

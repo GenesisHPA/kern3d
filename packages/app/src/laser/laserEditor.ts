@@ -50,7 +50,7 @@ import style from "./laserEditor.module.css";
 import { defaultLaserFont, loadLaserFont } from "./laserFonts";
 import { toolIcon } from "./laserIcons";
 import { LaserJobPanel, type LaserJobPanelHost, MODE_COLORS } from "./laserJobPanel";
-import { newLaserJob } from "./laserJobs";
+import { newLaserJob, openLaserHome } from "./laserJobs";
 import { LaserMachine } from "./laserMachine";
 import { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
@@ -962,6 +962,7 @@ export class LaserEditor {
             this.jobPicker,
             ...this.toolbarItems(),
             this.separator(),
+            button("laser.home.back", () => openLaserHome(), "laser.home.back.hint"),
             button("laser.toModel", () => workspaceTabs.activate(undefined)),
             button("laser.close", () => this.close()),
         );

@@ -16,6 +16,7 @@ import {
 import { LaserEditor } from "./laserEditor";
 import { type LaserJobMode, modeOf, newLaserJob } from "./laserJobs";
 import { LaserNode } from "./laserNode";
+import { showLaserHome } from "./laserStart";
 
 function jobsOf(document: IDocument): LaserNode[] {
     return document.modelManager.findNodes((n) => n instanceof LaserNode) as LaserNode[];
@@ -60,8 +61,8 @@ export class RotaryLaserJob implements ICommand {
 
 PubSub.default.sub("workspaceSelected", (workspace) => {
     if (workspace !== "ribbon.workspace.laser") return;
-    const document = getCurrentApplication().activeView?.document;
-    if (document !== undefined) openLaserWorkspace(document);
+    // the page with the two modes, not a job: the user picks what to make
+    if (getCurrentApplication().activeView?.document !== undefined) showLaserHome();
 });
 
 NodeCategories.register((node) => (node instanceof LaserNode ? "laser" : undefined));

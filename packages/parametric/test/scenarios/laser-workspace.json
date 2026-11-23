@@ -7,6 +7,10 @@
             "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); return true; })()"
         },
         {
+            "kind": "runCommand",
+            "name": "laser.flat"
+        },
+        {
             "kind": "waitFor",
             "selector": "dialog[open] svg"
         },
@@ -55,8 +59,8 @@
             "name": "04-machine"
         },
         {
-            "kind": "runCommand",
-            "name": "laser.flat"
+            "kind": "eval",
+            "expression": "(() => { const sel = document.querySelector('dialog[open] select'); sel.value = '__new__'; sel.dispatchEvent(new Event('change')); return true; })()"
         },
         {
             "kind": "eval",
