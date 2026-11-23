@@ -68,6 +68,7 @@ import {
     subPathsFromOutlines,
     toggleSmooth,
 } from "./pathShape";
+import { type RotaryStep, rotarySteps } from "./rotary";
 import {
     type Align,
     alignObjects,
@@ -299,6 +300,7 @@ export class LaserEditor {
                     images: r.images,
                     gcode: r.lines,
                     seconds: r.stats.seconds,
+                    rotary: this.rotaryPlan(),
                 };
             },
             framePaths: (mode) => framePaths(this.data, mode),
@@ -354,6 +356,16 @@ export class LaserEditor {
 
     private conceal() {
         if (this.dialog.open) this.dialog.close();
+    }
+
+    /** The chuck's stops when the job is marked round a part (galvo board only). */
+    private rotaryPlan(): { steps: RotaryStep[] } | undefined {
+        const rotary = this.data.rotary;
+        if (rotary?.enabled !== true || this.profile.controller !== "jcz") return undefined;
+        // in the job's coordinates as the board program sees them (the machine's origin)
+        const job = withOrigin(this.data, this.profile);
+        const centerY = this.profile.origin === "center" ? 0 : this.profile.bedHeight / 2;
+        return { steps: rotarySteps(job, rotary, centerY) };
     }
 
     /** The job went to the machine: the beam follows it over the preview. */
@@ -736,6 +748,11 @@ export class LaserEditor {
                 if (o === undefined) return;
                 edit(o);
                 if (o.kind === "vector") bakeSize(o);
+                this.commit();
+                this.render();
+            },
+            editJob: (edit) => {
+                edit(this.data);
                 this.commit();
                 this.render();
             },

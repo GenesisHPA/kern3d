@@ -196,7 +196,7 @@ export class LaserMachine {
             this.lastError,
         );
         if (jcz) {
-            parts.push(...this.jczSection());
+            parts.push(...this.jczSection(), ...this.rotarySection());
         } else {
             parts.push(
                 el(
@@ -399,6 +399,61 @@ export class LaserMachine {
     private idle(b: HTMLButtonElement): HTMLButtonElement {
         this.idleOnly.push(b);
         return b;
+    }
+
+    /** The rotary chuck on the board's extension axis: its settings and a test turn. */
+    private rotarySection(): HTMLElement[] {
+        const r = this.host.profile.jcz.rotary;
+        const set = (edit: (q: MachineProfile["jcz"]["rotary"]) => void) =>
+            this.host.setProfile((p) => edit(p.jcz.rotary));
+        const turn = (degrees: number) => () => {
+            const d = this.requireConnection();
+            if (d?.turnAxis === undefined) return;
+            void d.turnAxis(degrees);
+        };
+        return [
+            heading("laser.rotary.axis"),
+            row(
+                "laser.rotary.axisNumber",
+                numberField(r.axis, (v) => set((q) => (q.axis = Math.max(0, Math.round(v)))), {
+                    min: 0,
+                    step: 1,
+                }),
+            ),
+            row(
+                "laser.rotary.pulses",
+                numberField(
+                    r.pulsesPerRev,
+                    (v) => set((q) => (q.pulsesPerRev = Math.max(1, Math.round(v)))),
+                    {
+                        min: 1,
+                        step: 1,
+                    },
+                ),
+            ),
+            row(
+                "laser.rotary.invert",
+                checkbox(r.invert, (v) => set((q) => (q.invert = v))),
+            ),
+            row(
+                "laser.rotary.return",
+                checkbox(r.returnToStart, (v) => set((q) => (q.returnToStart = v))),
+            ),
+            row(
+                "laser.rotary.settle",
+                numberField(r.settleMs, (v) => set((q) => (q.settleMs = Math.max(0, v))), {
+                    min: 0,
+                    step: 10,
+                }),
+            ),
+            el(
+                "div",
+                { className: style.buttons },
+                this.idle(button("laser.rotary.test90", turn(90), "laser.rotary.test.hint")),
+                this.idle(button("laser.rotary.testBack", turn(-90), "laser.rotary.test.hint")),
+            ),
+            el("div", { className: style.muted, textContent: t("laser.rotary.hint") }),
+        ];
     }
 
     private pointerSection(): HTMLElement[] {

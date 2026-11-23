@@ -25,6 +25,7 @@ import {
 } from "./laserFonts";
 import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
 import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
+import { defaultRotaryJob, type RotaryJob } from "./rotary";
 import { ALIGNS, type Align } from "./selection";
 import { defaultQuiet, type LaserFontRef, type LaserShape, TEXT_ALIGNS } from "./shapes";
 
@@ -47,6 +48,8 @@ export interface LaserJobPanelHost {
     distributeSelected(axis: "x" | "y"): void;
     /** Applies `edit` to the selected object and writes the job back as one undo step. */
     editSelected(edit: (o: LaserObject) => void): void;
+    /** Applies `edit` to the job itself (its rotary settings) as one undo step. */
+    editJob(edit: (job: LaserJobData) => void): void;
     move(id: string, delta: -1 | 1): void;
     setProfile(edit: (p: MachineProfile) => void): void;
     /** Bodies and drawings of the document, for "from the model". */
@@ -97,6 +100,7 @@ export class LaserJobPanel {
         this.element.replaceChildren(
             ...this.bedSection(),
             ...this.objectsSection(),
+            ...this.rotarySection(),
             ...this.modelSection(),
             ...this.arrangeSection(),
             ...this.objectSection(),
@@ -138,6 +142,62 @@ export class LaserJobPanel {
                 ),
             ),
         ];
+    }
+
+    /** Marking round a part in the rotary chuck (a galvo board's extension axis). */
+    private rotarySection(): HTMLElement[] {
+        if (this.host.profile.controller !== "jcz") return [];
+        const r = this.host.data.rotary ?? defaultRotaryJob();
+        const set = (change: (q: RotaryJob) => void) =>
+            this.host.editJob((job) => {
+                const next = { ...(job.rotary ?? defaultRotaryJob()) };
+                change(next);
+                job.rotary = next;
+            });
+        const parts: HTMLElement[] = [
+            heading("laser.rotary"),
+            row(
+                "laser.rotary.enabled",
+                checkbox(r.enabled, (v) => set((q) => (q.enabled = v))),
+            ),
+        ];
+        if (!r.enabled) return parts;
+        parts.push(
+            row(
+                "laser.rotary.mode",
+                select(
+                    [
+                        { value: "strips", label: t("laser.rotary.mode.strips") },
+                        { value: "index", label: t("laser.rotary.mode.index") },
+                    ],
+                    r.mode,
+                    (v) => set((q) => (q.mode = v)),
+                ),
+            ),
+            row(
+                "laser.rotary.diameter",
+                numberField(r.diameter, (v) => set((q) => (q.diameter = Math.max(0.5, v))), { min: 0.5 }),
+            ),
+        );
+        if (r.mode === "strips")
+            parts.push(
+                row(
+                    "laser.rotary.strip",
+                    numberField(r.stripWidth, (v) => set((q) => (q.stripWidth = Math.max(0.2, v))), {
+                        min: 0.2,
+                    }),
+                ),
+            );
+        parts.push(
+            el("div", {
+                className: style.muted,
+                textContent: t(
+                    r.mode === "strips" ? "laser.rotary.hint.strips" : "laser.rotary.hint.index",
+                    (Math.PI * r.diameter).toFixed(1),
+                ),
+            }),
+        );
+        return parts;
     }
 
     private objectsSection(): HTMLElement[] {
@@ -323,6 +383,16 @@ export class LaserJobPanel {
                 "laser.lockAspect",
                 checkbox(o.lockAspect, (v) => edit((x) => (x.lockAspect = v))),
             ),
+            ...(this.host.data.rotary?.enabled && this.host.data.rotary.mode === "index"
+                ? [
+                      row(
+                          "laser.rotary.objectAngle",
+                          numberField(o.rotaryAngle ?? 0, (v) =>
+                              edit((x) => (x.rotaryAngle = v === 0 ? undefined : v)),
+                          ),
+                      ),
+                  ]
+                : []),
             row(
                 "laser.hidden",
                 checkbox(o.hidden === true, (v) => edit((x) => (x.hidden = v ? true : undefined))),
