@@ -1,7 +1,14 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, type IShape, ShapeTypes } from "@chili3d/core";
+import {
+    type IDocument,
+    type IProgress,
+    type IShape,
+    NoProgress,
+    ShapeTypes,
+    subProgress,
+} from "@chili3d/core";
 import { appendExtrude, appendTreatment, type BuiltModel, buildModel } from "./build";
 import { profileArea } from "./fit2d";
 import { meshVolume, soupMesh, type TriMesh, weldTriangles } from "./mesh";
@@ -41,6 +48,8 @@ export interface RebuildOptions {
      * already built (other axes, corrections, pieces, rounds) are not started past it.
      */
     readonly totalBudgetMs?: number;
+    /** Progress window and «Отмена» (the command's); none in the tests. */
+    readonly progress?: IProgress;
 }
 
 /** Diagnostics for the corpus test (unset in the app). */
@@ -125,13 +134,16 @@ function soundBody(shape: IShape | undefined, solids: number): boolean {
  * its own best axis and added or cut — a side hole, a pocket, a boss on another face, a chamfer.
  * A piece whose correction does not bring the difference down is left out again.
  */
-export function rebuildPart(
+export async function rebuildPart(
     document: IDocument,
     soup: ArrayLike<number>,
     reference: IShape,
     name: string,
     options: RebuildOptions = {},
-): RebuildReport {
+): Promise<RebuildReport> {
+    const progress = options.progress ?? NoProgress;
+    // progress ranges: mesh 0-4 %, axes 4-55 %, corrections 55-75 %, surface and pieces 75-100 %
+    await progress.report(0, "stl.stage.analyse");
     const mesh = weldTriangles(soup);
     if (mesh.areas.length === 0 || Math.abs(meshVolume(mesh)) <= 0) {
         return { ratio: 1, firstRatio: 1, features: 0, corrections: 0, error: "empty mesh" };
@@ -147,9 +159,12 @@ export function rebuildPart(
     const goal = options.goal ?? 0.002;
     const partSolids = Math.max(1, reference.findSubShapes(ShapeTypes.solid).length);
     const referenceFaces = reference.findSubShapes(ShapeTypes.face).length;
+    /** Created nodes not kept yet: discarded if the user stops (the transaction would too). */
+    const live = new Set<BuiltModel>();
     /** One axis tried whole: planned, built, its edges rounded, measured. */
-    const attempt = (frame: (typeof frames)[number], meshPieces = false) => {
+    const attempt = async (frame: (typeof frames)[number], meshPieces: boolean, step: IProgress) => {
         const ta = Date.now();
+        await step.report(0);
         const axisName = frame.axis.map((x) => x.toFixed(2)).join(",");
         const treatments: EdgeTreatment[] = [];
         const plans = planExtrusions(mesh, frame, tol, { treatments, meshPieces });
@@ -172,9 +187,19 @@ export function rebuildPart(
         if (meshPieces && volumeOf(plans.filter((p) => p.fromMesh)) > volumeOf(plans) * 0.75)
             return undefined;
         const tb = Date.now();
-        const model = buildModel(document, plans, name, tol, reference, (body) =>
-            measure(referenceMesh, body.shape.isOk ? body.shape.value : undefined),
+        const model = await buildModel(
+            document,
+            plans,
+            name,
+            tol,
+            reference,
+            (body) => measure(referenceMesh, body.shape.isOk ? body.shape.value : undefined),
+            async (done, total) => {
+                step.throwIfCancelled();
+                await step.report(0.05 + (0.65 * done) / total, "stl.stage.build{0}{1}", done + 1, total);
+            },
         );
+        live.add(model);
         const shape = bodyShape(model);
         const failed = failedFeature(model);
         // an unsound body is still a result (the mesh pieces' sewn faces often fail the strict
@@ -186,13 +211,21 @@ export function rebuildPart(
         if (failed !== undefined || shape === undefined)
             return { model, ratio: 1, rounded: 0, plans, frame, sound, error: failed ?? "no shape" };
         // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
+        await step.report(0.7, "stl.stage.measure");
         const tm = Date.now();
         let ratio = measure(referenceMesh, shape);
         REBUILD_DEBUG?.(`axis ${axisName}: measure ${Date.now() - tm} ms → ${(ratio * 100).toFixed(3)}%`);
         let rounded = 0;
         const tt = Date.now();
-        for (const treatment of treatments) {
+        for (const [index, treatment] of treatments.entries()) {
             if (!inTime() || !sound) break;
+            step.throwIfCancelled();
+            await step.report(
+                0.75 + (0.25 * index) / treatments.length,
+                "stl.stage.rounds{0}{1}",
+                index + 1,
+                treatments.length,
+            );
             REBUILD_DEBUG?.(`treatment ${treatment.kind} ${treatment.size.toFixed(3)}`);
             const before = model.body.features;
             if (!appendTreatment(model, treatment, tol)) continue;
@@ -212,171 +245,201 @@ export function rebuildPart(
         return { model, ratio, rounded, plans, frame, sound, error: undefined as string | undefined };
     };
     const discard = (model: BuiltModel) => {
+        live.delete(model);
         for (const n of [model.body, ...model.sketches]) n.parent?.remove(n);
     };
-    // the best-scoring axis first; the next ones only when it leaves the part off — the score
-    // counts flat faces, and a leaning arm or a side boss can make another axis the right one
-    let best = attempt(frames[0]);
-    for (const frame of frames.slice(1, 3)) {
-        if (best !== undefined && best.error === undefined && best.ratio <= goal) break;
-        if (best !== undefined && best.error === undefined && !inTime()) break;
-        const next = attempt(frame);
-        if (next === undefined) continue;
-        // a sound body before an unsound one, then the closer
-        const rank = (x: NonNullable<typeof best>) => (x.error !== undefined ? 2 : x.sound ? 0 : 1);
-        if (
-            best === undefined ||
-            rank(next) < rank(best) ||
-            (rank(next) === rank(best) && next.error === undefined && next.ratio < best.ratio)
-        ) {
-            if (best !== undefined) discard(best.model);
-            best = next;
-        } else {
-            discard(next.model);
-        }
+    const axes = Math.min(3, frames.length);
+    const axisStep = (i: number) => {
+        const from = 0.04 + (0.51 * i) / axes;
+        return subProgress(progress, from, from + 0.51 / axes);
+    };
+    try {
+        return await rebuildSteps();
+    } catch (error) {
+        for (const model of [...live]) discard(model);
+        throw error;
     }
-    const t1 = Date.now();
-    const t2 = t1;
-    if (best === undefined)
-        return { ratio: 1, firstRatio: 1, features: 0, corrections: 0, error: "no sections" };
-    let { model, rounded } = best;
-    if (best.error !== undefined) {
+    async function rebuildSteps(): Promise<RebuildReport> {
+        // the best-scoring axis first; the next ones only when it leaves the part off — the score
+        // counts flat faces, and a leaning arm or a side boss can make another axis the right one
+        await progress.report(0.04, "stl.stage.axis{0}{1}", 1, axes);
+        let best = await attempt(frames[0], false, axisStep(0));
+        for (const [i, frame] of frames.slice(1, 3).entries()) {
+            if (best !== undefined && best.error === undefined && best.ratio <= goal) break;
+            if (best !== undefined && best.error === undefined && !inTime()) break;
+            progress.throwIfCancelled();
+            await progress.report(0.04 + (0.51 * (i + 1)) / axes, "stl.stage.axis{0}{1}", i + 2, axes);
+            const next = await attempt(frame, false, axisStep(i + 1));
+            if (next === undefined) continue;
+            // a sound body before an unsound one, then the closer
+            const rank = (x: NonNullable<typeof best>) => (x.error !== undefined ? 2 : x.sound ? 0 : 1);
+            if (
+                best === undefined ||
+                rank(next) < rank(best) ||
+                (rank(next) === rank(best) && next.error === undefined && next.ratio < best.ratio)
+            ) {
+                if (best !== undefined) discard(best.model);
+                best = next;
+            } else {
+                discard(next.model);
+            }
+        }
+        const t1 = Date.now();
+        const t2 = t1;
+        if (best === undefined)
+            return { ratio: 1, firstRatio: 1, features: 0, corrections: 0, error: "no sections" };
+        let { model, rounded } = best;
+        if (best.error !== undefined) {
+            return {
+                model,
+                ratio: 1,
+                firstRatio: 1,
+                features: best.plans.length,
+                corrections: 0,
+                error: best.error,
+            };
+        }
+        const firstRatio = best.ratio;
+        const t3 = Date.now();
+        const deadline = Math.min(t3 + (options.budgetMs ?? 60_000), finishBy);
+        let ratio = firstRatio;
+        let corrections = 0;
+        const refVolume = solidVolume(reference);
+        const corrective = referenceFaces <= MAX_DIFFERENCE_FACES && best.sound;
+        if (!corrective)
+            REBUILD_DEBUG?.(
+                `corrections skipped: ${best.sound ? `${referenceFaces} faces` : "unsound body"}`,
+            );
+        for (
+            let pass = 0;
+            corrective && pass < (options.passes ?? 2) && ratio > goal && Date.now() < deadline;
+            pass++
+        ) {
+            progress.throwIfCancelled();
+            await progress.report(0.55 + 0.1 * pass, "stl.stage.corrections{0}", pass + 1);
+            const current = bodyShape(model);
+            if (current === undefined) break;
+            const td = Date.now();
+            const expected = difference(referenceMesh, current);
+            const diff = deviation(reference, current, true, expected);
+            REBUILD_DEBUG?.(`correction pass ${pass}: deviation ${Date.now() - td} ms`);
+            const pieces: { shape: IShape; operation: "fuse" | "cut" }[] = [];
+            for (const [whole, operation] of [
+                [diff.missingShape, "fuse"],
+                [diff.extraShape, "cut"],
+            ] as const) {
+                if (whole === undefined) continue;
+                for (const solid of whole.findSubShapes(ShapeTypes.solid)) {
+                    // slivers between a facet and the true surface are not features
+                    if (Math.abs(solid.volume()) > refVolume * 5e-4) pieces.push({ shape: solid, operation });
+                }
+            }
+            pieces.sort((a, b) => Math.abs(b.shape.volume()) - Math.abs(a.shape.volume()));
+            let improved = false;
+            for (const piece of pieces.slice(0, 8)) {
+                if (Date.now() >= deadline) break;
+                progress.throwIfCancelled();
+                await progress.report(0.55 + 0.1 * pass);
+                REBUILD_DEBUG?.(`piece ${piece.operation} ${Math.abs(piece.shape.volume()).toFixed(1)} mm³`);
+                const pieceMesh = weldTriangles(trianglesOf(piece.shape));
+                if (pieceMesh.areas.length === 0) continue;
+                const frame = sliceFrames(pieceMesh)[0];
+                const role = piece.operation === "fuse" ? "add" : "remove";
+                const extra: PlannedExtrude[] = planExtrusions(pieceMesh, frame, tol, {
+                    holes: false,
+                    operation: piece.operation,
+                    role,
+                });
+                if (extra.length === 0) continue;
+                if (extra.length > MAX_PIECE_FEATURES) {
+                    REBUILD_DEBUG?.(`piece ${piece.operation} skipped: ${extra.length} features`);
+                    continue;
+                }
+                REBUILD_DEBUG?.(`piece planned: ${extra.length} features`);
+                const before = model.body.features;
+                const sketchesBefore = model.sketches.length;
+                for (const plan of extra) appendExtrude(model, document, plan, tol);
+                REBUILD_DEBUG?.(`piece built`);
+                const after = bodyShape(model);
+                const next =
+                    failedFeature(model) !== undefined || !soundBody(after, partSolids)
+                        ? 1
+                        : measure(referenceMesh, after);
+                // every feature it adds must earn its place: 0.05 % of the part's volume each
+                if (ratio - next >= MIN_GAIN * extra.length) {
+                    ratio = next;
+                    corrections += extra.length;
+                    improved = true;
+                } else {
+                    // not an improvement: the pieces' features and sketches go again
+                    model.body.setFeaturesEmitShapeChanged(before);
+                    for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
+                }
+                REBUILD_DEBUG?.(
+                    `correction ${piece.operation} ${extra.length} features → ${(next * 100).toFixed(3)}% ${ratio === next ? "kept" : "dropped"}`,
+                );
+                if (ratio <= goal || Date.now() >= deadline) break;
+            }
+            diff.missingShape?.dispose();
+            diff.extraShape?.dispose();
+            if (!improved) break;
+        }
+        // still off: the stretches no feature describes taken as the part's own pieces — last, and
+        // judged by the surface, not the volume: true arcs where the STL had facets cost volume
+        // (a perfect rebuild of a round reads ~0.5 %) but no surface point
+        const fitEps = Math.max(tol * 4, 0.05);
+        const surfaceOf = (m: BuiltModel) => {
+            const shape = bodyShape(m);
+            return shape === undefined ? 1 : surfaceFit(mesh, shape, fitEps).off;
+        };
+        progress.throwIfCancelled();
+        await progress.report(0.75, "stl.stage.surface");
+        const ts = Date.now();
+        let surface = surfaceOf(model);
+        REBUILD_DEBUG?.(`surface ${(surface * 100).toFixed(1)}%, ${Date.now() - ts} ms`);
+        if (surface > 0.02) {
+            // on every axis tried: the axis features liked best need not be the one the pieces fit
+            for (const [i, frame] of frames.slice(0, 3).entries()) {
+                if (surface <= 0.02 || !inTime()) break;
+                progress.throwIfCancelled();
+                const from = 0.78 + (0.22 * i) / axes;
+                await progress.report(from, "stl.stage.pieces{0}{1}", i + 1, axes);
+                const alt = await attempt(frame, true, subProgress(progress, from, from + 0.22 / axes));
+                const altSurface = alt === undefined || alt.error !== undefined ? 1 : surfaceOf(alt.model);
+                REBUILD_DEBUG?.(
+                    `pieces on axis ${frame.axis.map((x) => x.toFixed(2))}: ${alt === undefined ? "none" : `${(alt.ratio * 100).toFixed(3)}% surface ${(altSurface * 100).toFixed(1)}% ${alt.error ?? ""}`}`,
+                );
+                // closer on the surface, and not further off in volume
+                if (
+                    alt !== undefined &&
+                    alt.error === undefined &&
+                    altSurface < surface - 0.01 &&
+                    alt.ratio <= ratio * 1.2 + 0.001
+                ) {
+                    discard(model);
+                    model = alt.model;
+                    rounded = alt.rounded;
+                    ratio = alt.ratio;
+                    surface = altSurface;
+                    corrections = 0;
+                } else if (alt !== undefined) {
+                    discard(alt.model);
+                }
+            }
+        }
+        const timings = { plan: t1 - t0, build: t2 - t1, compare: t3 - t2, correct: Date.now() - t3 };
+        const surfaceOff = surface;
+        await progress.report(1);
+        live.clear();
         return {
             model,
-            ratio: 1,
-            firstRatio: 1,
-            features: best.plans.length,
-            corrections: 0,
-            error: best.error,
+            ratio,
+            firstRatio,
+            features: model.body.features.length,
+            corrections,
+            rounded,
+            timings,
+            surfaceOff,
         };
     }
-    const firstRatio = best.ratio;
-    const t3 = Date.now();
-    const deadline = Math.min(t3 + (options.budgetMs ?? 60_000), finishBy);
-    let ratio = firstRatio;
-    let corrections = 0;
-    const refVolume = solidVolume(reference);
-    const corrective = referenceFaces <= MAX_DIFFERENCE_FACES && best.sound;
-    if (!corrective)
-        REBUILD_DEBUG?.(`corrections skipped: ${best.sound ? `${referenceFaces} faces` : "unsound body"}`);
-    for (
-        let pass = 0;
-        corrective && pass < (options.passes ?? 2) && ratio > goal && Date.now() < deadline;
-        pass++
-    ) {
-        const current = bodyShape(model);
-        if (current === undefined) break;
-        const td = Date.now();
-        const expected = difference(referenceMesh, current);
-        const diff = deviation(reference, current, true, expected);
-        REBUILD_DEBUG?.(`correction pass ${pass}: deviation ${Date.now() - td} ms`);
-        const pieces: { shape: IShape; operation: "fuse" | "cut" }[] = [];
-        for (const [whole, operation] of [
-            [diff.missingShape, "fuse"],
-            [diff.extraShape, "cut"],
-        ] as const) {
-            if (whole === undefined) continue;
-            for (const solid of whole.findSubShapes(ShapeTypes.solid)) {
-                // slivers between a facet and the true surface are not features
-                if (Math.abs(solid.volume()) > refVolume * 5e-4) pieces.push({ shape: solid, operation });
-            }
-        }
-        pieces.sort((a, b) => Math.abs(b.shape.volume()) - Math.abs(a.shape.volume()));
-        let improved = false;
-        for (const piece of pieces.slice(0, 8)) {
-            if (Date.now() >= deadline) break;
-            REBUILD_DEBUG?.(`piece ${piece.operation} ${Math.abs(piece.shape.volume()).toFixed(1)} mm³`);
-            const pieceMesh = weldTriangles(trianglesOf(piece.shape));
-            if (pieceMesh.areas.length === 0) continue;
-            const frame = sliceFrames(pieceMesh)[0];
-            const role = piece.operation === "fuse" ? "add" : "remove";
-            const extra: PlannedExtrude[] = planExtrusions(pieceMesh, frame, tol, {
-                holes: false,
-                operation: piece.operation,
-                role,
-            });
-            if (extra.length === 0) continue;
-            if (extra.length > MAX_PIECE_FEATURES) {
-                REBUILD_DEBUG?.(`piece ${piece.operation} skipped: ${extra.length} features`);
-                continue;
-            }
-            REBUILD_DEBUG?.(`piece planned: ${extra.length} features`);
-            const before = model.body.features;
-            const sketchesBefore = model.sketches.length;
-            for (const plan of extra) appendExtrude(model, document, plan, tol);
-            REBUILD_DEBUG?.(`piece built`);
-            const after = bodyShape(model);
-            const next =
-                failedFeature(model) !== undefined || !soundBody(after, partSolids)
-                    ? 1
-                    : measure(referenceMesh, after);
-            // every feature it adds must earn its place: 0.05 % of the part's volume each
-            if (ratio - next >= MIN_GAIN * extra.length) {
-                ratio = next;
-                corrections += extra.length;
-                improved = true;
-            } else {
-                // not an improvement: the pieces' features and sketches go again
-                model.body.setFeaturesEmitShapeChanged(before);
-                for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
-            }
-            REBUILD_DEBUG?.(
-                `correction ${piece.operation} ${extra.length} features → ${(next * 100).toFixed(3)}% ${ratio === next ? "kept" : "dropped"}`,
-            );
-            if (ratio <= goal || Date.now() >= deadline) break;
-        }
-        diff.missingShape?.dispose();
-        diff.extraShape?.dispose();
-        if (!improved) break;
-    }
-    // still off: the stretches no feature describes taken as the part's own pieces — last, and
-    // judged by the surface, not the volume: true arcs where the STL had facets cost volume
-    // (a perfect rebuild of a round reads ~0.5 %) but no surface point
-    const fitEps = Math.max(tol * 4, 0.05);
-    const surfaceOf = (m: BuiltModel) => {
-        const shape = bodyShape(m);
-        return shape === undefined ? 1 : surfaceFit(mesh, shape, fitEps).off;
-    };
-    const ts = Date.now();
-    let surface = surfaceOf(model);
-    REBUILD_DEBUG?.(`surface ${(surface * 100).toFixed(1)}%, ${Date.now() - ts} ms`);
-    if (surface > 0.02) {
-        // on every axis tried: the axis features liked best need not be the one the pieces fit
-        for (const frame of frames.slice(0, 3)) {
-            if (surface <= 0.02 || !inTime()) break;
-            const alt = attempt(frame, true);
-            const altSurface = alt === undefined || alt.error !== undefined ? 1 : surfaceOf(alt.model);
-            REBUILD_DEBUG?.(
-                `pieces on axis ${frame.axis.map((x) => x.toFixed(2))}: ${alt === undefined ? "none" : `${(alt.ratio * 100).toFixed(3)}% surface ${(altSurface * 100).toFixed(1)}% ${alt.error ?? ""}`}`,
-            );
-            // closer on the surface, and not further off in volume
-            if (
-                alt !== undefined &&
-                alt.error === undefined &&
-                altSurface < surface - 0.01 &&
-                alt.ratio <= ratio * 1.2 + 0.001
-            ) {
-                discard(model);
-                model = alt.model;
-                rounded = alt.rounded;
-                ratio = alt.ratio;
-                surface = altSurface;
-                corrections = 0;
-            } else if (alt !== undefined) {
-                discard(alt.model);
-            }
-        }
-    }
-    const timings = { plan: t1 - t0, build: t2 - t1, compare: t3 - t2, correct: Date.now() - t3 };
-    const surfaceOff = surface;
-    return {
-        model,
-        ratio,
-        firstRatio,
-        features: model.body.features.length,
-        corrections,
-        rounded,
-        timings,
-        surfaceOff,
-    };
 }

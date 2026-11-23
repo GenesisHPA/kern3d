@@ -252,6 +252,11 @@ function enableSystemFonts() {
         }
         return families;
     };
+    ipcMain.on("progress:set", (event, value) => {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        const v = Number(value);
+        if (win && !win.isDestroyed() && Number.isFinite(v)) win.setProgressBar(v < 0 ? -1 : Math.min(1, v));
+    });
     ipcMain.handle("fonts:list", async (event) => {
         if (!fromApp(event)) return [];
         return [...(await load()).keys()].sort((a, b) => a.localeCompare(b)).map((family) => ({ family }));

@@ -13,6 +13,7 @@ import {
     Ribbon,
     RibbonTab,
     type RibbonTabProfile,
+    setProgressHost,
     VisualConfig,
 } from "@chili3d/core";
 import { showDialog } from "./dialog";
@@ -20,6 +21,7 @@ import { Editor } from "./editor";
 import { showFloatPanel } from "./floatPanel";
 import { Home } from "./home";
 import { Permanent } from "./permanent";
+import { showProgress } from "./progressDialog";
 import { installSelectOnFocus } from "./selectOnFocus";
 import { Toast } from "./toast";
 
@@ -104,6 +106,7 @@ export class MainWindow extends HTMLElement implements IWindow {
         PubSub.default.sub("showDialog", showDialog);
         PubSub.default.sub("showFloatPanel", showFloatPanel);
         PubSub.default.sub("showPermanent", Permanent.show);
+        setProgressHost(showProgress);
         PubSub.default.sub("activeViewChanged", (view) => displayHome(app, view === undefined));
         PubSub.default.sub("displayHome", (show) => displayHome(app, show));
 

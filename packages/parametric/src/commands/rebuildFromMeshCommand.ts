@@ -9,7 +9,10 @@ import {
     type IApplication,
     type ICommand,
     type INode,
+    type IProgress,
     PubSub,
+    runWithProgress,
+    subProgress,
     Transaction,
 } from "@chili3d/core";
 import { ParametricBodyNode } from "../parametricBodyNode";
@@ -55,58 +58,68 @@ export class RebuildFromMeshCommand implements ICommand {
             PubSub.default.pub("showToast", "toast.recoverCylinders.none");
             return;
         }
-        PubSub.default.pub(
-            "showPermanent",
-            async () => {
-                await new Promise((resolve) => setTimeout(resolve, 50));
-                const kept: number[] = [];
-                const dropped: number[] = [];
-                Transaction.execute(document, "modify.rebuildFromMesh", () => {
-                    for (const node of nodes) {
-                        const shape = node.shape.value;
-                        const triangles = sourceTriangles(node.id) ?? trianglesOf(shape);
-                        const report = rebuildPart(document, triangles, shape, node.name);
-                        const model = report.model;
-                        if (model === undefined) {
-                            dropped.push(1);
-                            continue;
-                        }
-                        if (report.error !== undefined || report.ratio > KEEP_BELOW) {
-                            for (const n of [model.body, ...model.sketches]) n.parent?.remove(n);
-                            dropped.push(report.ratio);
-                            continue;
-                        }
-                        // the rebuild right after the original, which is hidden
-                        const parent = node.parent;
-                        if (parent !== undefined) {
-                            let anchor: INode = node;
-                            for (const n of [model.body, ...model.sketches]) {
-                                n.parent?.remove(n);
-                                parent.insertAfter(anchor, n);
-                                anchor = n;
-                            }
-                        }
-                        node.visible = false;
-                        kept.push(report.ratio);
+        void runWithProgress(async (progress) => {
+            const kept: number[] = [];
+            const dropped: number[] = [];
+            await Transaction.executeAsync(document, "modify.rebuildFromMesh", async () => {
+                for (const [index, node] of nodes.entries()) {
+                    progress.throwIfCancelled();
+                    const shape = node.shape.value;
+                    const triangles = sourceTriangles(node.id) ?? trianglesOf(shape);
+                    // several parts share the bar; each gets its slice, its name in the stage
+                    const part = subProgress(progress, index / nodes.length, (index + 1) / nodes.length);
+                    const named: IProgress =
+                        nodes.length === 1
+                            ? part
+                            : {
+                                  report: (fraction, stage, ...args) =>
+                                      part.report(
+                                          fraction,
+                                          stage === undefined ? undefined : "stl.stage.part{0}{1}{2}",
+                                          index + 1,
+                                          nodes.length,
+                                          stage === undefined ? "" : I18n.translate(stage, ...args),
+                                      ),
+                                  get cancelled() {
+                                      return part.cancelled;
+                                  },
+                                  throwIfCancelled: () => part.throwIfCancelled(),
+                              };
+                    const report = await rebuildPart(document, triangles, shape, node.name, {
+                        progress: named,
+                    });
+                    const model = report.model;
+                    if (model === undefined) {
+                        dropped.push(1);
+                        continue;
                     }
-                });
-                document.visual.update();
-                if (kept.length > 0) {
-                    const worst = Math.max(...kept) * 100;
-                    PubSub.default.pub(
-                        "showToast",
-                        "toast.rebuildFromMesh{0}{1}",
-                        kept.length,
-                        worst.toFixed(2),
-                    );
+                    if (report.error !== undefined || report.ratio > KEEP_BELOW) {
+                        for (const n of [model.body, ...model.sketches]) n.parent?.remove(n);
+                        dropped.push(report.ratio);
+                        continue;
+                    }
+                    // the rebuild right after the original, which is hidden
+                    const parent = node.parent;
+                    if (parent !== undefined) {
+                        let anchor: INode = node;
+                        for (const n of [model.body, ...model.sketches]) {
+                            n.parent?.remove(n);
+                            parent.insertAfter(anchor, n);
+                            anchor = n;
+                        }
+                    }
+                    node.visible = false;
+                    kept.push(report.ratio);
                 }
-                if (dropped.length > 0) {
-                    const best = Math.min(...dropped) * 100;
-                    PubSub.default.pub("showToast", "toast.rebuildFromMesh.failed{0}", best.toFixed(1));
-                }
-            },
-            "toast.excuting{0}",
-            I18n.translate("command.modify.rebuildFromMesh"),
-        );
+            }).finally(() => document.visual.update());
+            if (kept.length > 0) {
+                const worst = Math.max(...kept) * 100;
+                PubSub.default.pub("showToast", "toast.rebuildFromMesh{0}{1}", kept.length, worst.toFixed(2));
+            }
+            if (dropped.length > 0) {
+                const best = Math.min(...dropped) * 100;
+                PubSub.default.pub("showToast", "toast.rebuildFromMesh.failed{0}", best.toFixed(1));
+            }
+        }, "command.modify.rebuildFromMesh");
     }
 }

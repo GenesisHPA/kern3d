@@ -65,31 +65,31 @@ function rebuild(part: IShape) {
 }
 
 describe("STL rebuilt as features (real kernel)", () => {
-    test("a plate with two through holes: one extrude and two hole cuts", () => {
+    test("a plate with two through holes: one extrude and two hole cuts", async () => {
         const plate = cut(
             box(0, 0, 0, 60, 40, 8),
             cyl(XYZ.unitZ, at(15, 20, -1), 3, 10),
             cyl(XYZ.unitZ, at(45, 20, -1), 4, 10),
         );
-        const report = rebuild(plate);
+        const report = await rebuild(plate);
         expect(report.error).toBeUndefined();
         expect(report.ratio).toBeLessThan(0.005);
         const roles = report.model!.sketches.map((s) => s.name);
         expect(roles.filter((n) => n.startsWith("Отверстие"))).toHaveLength(2);
     });
 
-    test("a stepped part with a counterbore", () => {
+    test("a stepped part with a counterbore", async () => {
         const part = cut(
             fuse(box(0, 0, 0, 50, 50, 10), box(10, 10, 10, 30, 30, 15)),
             cyl(XYZ.unitZ, at(25, 25, -1), 4, 30),
             cyl(XYZ.unitZ, at(25, 25, 20), 7, 10),
         );
-        const report = rebuild(part);
+        const report = await rebuild(part);
         expect(report.error).toBeUndefined();
         expect(report.ratio).toBeLessThan(0.005);
     });
 
-    test("rounded top edges come back as one fillet feature, not as slabs", () => {
+    test("rounded top edges come back as one fillet feature, not as slabs", async () => {
         const block = box(0, 0, 0, 40, 30, 12);
         const edges = block.findSubShapes(ShapeTypes.edge) as IEdge[];
         const top = edges.flatMap((e, i) => {
@@ -99,14 +99,14 @@ describe("STL rebuilt as features (real kernel)", () => {
         const rounded = shapeFactory.fillet(block, top, 3).value;
         if (process.env["KERN3D_STL_DUMP_ROUNDED"])
             writeFileSync(process.env["KERN3D_STL_DUMP_ROUNDED"], stlBytes(rounded));
-        const report = rebuild(rounded);
+        const report = await rebuild(rounded);
         expect(report.error).toBeUndefined();
         expect(report.rounded).toBeGreaterThanOrEqual(1);
         expect(report.model!.body.features.some((f) => f.type === "fillet")).toBe(true);
         expect(report.ratio).toBeLessThan(0.01);
     });
 
-    test("a leaning arm on a plate is one oblique extrude along a direction line", () => {
+    test("a leaning arm on a plate is one oblique extrude along a direction line", async () => {
         const plate = box(0, 0, 0, 60, 40, 5);
         const foot = shapeFactory.face([
             shapeFactory.wire([
@@ -119,13 +119,13 @@ describe("STL rebuilt as features (real kernel)", () => {
         const arm = shapeFactory.prism(foot, new XYZ({ x: 8, y: 6, z: 20 })).value;
         const part = fuse(plate, arm);
         if (process.env["KERN3D_STL_DUMP"]) writeFileSync(process.env["KERN3D_STL_DUMP"], stlBytes(part));
-        const report = rebuild(part);
+        const report = await rebuild(part);
         expect(report.error).toBeUndefined();
         expect(report.model!.sketches.some((x) => x.name.startsWith("Направление"))).toBe(true);
         expect(report.ratio).toBeLessThan(0.005);
     });
 
-    test("a hole square to the main axis is cut by the correction pass along its own axis", () => {
+    test("a hole square to the main axis is cut by the correction pass along its own axis", async () => {
         // the vertical holes make z the main axis; the side hole runs along x
         const part = cut(
             box(0, 0, 0, 40, 30, 20),
@@ -135,7 +135,7 @@ describe("STL rebuilt as features (real kernel)", () => {
             cyl(XYZ.unitZ, at(8, 22, -1), 2.5, 22),
             cyl(XYZ.unitZ, at(32, 22, -1), 2.5, 22),
         );
-        const report = rebuild(part);
+        const report = await rebuild(part);
         expect(report.error).toBeUndefined();
         expect(report.ratio).toBeLessThan(0.01);
         expect(report.corrections).toBeGreaterThan(0);
@@ -169,7 +169,7 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
 `,
             );
     };
-    test.each(files)("%s", (file) => {
+    test.each(files)("%s", async (file) => {
         const started = Date.now();
         const stl = fromStl(new Uint8Array(readFileSync(file)));
         const tRef = Date.now();
@@ -188,7 +188,7 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
             return;
         }
         setRebuildDebug((line) => log(`  ${path.basename(file)}: ${line}`));
-        const report = rebuildPart(document(), trianglesOf(stl), reference.value, path.basename(file));
+        const report = await rebuildPart(document(), trianglesOf(stl), reference.value, path.basename(file));
         setRebuildDebug(undefined);
         const names = report.model?.sketches.map((x) => x.name.split(" ")[0]) ?? [];
         const counts = [...new Set(names)]
@@ -215,7 +215,7 @@ function measureRatio(mesh: ReturnType<typeof weldTriangles>, shape: IShape): nu
 /** KERN3D_STL_DEBUG=<file.stl>: prints the frame and every slab's fitted profiles. */
 const debugFile = process.env["KERN3D_STL_DEBUG"];
 describe.skipIf(debugFile === undefined)("STL debug", () => {
-    test("slabs", () => {
+    test("slabs", async () => {
         const out = process.env["KERN3D_STL_DEBUG_OUT"] ?? `${debugFile}.debug.txt`;
         const dbg = (...parts: unknown[]) =>
             appendFileSync(
@@ -276,7 +276,7 @@ describe.skipIf(debugFile === undefined)("STL debug", () => {
         for (const t of treatments)
             dbg(`DEBUG treatment ${t.kind} size ${t.size} at ${t.height.toFixed(3)} loops ${t.loops.length}`);
         const reference = meshToSolid(stl).value;
-        const model = buildModel(document(), plans, "debug", tol);
+        const model = await buildModel(document(), plans, "debug", tol);
         model.body.features.forEach((_, i) => {
             const items = model.body.featureItems();
             dbg(`DEBUG feature ${i} error ${items[i]?.error ?? "-"}`);

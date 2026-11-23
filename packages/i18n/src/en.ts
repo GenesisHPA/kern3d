@@ -302,6 +302,21 @@ export default {
         "command.modify.rebuildFromMesh": "Rebuild as Features",
         "toast.rebuildFromMesh{0}{1}":
             "Bodies rebuilt: {0}, off the original by up to {1} %; the original is hidden",
+        "import.stage.read{0}{1}{2}": "File {0} of {1}: reading {2}",
+        "import.stage.convert{0}{1}{2}":
+            "File {0} of {1}: building the body of {2} — a big file takes minutes, the window may not respond",
+        "import.stage.show{0}{1}{2}": "File {0} of {1}: displaying {2}",
+        "progress.cancelling": "Stopping…",
+        "progress.cancelled": "Stopped — nothing changed",
+        "stl.stage.analyse": "Reading the mesh",
+        "stl.stage.axis{0}{1}": "Sections along axis {0} of {1}",
+        "stl.stage.build{0}{1}": "Features: {0} of {1}",
+        "stl.stage.measure": "Comparing with the part",
+        "stl.stage.rounds{0}{1}": "Fillets and chamfers: {0} of {1}",
+        "stl.stage.corrections{0}": "Fixing differences, pass {0}",
+        "stl.stage.surface": "Checking the surface",
+        "stl.stage.pieces{0}{1}": "Complex areas, axis {0} of {1}",
+        "stl.stage.part{0}{1}{2}": "Part {0} of {1}: {2}",
         "toast.rebuildFromMesh.failed{0}":
             "Could not rebuild closely enough ({0} % off); the body is left as it was",
         "toast.recoverCylinders{0}": "Bodies with recovered cylinders: {0}",

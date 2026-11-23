@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IDocument, IView } from "@chili3d/core";
-import { PubSub } from "@chili3d/core";
+import { type I18nKeys, type IProgress, NoProgress, setProgressHost } from "@chili3d/core";
 import { createMockApplication, createMockDocument, createMockView } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, test } from "@rstest/core";
 import { importFiles } from "../src/utils";
@@ -16,13 +16,19 @@ function createDocView(doc: IDocument): IView {
 
 describe("importFiles", () => {
     let newDocumentCalls: string[];
+    /** What importFiles handed the progress window: the task (not run here) and its title. */
+    let captured: { task: (progress: IProgress) => Promise<void>; title: I18nKeys } | undefined;
 
     beforeEach(() => {
         newDocumentCalls = [];
+        captured = undefined;
+        setProgressHost(async (task, title) => {
+            captured = { task, title };
+        });
     });
 
     afterEach(() => {
-        PubSub.default.removeAll("showPermanent");
+        setProgressHost(undefined);
     });
 
     describe("document resolution", () => {
@@ -81,87 +87,57 @@ describe("importFiles", () => {
         });
     });
 
-    describe("PubSub event", () => {
-        test("should publish showPermanent with correct message key", async () => {
+    describe("progress window", () => {
+        test("runs the import under the progress window titled with the import command", async () => {
             const doc = createMockDocument({ id: "test-doc", name: "test-doc" });
-            const view = createDocView(doc);
+            const app = createMockApplication({
+                dataExchange: { import: async () => {} },
+            });
+            app.activeView = createDocView(doc);
+            app.newDocument = async () => ({}) as IDocument;
 
-            let capturedCallback: unknown;
-            let capturedMessage: unknown;
+            await importFiles(app, [new File([], "test.stl")]);
 
-            const originalPub = PubSub.default.pub.bind(PubSub.default);
-            PubSub.default.pub = ((event: string, ...args: unknown[]) => {
-                if (event === "showPermanent") {
-                    capturedCallback = args[0];
-                    capturedMessage = args[1];
-                }
-            }) as typeof PubSub.default.pub;
-
-            try {
-                const app = createMockApplication({
-                    dataExchange: { import: async () => {} },
-                });
-                app.activeView = view;
-                app.newDocument = async () => ({}) as IDocument;
-
-                await importFiles(app, [new File([], "test.stl")]);
-
-                expect(capturedMessage).toBe("toast.excuting{0}");
-                expect(typeof capturedCallback).toBe("function");
-            } finally {
-                PubSub.default.pub = originalPub;
-            }
+            expect(captured?.title).toBe("command.file.import");
+            expect(typeof captured?.task).toBe("function");
         });
     });
 
     describe("dataExchange integration", () => {
-        test("should call dataExchange.import when the published callback is executed", async () => {
-            let capturedCallback: (() => Promise<void>) | undefined;
-            const originalPub = PubSub.default.pub.bind(PubSub.default);
-            PubSub.default.pub = ((event: string, ...args: unknown[]) => {
-                if (event === "showPermanent") {
-                    capturedCallback = args[0] as () => Promise<void>;
-                }
-            }) as typeof PubSub.default.pub;
+        test("the window's task imports the files with its progress and fits the view", async () => {
+            let fitContentCalled = false;
+            let importFilesArg: File[] | FileList | undefined;
+            let importProgress: IProgress | undefined;
 
-            try {
-                let fitContentCalled = false;
-                let importCalled = false;
-                let importFilesArg: File[] | FileList | undefined;
-
-                const app = createMockApplication({
-                    dataExchange: {
-                        import: async (_document: IDocument, files: File[] | FileList) => {
-                            importCalled = true;
-                            importFilesArg = files;
-                        },
+            const app = createMockApplication({
+                dataExchange: {
+                    import: async (_document: IDocument, files: File[] | FileList, progress?: IProgress) => {
+                        importFilesArg = files;
+                        importProgress = progress;
                     },
-                });
-                app.newDocument = async () => ({}) as IDocument;
+                },
+            });
+            app.newDocument = async () => ({}) as IDocument;
 
-                const doc = createMockDocument({ id: "import-doc", name: "import-doc", application: app });
-                const view = createMockView({
-                    document: doc,
-                    cameraController: {
-                        fitContent: () => {
-                            fitContentCalled = true;
-                        },
+            const doc = createMockDocument({ id: "import-doc", name: "import-doc", application: app });
+            app.activeView = createMockView({
+                document: doc,
+                cameraController: {
+                    fitContent: () => {
+                        fitContentCalled = true;
                     },
-                } as unknown as Partial<IView>);
-                app.activeView = view;
+                },
+            } as unknown as Partial<IView>);
 
-                const files = [new File([], "model.brep")];
-                await importFiles(app, files);
+            const files = [new File([], "model.brep")];
+            await importFiles(app, files);
 
-                expect(capturedCallback).not.toBeUndefined();
-                await capturedCallback!();
+            expect(captured).not.toBeUndefined();
+            await captured!.task(NoProgress);
 
-                expect(importCalled).toBe(true);
-                expect(importFilesArg).toBe(files);
-                expect(fitContentCalled).toBe(true);
-            } finally {
-                PubSub.default.pub = originalPub;
-            }
+            expect(importFilesArg).toBe(files);
+            expect(importProgress).toBe(NoProgress);
+            expect(fitContentCalled).toBe(true);
         });
     });
 });

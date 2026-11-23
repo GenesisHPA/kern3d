@@ -114,21 +114,24 @@ const ROLE_NAMES: Record<PlannedExtrude["role"], string> = {
  * The planned extrudes as one parametric body in `document`: a sketch node per extrude (hidden,
  * named by what it makes) and one extrude feature each, in order.
  */
-export function buildModel(
+export async function buildModel(
     document: IDocument,
     plans: readonly PlannedExtrude[],
     name: string,
     tol: number,
     reference?: IShape,
     judge?: BodyJudge,
-): BuiltModel {
+    /** Called before each feature (done, total): progress and «Отмена» between the features. */
+    onStep?: (done: number, total: number) => Promise<void>,
+): Promise<BuiltModel> {
     const body = new ParametricBodyNode({ document, features: [] });
     body.name = name;
     document.modelManager.addNode(body);
     const model: BuiltModel = { body, sketches: [] };
     // one feature at a time: a taper the kernel refuses is redone straight, so one bad cone
     // does not take the whole body down
-    for (const plan of plans) {
+    for (const [index, plan] of plans.entries()) {
+        await onStep?.(index, plans.length);
         if (
             plan.fromMesh &&
             reference !== undefined &&

@@ -21,6 +21,7 @@ export * from "./objectStorage";
 export * from "./observer";
 export * from "./pendingWork";
 export * from "./precision";
+export * from "./progress";
 export * from "./pubsub";
 export * from "./result";
 export * from "./signal";

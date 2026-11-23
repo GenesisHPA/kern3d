@@ -7,10 +7,13 @@ import {
     type IDataExchange,
     type IDocument,
     type INode,
+    type IProgress,
     type IShape,
+    NoProgress,
     PubSub,
     Result,
     ShapeNode,
+    subProgress,
     type VisualNode,
 } from "@chili3d/core";
 import { makeEditable } from "@chili3d/parametric";
@@ -26,16 +29,34 @@ export class DefaultDataExchange implements IDataExchange {
         return [".step", ".iges", ".brep", ".stl", ".stl binary", ".ply", ".ply binary", ".obj", ".3mf"];
     }
 
-    async import(document: IDocument, files: FileList | File[]): Promise<void> {
-        for (const file of files) {
-            await this.handleSingleFileImport(document, file);
+    async import(
+        document: IDocument,
+        files: FileList | File[],
+        progress: IProgress = NoProgress,
+    ): Promise<void> {
+        const list = [...files];
+        for (const [index, file] of list.entries()) {
+            progress.throwIfCancelled();
+            const step = subProgress(progress, index / list.length, (index + 1) / list.length);
+            await this.handleSingleFileImport(document, file, step, index, list.length);
         }
+        await progress.report(1);
     }
 
-    private async handleSingleFileImport(document: IDocument, file: File) {
+    private async handleSingleFileImport(
+        document: IDocument,
+        file: File,
+        progress: IProgress,
+        index: number,
+        count: number,
+    ) {
         let importResult: Result<INode> | undefined;
-
+        await progress.report(0, "import.stage.read{0}{1}{2}", index + 1, count, file.name);
         const fileName = file.name.toLocaleLowerCase();
+        // the conversion is one long synchronous kernel call: the window says what it waits for
+        const heavy = this.extensionIs(fileName, ".stl", ".step", ".stp", ".iges", ".igs");
+        if (heavy) await progress.report(0.1, "import.stage.convert{0}{1}{2}", index + 1, count, file.name);
+
         if (this.extensionIs(fileName, ".brep")) {
             importResult = await this.importBrep(document, file);
         } else if (this.extensionIs(fileName, ".stl")) {
@@ -46,6 +67,7 @@ export class DefaultDataExchange implements IDataExchange {
             importResult = await this.importIges(document, file);
         }
 
+        await progress.report(0.9, "import.stage.show{0}{1}{2}", index + 1, count, file.name);
         this.handleImportResult(document, fileName, importResult);
     }
 

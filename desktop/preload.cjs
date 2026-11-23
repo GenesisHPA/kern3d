@@ -7,6 +7,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("kern3dDesktop", {
+    // taskbar bar for long tasks: 0..1, or -1 to hide
+    setProgress: (value) => ipcRenderer.send("progress:set", value),
     usbDriver: {
         /** {found, driver: "winusb" | "ezcad" | "other" | "none", ezcadAvailable} */
         status: () => ipcRenderer.invoke("usb-driver:status"),
