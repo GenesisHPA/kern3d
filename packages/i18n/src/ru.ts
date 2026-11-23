@@ -697,6 +697,12 @@ export default {
         "laser.rotary.zeroHere.hint":
             "Текущее положение патрона станет 0° — например, после установки детали",
         "laser.rotary.zeroSet": "Ось: текущее положение патрона принято за 0°",
+        "laser.text.hatch": "Штриховка текста",
+        "laser.text.hatch.on": "Заштриховать буквы",
+        "laser.text.hatch.outline": "Обвести контур после штриховки",
+        "laser.text.hatch.stroke":
+            "Однолинейный шрифт: буква — одна линия, штриховать нечего. Для штриховки выберите обычный шрифт.",
+        "laser.rotary.around": "Положение по окружности, °",
         "laser.rotary.timeout": "Поворотная ось не дошла до угла за 30 с — проверьте настройки оси",
         "home.credits":
             "Kern3D от Genesis Tactical · на основе Chili3D, автор xiangechen (仙阁) · лицензия AGPL-3.0",

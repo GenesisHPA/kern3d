@@ -104,6 +104,11 @@ function fillLines(o: LaserVectorObject, w: GcodeWriter, profile: MachineProfile
         w.rapid(segment.from);
         w.cut(segment.to, s, o.op.speed);
     }
+    if (o.op.fillOutline !== true) return;
+    for (const trace of orderPaths(paths, w.position)) {
+        w.rapid(trace[0]);
+        for (let k = 1; k < trace.length; k++) w.cut(trace[k], s, o.op.speed);
+    }
 }
 
 /** One raster line's runs of equal power: [startColumn, endColumn (exclusive), S]. */

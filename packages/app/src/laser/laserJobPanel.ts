@@ -393,6 +393,7 @@ export class LaserJobPanel {
                 "laser.lockAspect",
                 checkbox(o.lockAspect, (v) => edit((x) => (x.lockAspect = v))),
             ),
+            ...this.aroundRows(o),
             ...(this.host.data.rotary?.enabled && this.host.data.rotary.mode === "index"
                 ? [
                       row(
@@ -820,6 +821,86 @@ export class LaserJobPanel {
             row(
                 "laser.shape.arc",
                 numberField(shape.arcRadius, (v) => edit((s) => (s.arcRadius = v))),
+            ),
+            ...this.textHatchRows(shape),
+        ];
+    }
+
+    /**
+     * The text's hatch, here with the text (it is also the operation's «Заливка»): on/off, the
+     * spacing and angle, the outline traced after it. Single-line letters have no inside.
+     */
+    private textHatchRows(shape: Extract<LaserShape, { type: "text" }>): HTMLElement[] {
+        const o = this.host.data.objects.find((x) => x.id === this.host.selection);
+        if (o === undefined) return [];
+        const op = o.op;
+        const editOp = (f: (op: LaserOperation) => void) => this.host.editSelected((x) => f(x.op));
+        const rows: HTMLElement[] = [heading("laser.text.hatch")];
+        if (shape.font.stroke !== undefined) {
+            rows.push(el("div", { className: style.muted, textContent: t("laser.text.hatch.stroke") }));
+            return rows;
+        }
+        const on = op.mode === "fill";
+        rows.push(
+            row(
+                "laser.text.hatch.on",
+                checkbox(on, (v) => editOp((x) => (x.mode = v ? "fill" : "line"))),
+            ),
+        );
+        if (!on) return rows;
+        rows.push(
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.fillInterval",
+                    numberField(
+                        op.fillInterval,
+                        (v) => editOp((x) => (x.fillInterval = Math.max(0.005, v))),
+                        {
+                            min: 0.005,
+                            step: 0.01,
+                        },
+                    ),
+                ),
+                row(
+                    "laser.fillAngle",
+                    numberField(op.fillAngle, (v) => editOp((x) => (x.fillAngle = v))),
+                ),
+            ),
+            row(
+                "laser.text.hatch.outline",
+                checkbox(op.fillOutline === true, (v) =>
+                    editOp((x) => (x.fillOutline = v ? true : undefined)),
+                ),
+            ),
+        );
+        return rows;
+    }
+
+    /**
+     * A rotary job: where the object sits round the part, in degrees — its centre at that angle
+     * from the seam (0°), with quick places every quarter turn.
+     */
+    private aroundRows(o: LaserObject): HTMLElement[] {
+        const r = this.host.data.rotary;
+        if (r?.enabled !== true || r.mode !== "strips") return [];
+        const perDegree = (Math.PI * r.diameter) / 360;
+        const minY = this.host.profile.origin === "center" ? (-Math.PI * r.diameter) / 2 : 0;
+        const angle = (o.y + o.height / 2 - minY) / perDegree;
+        const place = (deg: number) =>
+            this.host.editSelected((x) => {
+                x.y = minY + deg * perDegree - x.height / 2;
+            });
+        return [
+            row(
+                "laser.rotary.around",
+                numberField(Math.round(angle * 100) / 100, (v) => place(v), { step: 1 }),
+            ),
+            el(
+                "div",
+                { className: style.buttons },
+                ...[0, 90, 180, 270].map((deg) => button(`${deg}°` as never, () => place(deg))),
             ),
         ];
     }

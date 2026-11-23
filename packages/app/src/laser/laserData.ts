@@ -69,6 +69,8 @@ export interface LaserOperation {
     fillInterval: number;
     /** Fill: hatch direction, degrees from +x. */
     fillAngle: number;
+    /** Fill: the outline traced after the hatch (a clean edge, as EzCAD's «обвести контур»). */
+    fillOutline?: boolean;
     raster: RasterSettings;
     /** Galvo (JCZ): pulse frequency, kHz. */
     frequency: number;
@@ -244,6 +246,7 @@ function parseOperation(raw: Partial<LaserOperation> | undefined, mode: LaserMod
         air: raw?.air === true,
         fillInterval: finite(raw?.fillInterval, base.fillInterval),
         fillAngle: finite(raw?.fillAngle, base.fillAngle),
+        fillOutline: raw?.fillOutline === true ? true : undefined,
         frequency: finite(raw?.frequency, base.frequency),
         pen: typeof raw?.pen === "string" ? raw.pen : "",
         raster: {

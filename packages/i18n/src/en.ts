@@ -783,6 +783,12 @@ export default {
         "laser.rotary.zeroHere": "Zero here",
         "laser.rotary.zeroHere.hint": "The chuck's present place becomes 0° — after setting the part in, say",
         "laser.rotary.zeroSet": "Axis: the chuck's present place is now 0°",
+        "laser.text.hatch": "Text hatch",
+        "laser.text.hatch.on": "Hatch the letters",
+        "laser.text.hatch.outline": "Trace the outline after the hatch",
+        "laser.text.hatch.stroke":
+            "A single-line font: each letter is one stroke, there is nothing to hatch. Pick an outline font to hatch.",
+        "laser.rotary.around": "Place round the part, °",
         "laser.rotary.timeout": "The rotary axis did not reach its angle in 30 s — check the axis settings",
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",

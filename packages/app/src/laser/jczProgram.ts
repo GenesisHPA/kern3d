@@ -101,8 +101,13 @@ export class GalvoMapper {
 export function burnPolylines(o: LaserObject, image: GrayImage | undefined): Pt[][] {
     if (o.kind === "image") return image === undefined ? [] : rasterRuns(o, image);
     const paths = transformPaths(o.paths, objectMatrix(o));
-    if (o.op.mode === "fill")
-        return hatchPaths(paths, o.op.fillInterval, o.op.fillAngle + o.angle).map((s) => [s.from, s.to]);
+    if (o.op.mode === "fill") {
+        const hatch = hatchPaths(paths, o.op.fillInterval, o.op.fillAngle + o.angle).map((s) => [
+            s.from,
+            s.to,
+        ]);
+        return o.op.fillOutline === true ? [...hatch, ...orderPaths(paths)] : hatch;
+    }
     return orderPaths(paths);
 }
 
