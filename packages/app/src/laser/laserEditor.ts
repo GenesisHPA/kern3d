@@ -162,8 +162,15 @@ export class LaserEditor {
         return LaserEditor.lastJob.get(document);
     }
 
+    /** Remembers the job as its document's last one; a job no longer in a document is skipped. */
+    private static remember(node: LaserNode) {
+        const document = node.document as IDocument | undefined;
+        if (document !== undefined && document !== null && typeof document === "object")
+            LaserEditor.lastJob.set(document, node.id);
+    }
+
     static open(node: LaserNode) {
-        LaserEditor.lastJob.set(node.document, node.id);
+        LaserEditor.remember(node);
         let editor = LaserEditor.editors.get(node.id);
         if (editor === undefined) {
             editor = new LaserEditor(node);
@@ -346,8 +353,13 @@ export class LaserEditor {
     }
 
     private reveal() {
+        // the job's document was closed (or the job deleted): its tab has nothing to show
+        if (this.node.document === undefined || this.node.document === null) {
+            this.close();
+            return;
+        }
         if (!this.dialog.open) this.dialog.show();
-        LaserEditor.lastJob.set(this.node.document, this.node.id);
+        LaserEditor.remember(this.node);
         this.updateJobPicker();
         if (!this.fitted) {
             this.fitted = true;
@@ -454,7 +466,7 @@ export class LaserEditor {
         Transaction.execute(this.node.document, "laser", () => {
             this.node.content = content;
         });
-        LaserEditor.lastJob.set(this.node.document, this.node.id);
+        LaserEditor.remember(this.node);
         this.changed();
     }
 
