@@ -69,6 +69,8 @@ import {
     toggleSmooth,
 } from "./pathShape";
 import { type RotaryStep, rotarySteps } from "./rotary";
+import { Rotary3DView } from "./rotary3d";
+import { rotary3dSource } from "./rotary3dSource";
 import {
     type Align,
     alignObjects,
@@ -373,6 +375,7 @@ export class LaserEditor {
         const r = this.output.current;
         if (r === undefined) return;
         this.beamPercent = -1;
+        this.view3d?.setFraction(0);
         // a galvo board reports no position while marking: the beam keeps the job's time
         this.beam.start(r.moves, r.stats.seconds, this.profile.controller === "jcz" ? "time" : "position");
     }
@@ -405,10 +408,12 @@ export class LaserEditor {
         if (percent === this.beamPercent || p.fraction >= 1) return;
         this.beamPercent = percent;
         this.setStatus(t("laser.beam.progress", percent, formatDuration(p.remaining)));
+        this.view3d?.setFraction(p.fraction);
     }
 
     close() {
         this.beam.dispose();
+        this.close3d();
         // the laser off and the port free before the editor goes
         if (this.machine.connected) void this.machine.disconnect();
         this.node.removePropertyChanged(this.onNodeChanged);
@@ -755,6 +760,7 @@ export class LaserEditor {
                 edit(this.data);
                 this.commit();
                 this.render();
+                void this.refresh3d();
             },
             editShape: (edit) => void this.editShape(edit),
             convertToCurves: () => {
@@ -845,6 +851,7 @@ export class LaserEditor {
             button("laser.delete", () => this.deleteSelected()),
             this.separator(),
             button("laser.fit", () => this.fit()),
+            this.view3dButton,
             this.separator(),
             ...this.gcodeOnly(
                 button("laser.generate", () => void this.output.generate()),
@@ -854,6 +861,46 @@ export class LaserEditor {
             this.separator(),
             ...this.machine.toolbarControls(),
         ];
+    }
+
+    /** «3D»: the part in the rotary chuck, shown when the job is marked round a part. */
+    private readonly view3dButton = button(
+        "laser.rotary.3d.open",
+        () => void this.toggle3d(),
+        "laser.rotary.3d.hint",
+    );
+    private view3d: Rotary3DView | undefined;
+
+    private async toggle3d() {
+        if (this.view3d !== undefined) {
+            this.close3d();
+            return;
+        }
+        const view = new Rotary3DView(() => this.close3d());
+        this.view3d = view;
+        this.svg.parentElement?.append(view.element);
+        await this.refresh3d();
+    }
+
+    private close3d() {
+        this.view3d?.dispose();
+        this.view3d = undefined;
+    }
+
+    /** The 3D part made again from the job (opened, or the job / its rotary settings changed). */
+    private async refresh3d() {
+        const view = this.view3d;
+        const rotary = this.data.rotary;
+        if (view === undefined || rotary === undefined) return;
+        const images = this.output.current?.images ?? (await this.output.generate())?.images ?? new Map();
+        const job = withOrigin(this.data, this.profile);
+        const centerY = this.profile.origin === "center" ? 0 : this.profile.bedHeight / 2;
+        const source = rotary3dSource(job, rotary, images, centerY);
+        if (source === undefined) {
+            this.setStatus(t("toast.laser.nothingToEngrave"));
+            return;
+        }
+        await view.show(source);
     }
 
     private gcodeOnly(...buttons: HTMLButtonElement[]): HTMLButtonElement[] {
@@ -902,6 +949,9 @@ export class LaserEditor {
         this.updateJobPicker();
         const gcode = this.profile.controller !== "jcz";
         for (const b of this.gcodeButtons) b.style.display = gcode ? "" : "none";
+        const rotary = !gcode && this.data.rotary?.enabled === true;
+        this.view3dButton.style.display = rotary ? "" : "none";
+        if (!rotary && this.view3d !== undefined) this.close3d();
         this.world.setAttribute("transform", "matrix(1 0 0 -1 0 0)");
         this.renderBed();
         this.renderObjects();

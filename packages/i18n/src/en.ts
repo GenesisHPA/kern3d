@@ -717,6 +717,11 @@ export default {
         "laser.rotary.test.hint": "Axis test: the chuck should turn exactly a quarter turn",
         "laser.rotary.hint":
             "Pulses per turn = motor steps × driver microsteps × gear ratio. Check with ±90°: if the chuck did not turn a quarter, fix the number; the wrong way — «Reverse direction».",
+        "laser.rotary.3d": "Part in the chuck",
+        "laser.rotary.3d.open": "3D",
+        "laser.rotary.3d.hint":
+            "The part in the rotary axis in 3D: the job on its surface, turning and burning in step with the marking",
+        "laser.rotary.3d.play": "▶ Preview",
         "laser.rotary.timeout": "The rotary axis did not reach its angle in 30 s — check the axis settings",
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",
