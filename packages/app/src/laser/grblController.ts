@@ -26,6 +26,12 @@ export interface GrblStatus {
     /** Planner blocks and receive-buffer bytes free (`Bf:`), when reported. */
     bufferBlocks?: number;
     bufferBytes?: number;
+    /** Overrides in percent: feed, rapid, spindle (`Ov:`). */
+    overrides?: [number, number, number];
+    /** Input pins seen active (`Pn:`), e.g. "XYZP". */
+    pins?: string;
+    /** Accessories on (`A:`): S / C spindle, F flood, M mist. */
+    accessories?: string;
 }
 
 export type JobState = "none" | "running" | "paused" | "stopping" | "done" | "stopped" | "error";
@@ -75,7 +81,12 @@ export function parseStatus(line: string, lastWco?: [number, number, number]): G
             const [feed, spindle] = value.split(",").map(Number);
             status.feed = feed;
             if (spindle !== undefined) status.spindle = spindle;
-        } else if (key === "Bf") {
+        } else if (key === "Ov") {
+            const v = value.split(",").map(Number);
+            status.overrides = [v[0] ?? 100, v[1] ?? 100, v[2] ?? 100];
+        } else if (key === "Pn") status.pins = value;
+        else if (key === "A") status.accessories = value;
+        else if (key === "Bf") {
             const [blocks, bytes] = value.split(",").map(Number);
             status.bufferBlocks = blocks;
             status.bufferBytes = bytes;
