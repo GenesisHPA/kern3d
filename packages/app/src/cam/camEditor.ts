@@ -3,11 +3,11 @@
 
 import { Id, PubSub, ShapeNode, Transaction, workspaceTabs } from "@chili3d/core";
 import { bodyOutline, type ModelView } from "../laser/fromModel";
-import style from "../laser/laserEditor.module.css";
 import { button, checkbox, el, heading, numberField, row, select, t } from "../laser/laserUi";
 import { importSvg } from "../laser/svgImport";
 import { MachineControl } from "./camControl";
 import { type MillJob, type MillNode, parseMillJob } from "./camData";
+import style from "./camEditor.module.css";
 import { millProgram, POST_KINDS } from "./camGcode";
 import { type CamTool, loadTools, newToolId, storeTools, TOOL_KINDS } from "./camTools";
 import { CamView } from "./camView";
@@ -42,12 +42,33 @@ function circleCentres(rings: Pt[][]): Pt[] {
  * spindle's inverter on the left; the stock in 3D with the paths and the cut animated on the
  * right; G-code out. It covers the model as the laser editor does.
  */
+/** A glyph per operation kind for its card. */
+const KIND_ICON: Record<OperationKind, string> = {
+    profile: "◻",
+    pocket: "▣",
+    engrave: "✎",
+    drill: "⊙",
+    facing: "▤",
+    helix: "◎",
+    thread: "⧖",
+    chamfer: "◺",
+    vcarve: "V",
+};
+
+/** A bar button with a glyph before its label. */
+function iconButton(icon: string, key: string, action: () => void, title?: string): HTMLButtonElement {
+    const b = button(key, action, title);
+    b.classList.add(style.icon);
+    b.setAttribute("data-icon", icon);
+    return b;
+}
+
 export class MillEditor {
     private static readonly editors = new Map<string, MillEditor>();
     private readonly dialog = document.createElement("dialog");
     private readonly left = el("div", { className: style.panel });
     private readonly view = new CamView();
-    private readonly status = el("span", { className: style.muted });
+    private readonly status = el("span", { className: style.status });
     private data: MillJob;
     private panel: Panel = "ops";
     private selected: string | undefined;
@@ -92,23 +113,22 @@ export class MillEditor {
             close: () => this.close(),
         };
         this.dialog.className = style.dialog;
-        this.left.style.cssText = "width:380px;flex:none;overflow:auto;height:100%;box-sizing:border-box";
-        const stage = el("div");
-        stage.style.cssText = "position:relative;flex:1;min-width:0;height:100%";
+        const stage = el("div", { className: style.stage });
         stage.append(this.view.element);
         this.stage = stage;
-        this.body.style.cssText = "display:flex;flex:1;min-height:0";
+        this.body.className = style.body;
         this.body.append(this.left, stage);
-        const frame = el("div", {}, this.topBar(), this.body);
-        frame.style.cssText = "display:flex;flex-direction:column;height:100%";
+        const frame = el("div", { className: style.frame }, this.topBar(), this.body);
         this.dialog.append(frame);
         this.node.onPropertyChanged(this.onNodeChanged);
         this.view.onProgress = (done, total) => {
             this.progressText = `${done} / ${total}`;
+            this.progressBar.style.width = `${total > 0 ? (100 * done) / total : 0}%`;
             this.showStatus();
         };
     }
 
+    private readonly progressBar = el("div");
     private progressText = "";
     private programText = "";
     private showStatus() {
@@ -175,7 +195,7 @@ export class MillEditor {
     private setMode(mode: "prepare" | "control") {
         this.mode = mode;
         if (mode === "control") {
-            this.control.element.style.cssText = "flex:1.4;min-width:0;height:100%";
+            this.control.element.classList.add(style.control);
             this.control.show();
             this.body.replaceChildren(this.control.element, this.stage);
         } else this.body.replaceChildren(this.left, this.stage);
@@ -187,14 +207,12 @@ export class MillEditor {
             const b = button(m === "prepare" ? "cnc.mode.prepare" : "cnc.mode.control", () =>
                 this.setMode(m),
             );
-            b.style.fontWeight = "800";
-            if (m === this.mode) {
-                b.style.background = "var(--primary-color)";
-                b.style.color = "#fff";
-            }
+            b.classList.add(style.icon);
+            b.setAttribute("data-icon", m === "prepare" ? "✎" : "⚙");
+            if (m === this.mode) b.classList.add(style.on);
             return b;
         };
-        this.modeButtons.style.cssText = "display:inline-flex;gap:4px;margin-right:8px";
+        this.modeButtons.className = style.segmented;
         this.modeButtons.replaceChildren(make("prepare"), make("control"));
     }
 
@@ -209,24 +227,33 @@ export class MillEditor {
         );
         const bar = el(
             "div",
-            {},
-            button("mill.toModel", () => workspaceTabs.activate(undefined)),
-            this.modeButtons,
-            button("mill.importSvg", () => void this.importSvgFile()),
-            button("mill.saveGcode", () => this.saveGcode()),
-            el("span", { textContent: "  " }),
-            button("mill.play", () => this.view.play()),
-            button("mill.pause", () => this.view.pause()),
-            button("mill.restart", () => this.view.restart()),
-            button("mill.finish", () => this.view.finish()),
-            el("span", { textContent: t("mill.speed") }),
-            speed,
+            { className: style.topBar },
+            el(
+                "span",
+                { className: style.group },
+                iconButton("←", "mill.toModel", () => workspaceTabs.activate(undefined)),
+            ),
+            el("span", { className: style.group }, this.modeButtons),
+            el(
+                "span",
+                { className: style.group },
+                iconButton("⇪", "mill.importSvg", () => void this.importSvgFile()),
+                iconButton("⤓", "mill.saveGcode", () => this.saveGcode()),
+            ),
+            el(
+                "span",
+                { className: style.group },
+                iconButton("▶", "mill.play", () => this.view.play()),
+                iconButton("⏸", "mill.pause", () => this.view.pause()),
+                iconButton("↺", "mill.restart", () => this.view.restart()),
+                iconButton("⏭", "mill.finish", () => this.view.finish()),
+                el("span", { className: style.muted, textContent: t("mill.speed") }),
+                speed,
+            ),
             this.status,
+            el("div", { className: style.progress }, this.progressBar),
         );
         this.showModes();
-        bar.className = style.panel;
-        bar.style.cssText =
-            "display:flex;flex-direction:row;width:auto;border-left:none;gap:6px;align-items:center;flex:none;min-height:44px;padding:6px 10px;box-sizing:border-box;flex-wrap:wrap";
         return bar;
     }
 
@@ -299,13 +326,13 @@ export class MillEditor {
     private render() {
         const tabs = el(
             "div",
-            { className: style.buttons },
+            { className: `${style.segmented} ${style.tabs}` },
             ...(["ops", "tools", "machine", "spindle"] as Panel[]).map((p) => {
                 const b = button(`mill.panel.${p}`, () => {
                     this.panel = p;
                     this.render();
                 });
-                if (p === this.panel) b.style.fontWeight = "700";
+                if (p === this.panel) b.classList.add(style.on);
                 return b;
             }),
         );
@@ -317,8 +344,14 @@ export class MillEditor {
                   : this.panel === "machine"
                     ? this.machinePanel()
                     : this.spindlePanel();
-        this.left.replaceChildren(tabs, ...content);
+        const body = el("div", {}, ...content);
+        if (this.panel !== this.shownPanel) body.className = style.content; // fade in on a switch only
+        this.shownPanel = this.panel;
+        this.left.replaceChildren(tabs, body);
     }
+
+    private shownPanel: Panel | undefined;
+    private shownOp: string | undefined;
 
     private opsPanel(): HTMLElement[] {
         const out: HTMLElement[] = [heading("mill.shapes")];
@@ -359,7 +392,7 @@ export class MillEditor {
             out.push(
                 el(
                     "div",
-                    { className: style.pair },
+                    { className: style.item },
                     el("span", {
                         textContent: `${s.name} (${s.rings.length}${s.points.length ? `, ⌀×${s.points.length}` : ""})`,
                     }),
@@ -382,24 +415,39 @@ export class MillEditor {
         );
         this.data.operations.forEach((op, i) => {
             const tool = this.data.tools.find((x) => x.id === op.toolId);
+            const selected = op.id === this.selected;
             const line = el(
                 "div",
-                { className: style.pair },
-                el("span", {
-                    textContent: `${i + 1}. ${op.name || t(`mill.op.${op.kind}`)} — ${tool ? `T${tool.number}` : "?"} ${op.hidden ? "(откл.)" : ""}`,
-                    onclick: () => {
+                {
+                    className: [style.op, selected ? style.opOn : "", op.hidden ? style.opOff : ""]
+                        .filter((c) => c)
+                        .join(" "),
+                    onclick: (e: MouseEvent) => {
+                        if ((e.target as HTMLElement).closest("button")) return;
                         this.selected = this.selected === op.id ? undefined : op.id;
                         this.render();
                     },
+                },
+                el("span", { className: style.grip, textContent: "⋮⋮" }),
+                el("span", { className: style.kind, textContent: KIND_ICON[op.kind] ?? "•" }),
+                el("span", {
+                    className: style.name,
+                    textContent: `${i + 1}. ${op.name || t(`mill.op.${op.kind}`)} ${op.hidden ? "(откл.)" : ""}`,
                 }),
+                el("span", { className: style.tool, textContent: tool ? `T${tool.number}` : "?" }),
                 button("mill.up", () => this.moveOp(i, -1)),
                 button("mill.down", () => this.moveOp(i, 1)),
             );
-            line.style.cursor = "pointer";
-            if (op.id === this.selected) line.style.fontWeight = "700";
+            line.setAttribute("data-kind", op.kind);
             out.push(line);
-            if (op.id === this.selected) out.push(...this.opEditor(op));
+            if (selected) {
+                const card = el("div", { className: style.opBody }, ...this.opEditor(op));
+                card.style.setProperty("--m-accent", "var(--k)");
+                if (this.shownOp !== op.id) card.classList.add(style.opening);
+                out.push(card);
+            }
         });
+        this.shownOp = this.selected;
         return out;
     }
 

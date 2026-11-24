@@ -428,3 +428,312 @@
     border-radius: 10px;
     pointer-events: none;
 }
+
+/* ---- modern look: glow, motion, press feedback (QtDragon / gSender spirit) ---- */
+
+.root {
+    --c-accent: #4dabf7;
+    background:
+        radial-gradient(1200px 500px at 10% -10%, rgba(77, 171, 247, 0.08), transparent 60%),
+        radial-gradient(900px 400px at 110% 0%, rgba(105, 240, 174, 0.06), transparent 60%), var(--c-bg);
+    font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+.header {
+    background: rgba(16, 19, 23, 0.82);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.state {
+    border-radius: 999px;
+    transition:
+        background-color 0.25s,
+        box-shadow 0.25s;
+    font-variant-numeric: tabular-nums;
+}
+
+.state[data-state="run"],
+.state[data-state="jog"] {
+    animation: kernPulseGreen 1.6s ease-in-out infinite;
+}
+
+.state[data-state="alarm"] {
+    animation: kernPulseRed 0.9s ease-in-out infinite;
+}
+
+.state[data-state="hold"],
+.state[data-state="door"] {
+    animation: kernPulseAmber 1.3s ease-in-out infinite;
+}
+
+@keyframes kernPulseGreen {
+    50% {
+        box-shadow:
+            0 0 0 6px rgba(64, 192, 87, 0.25),
+            0 0 18px rgba(64, 192, 87, 0.55);
+    }
+}
+@keyframes kernPulseRed {
+    50% {
+        box-shadow:
+            0 0 0 6px rgba(250, 82, 82, 0.3),
+            0 0 20px rgba(250, 82, 82, 0.7);
+    }
+}
+@keyframes kernPulseAmber {
+    50% {
+        box-shadow:
+            0 0 0 6px rgba(250, 176, 5, 0.25),
+            0 0 18px rgba(250, 176, 5, 0.55);
+    }
+}
+
+.grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: 12px;
+    padding: 12px;
+}
+
+.card {
+    background: linear-gradient(180deg, #232931, var(--c-card));
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.04) inset,
+        0 8px 24px rgba(0, 0, 0, 0.25);
+    animation: kernRise 0.35s ease-out both;
+    transition: border-color 0.2s;
+
+    &:hover {
+        border-color: #3d4753;
+    }
+
+    & h4 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        &::before {
+            content: "";
+            width: 4px;
+            height: 12px;
+            border-radius: 2px;
+            background: var(--c-accent);
+        }
+    }
+}
+
+@keyframes kernRise {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+}
+
+.btn {
+    border-radius: 8px;
+    transition:
+        filter 0.15s,
+        transform 0.08s,
+        box-shadow 0.15s,
+        background-color 0.15s;
+
+    &:focus-visible {
+        outline: none;
+        box-shadow:
+            0 0 0 2px var(--c-bg),
+            0 0 0 4px var(--c-accent);
+    }
+
+    &:active {
+        transform: translateY(1px) scale(0.97);
+    }
+}
+
+.go:hover {
+    box-shadow: 0 0 14px rgba(64, 192, 87, 0.45);
+}
+.hold:hover {
+    box-shadow: 0 0 14px rgba(250, 176, 5, 0.45);
+}
+.halt:hover {
+    box-shadow: 0 0 14px rgba(250, 82, 82, 0.5);
+}
+.on {
+    box-shadow: 0 0 12px rgba(77, 171, 247, 0.45);
+}
+
+.cycle {
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+}
+
+/* LCD readout */
+.droRow {
+    border: 1px solid #1d2a22;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #0a0f0c, #0d1410);
+    box-shadow: inset 0 0 18px rgba(105, 240, 174, 0.06);
+}
+
+.droAxis {
+    text-shadow: 0 0 10px currentColor;
+}
+
+.droValue {
+    font-variant-numeric: tabular-nums;
+    text-shadow:
+        0 0 6px rgba(105, 240, 174, 0.55),
+        0 0 18px rgba(105, 240, 174, 0.25);
+}
+
+.changed {
+    animation: kernDroTick 0.45s ease-out;
+}
+
+@keyframes kernDroTick {
+    from {
+        color: #e6fff2;
+        text-shadow:
+            0 0 10px #69f0ae,
+            0 0 26px #69f0ae;
+    }
+}
+
+/* jog pad */
+.pad {
+    grid-template-columns: repeat(4, 60px);
+    grid-template-rows: repeat(3, 54px);
+    gap: 8px;
+}
+
+.jog {
+    border-radius: 12px;
+    background: linear-gradient(180deg, #2c333c, #21272e);
+    box-shadow:
+        0 3px 0 #11151a,
+        0 6px 14px rgba(0, 0, 0, 0.3);
+
+    &:active {
+        transform: translateY(3px) scale(0.96);
+        box-shadow: 0 0 16px currentColor;
+        filter: brightness(1.35);
+    }
+}
+
+.big {
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(255, 212, 59, 0.45);
+}
+
+/* progress */
+.progress {
+    height: 12px;
+    border-radius: 999px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.bar {
+    border-radius: 999px;
+    background:
+        repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.14) 0 8px, transparent 8px 16px),
+        linear-gradient(90deg, #2f9e44, #69db7c);
+    background-size:
+        32px 32px,
+        100% 100%;
+    box-shadow: 0 0 10px rgba(105, 219, 124, 0.5);
+    transition: width 0.35s ease-out;
+    animation: kernStripes 0.9s linear infinite;
+}
+
+@keyframes kernStripes {
+    to {
+        background-position:
+            32px 0,
+            0 0;
+    }
+}
+
+/* tabs: segmented */
+.tabs {
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: #11151a;
+    border: 1px solid var(--c-line);
+    width: fit-content;
+    max-width: 100%;
+    flex-wrap: wrap;
+
+    & button {
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--c-dim);
+        transition:
+            background-color 0.2s,
+            color 0.2s;
+
+        &:hover {
+            color: var(--c-text);
+            background: #222830;
+        }
+    }
+
+    & button.on {
+        color: #fff;
+    }
+}
+
+.tabBody > * {
+    animation: kernFade 0.25s ease-out both;
+}
+
+@keyframes kernFade {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+.current {
+    background: linear-gradient(90deg, #1971c2, rgba(28, 126, 214, 0.65));
+    box-shadow: inset 3px 0 0 #74c0fc;
+}
+
+.lines,
+.console,
+.mdi {
+    border: 1px solid #1f262e;
+    border-radius: 8px;
+}
+
+.mdi:focus {
+    outline: none;
+    border-color: var(--c-lcd-text);
+    box-shadow: 0 0 0 3px rgba(105, 240, 174, 0.15);
+}
+
+.ledOn {
+    animation: kernLed 1s ease-in-out infinite alternate;
+}
+
+@keyframes kernLed {
+    to {
+        box-shadow: 0 0 12px #fa5252;
+    }
+}
+
+.veil {
+    backdrop-filter: blur(3px);
+    animation: kernFade 0.3s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .root *,
+    .root *::before {
+        animation: none !important;
+        transition: none !important;
+    }
+}

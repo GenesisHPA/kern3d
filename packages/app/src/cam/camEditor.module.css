@@ -1,0 +1,585 @@
+/* The milling editor: its own look (the laser editor keeps laserEditor.module.css). */
+
+.dialog {
+    --m-accent: var(--primary-color, #1c7ed6);
+    --m-bg: var(--background-color, #f4f5f7);
+    --m-panel: var(--panel-background-color, #fff);
+    --m-fg: var(--foreground-color, #1d2125);
+    --m-line: var(--border-color, #d0d5db);
+    --m-hover: var(--hover-background-color, rgba(127, 127, 127, 0.12));
+    --m-soft: color-mix(in srgb, var(--m-accent) 14%, transparent);
+    --m-radius: 10px;
+    --m-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+    position: fixed;
+    inset: 30px 0 0 0;
+    z-index: 1500;
+    width: 100vw;
+    height: calc(100vh - 30px);
+    max-width: 100vw;
+    max-height: calc(100vh - 30px);
+    margin: 0;
+    padding: 0;
+    border: none;
+    background-color: var(--m-bg);
+    color: var(--m-fg);
+    font-family: Inter, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+
+    & input[type="number"] {
+        appearance: textfield;
+        -moz-appearance: textfield;
+    }
+
+    & input[type="number"]::-webkit-inner-spin-button,
+    & input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+}
+
+.frame {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* ---- top bar ---- */
+
+.topBar {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    min-height: 48px;
+    padding: 6px 12px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--m-line);
+    background: color-mix(in srgb, var(--m-panel) 88%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 8px;
+    margin-right: 2px;
+    border-right: 1px solid var(--m-line);
+
+    &:last-of-type {
+        border-right: none;
+    }
+}
+
+.topBar button,
+.panel button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--m-line);
+    border-radius: 8px;
+    background-color: var(--m-panel);
+    color: var(--m-fg);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background-color 0.15s,
+        border-color 0.15s,
+        box-shadow 0.15s,
+        transform 0.08s;
+
+    &:hover {
+        background-color: var(--m-hover);
+        border-color: color-mix(in srgb, var(--m-accent) 45%, var(--m-line));
+    }
+
+    &:active {
+        transform: translateY(1px) scale(0.97);
+    }
+
+    &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--m-soft);
+        border-color: var(--m-accent);
+    }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: default;
+    }
+}
+
+.icon::before {
+    content: attr(data-icon);
+    font-size: 14px;
+    line-height: 1;
+}
+
+.topBar select,
+.panel select {
+    padding: 5px 8px;
+    border: 1px solid var(--m-line);
+    border-radius: 8px;
+    background-color: var(--m-panel);
+    color: var(--m-fg);
+    font: inherit;
+    transition: border-color 0.15s;
+
+    &:focus {
+        outline: none;
+        border-color: var(--m-accent);
+        box-shadow: 0 0 0 3px var(--m-soft);
+    }
+}
+
+/* the «Подготовка / Пульт станка» switch and the panel tabs: segmented controls */
+.segmented {
+    position: relative;
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--m-hover);
+    border: 1px solid var(--m-line);
+
+    & button {
+        border: none !important;
+        background: transparent;
+        color: color-mix(in srgb, var(--m-fg) 70%, transparent);
+        box-shadow: none;
+        border-radius: 7px;
+        font-weight: 700;
+    }
+
+    & button:hover {
+        background: color-mix(in srgb, var(--m-panel) 70%, transparent);
+        color: var(--m-fg);
+    }
+
+    & button.on {
+        background: var(--m-accent);
+        color: #fff;
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--m-accent) 45%, transparent);
+    }
+}
+
+.tabs {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 6px;
+
+    & button {
+        flex: 1 1 0;
+        justify-content: center;
+        padding: 7px 6px;
+        min-width: 0;
+    }
+}
+
+.status {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--m-soft);
+    color: var(--m-fg);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    &:empty {
+        display: none;
+    }
+}
+
+/* the simulation progress, a thin line under the bar */
+.progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: transparent;
+    pointer-events: none;
+
+    & > div {
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, var(--m-accent), #69db7c);
+        box-shadow: 0 0 8px var(--m-accent);
+        transition: width 0.25s var(--m-ease);
+    }
+}
+
+/* ---- body ---- */
+
+.body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.stage {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.control {
+    flex: 1.4;
+    min-width: 0;
+    height: 100%;
+    animation: millSlide 0.3s var(--m-ease);
+}
+
+.panel {
+    width: 390px;
+    flex: none;
+    height: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 10px 12px 16px;
+    border-right: 1px solid var(--m-line);
+    background-color: var(--m-panel);
+    animation: millSlide 0.3s var(--m-ease);
+
+    & h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 16px 0 8px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: color-mix(in srgb, var(--m-fg) 65%, transparent);
+
+        &::before {
+            content: "";
+            width: 4px;
+            height: 12px;
+            border-radius: 2px;
+            background: var(--m-accent);
+        }
+
+        &::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--m-line);
+        }
+    }
+
+    /* field rows (built by laserUi.row) */
+    & label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 5px 0;
+    }
+
+    & label > span {
+        width: 130px;
+        flex-shrink: 0;
+        font-size: 12px;
+        color: color-mix(in srgb, var(--m-fg) 75%, transparent);
+    }
+
+    & input[type="text"],
+    & input[type="number"] {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 5px 8px;
+        border: 1px solid var(--m-line);
+        border-radius: 7px;
+        background-color: var(--m-bg);
+        color: var(--m-fg);
+        font: inherit;
+        font-variant-numeric: tabular-nums;
+        transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
+
+        &:focus {
+            outline: none;
+            border-color: var(--m-accent);
+            box-shadow: 0 0 0 3px var(--m-soft);
+        }
+    }
+
+    & label select {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    & input[type="checkbox"] {
+        accent-color: var(--m-accent);
+        width: 16px;
+        height: 16px;
+    }
+}
+
+.content {
+    animation: millFade 0.25s var(--m-ease);
+}
+
+.pair {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    & > label {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    & > label > span {
+        width: auto;
+    }
+
+    & > select {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+}
+
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+
+    & > button {
+        max-width: 100%;
+        white-space: normal;
+    }
+}
+
+.muted {
+    margin: 4px 0;
+    font-size: 12px;
+    color: color-mix(in srgb, var(--m-fg) 60%, transparent);
+}
+
+/* a list entry (shape) as a small card */
+.item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+    padding: 6px 8px 6px 12px;
+    border: 1px solid var(--m-line);
+    border-radius: var(--m-radius);
+    background: var(--m-bg);
+    transition:
+        border-color 0.15s,
+        transform 0.15s;
+
+    & > span:first-child {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--m-accent) 40%, var(--m-line));
+    }
+}
+
+/* the operations: cards with a kind colour and icon */
+.op {
+    --k: var(--m-accent);
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 0;
+    padding: 8px 8px 8px 6px;
+    border: 1px solid var(--m-line);
+    border-radius: var(--m-radius);
+    background: var(--m-bg);
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.2s,
+        transform 0.15s,
+        opacity 0.2s;
+
+    &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--k);
+    }
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--k) 55%, var(--m-line));
+        transform: translateX(2px);
+    }
+
+    & > span.name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+    }
+
+    & > button {
+        padding: 3px 8px;
+    }
+}
+
+.grip {
+    padding-left: 6px;
+    color: color-mix(in srgb, var(--m-fg) 35%, transparent);
+    cursor: grab;
+    letter-spacing: -2px;
+    user-select: none;
+}
+
+.kind {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--k) 18%, transparent);
+    color: var(--k);
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.tool {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--k) 14%, transparent);
+    color: var(--k);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.opOn {
+    border-color: var(--k);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--k) 25%, transparent);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.opOff {
+    opacity: 0.55;
+
+    & > span.name {
+        text-decoration: line-through;
+    }
+}
+
+/* the selected operation's settings, a card joined under it */
+.opBody {
+    margin: 0 0 8px;
+    padding: 6px 10px 8px;
+    border: 1px solid var(--m-accent);
+    border-top: none;
+    border-radius: 0 0 var(--m-radius) var(--m-radius);
+    background: var(--m-panel);
+    transform-origin: top;
+}
+
+.opening {
+    animation: millOpen 0.25s var(--m-ease) both;
+}
+
+.on {
+    font-weight: 700;
+}
+
+.op[data-kind="profile"] {
+    --k: #1c7ed6;
+}
+.op[data-kind="pocket"] {
+    --k: #7048e8;
+}
+.op[data-kind="engrave"] {
+    --k: #e8590c;
+}
+.op[data-kind="drill"] {
+    --k: #2f9e44;
+}
+.op[data-kind="chamfer"] {
+    --k: #d6336c;
+}
+.op[data-kind="vcarve"] {
+    --k: #f08c00;
+}
+.op[data-kind="facing"] {
+    --k: #0c8599;
+}
+.op[data-kind="helix"] {
+    --k: #5c7cfa;
+}
+.op[data-kind="thread"] {
+    --k: #868e96;
+}
+
+@keyframes millFade {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+@keyframes millSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+}
+
+@keyframes millOpen {
+    from {
+        opacity: 0;
+        transform: scaleY(0.92);
+    }
+}
+
+@media (max-width: 760px) {
+    .panel {
+        width: 100%;
+        border-right: none;
+    }
+
+    .body {
+        flex-direction: column;
+    }
+
+    .stage {
+        min-height: 300px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dialog *,
+    .dialog *::before {
+        animation: none !important;
+        transition: none !important;
+    }
+}
