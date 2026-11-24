@@ -178,7 +178,16 @@ export class VfdSpindle {
         public settings: VfdSettings,
     ) {}
 
-    private async send(frames: Uint8Array[]): Promise<Uint8Array | undefined> {
+    /** One exchange at a time on the line: commands and speed reads queue up. */
+    private queue: Promise<unknown> = Promise.resolve();
+
+    private send(frames: Uint8Array[]): Promise<Uint8Array | undefined> {
+        const next = this.queue.then(() => this.exchange(frames));
+        this.queue = next.catch(() => {});
+        return next;
+    }
+
+    private async exchange(frames: Uint8Array[]): Promise<Uint8Array | undefined> {
         let reply: Uint8Array | undefined;
         for (const f of frames) {
             await this.transport.write(f);

@@ -131,6 +131,9 @@ export class MachineControl {
     private readonly stateBadge = el("span");
     private readonly dro = new Map<Axis, { work: HTMLElement; machine: HTMLElement }>();
     private readonly spindleText = el("div");
+    private readonly vfdText = el("div");
+    private vfdPoll?: ReturnType<typeof setInterval>;
+    private vfdReading = false;
     private readonly feedText = el("div");
     private readonly ovText = { feed: el("b"), rapid: el("b"), spindle: el("b") };
     private readonly pinsText = el("div");
@@ -154,6 +157,7 @@ export class MachineControl {
 
     dispose() {
         this.gamepad.stop();
+        if (this.vfdPoll) clearInterval(this.vfdPoll);
         document.removeEventListener("keydown", this.onKey);
         document.removeEventListener("keyup", this.onKeyUp);
         void this.disconnect();
@@ -744,8 +748,38 @@ export class MachineControl {
         return r;
     }
 
+    /** The inverter's real speed, read once a second while it is connected. */
+    private startVfdPoll() {
+        if (this.vfdPoll) return;
+        this.vfdPoll = setInterval(async () => {
+            const vfd = this.host.vfd();
+            if (!vfd) {
+                this.vfdText.textContent = "";
+                return;
+            }
+            if (this.vfdReading) return;
+            this.vfdReading = true;
+            try {
+                const rpm = await vfd.readRpm();
+                const want = this.status.spindle;
+                const off =
+                    want !== undefined && want > 0 && rpm !== undefined && Math.abs(rpm - want) > want * 0.1;
+                this.vfdText.textContent =
+                    rpm === undefined
+                        ? t("cnc.vfd.noReply")
+                        : `${t("cnc.vfd.actual", Math.round(rpm))}${off ? ` ⚠ ${t("cnc.vfd.mismatch")}` : ""}`;
+            } catch {
+                this.vfdText.textContent = t("cnc.vfd.noReply");
+            } finally {
+                this.vfdReading = false;
+            }
+        }, 1000);
+    }
+
     private spindleCard(): HTMLElement {
         this.spindleText.className = style.big;
+        this.vfdText.className = style.caption;
+        this.startVfdPoll();
         this.feedText.className = style.caption;
         const rpm = el("input", { type: "number", min: "0", step: "100" });
         rpm.value = String(this.rpm);
@@ -786,6 +820,7 @@ export class MachineControl {
         return card(
             t("cnc.spindle"),
             this.spindleText,
+            this.vfdText,
             this.feedText,
             set,
             spin,
