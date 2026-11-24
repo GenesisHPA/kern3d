@@ -41,14 +41,19 @@ function pad(n: number, digits: number): string {
 }
 
 /** The text with its variables filled in (unknown `{…}` stay as they are). */
-export function expandVariables(text: string, serial: SerialSettings | undefined, now = new Date()): string {
+export function expandVariables(
+    text: string,
+    serial: SerialSettings | undefined,
+    now = new Date(),
+    offset = 0,
+): string {
     if (!text.includes("{")) return text;
     const s = serial ?? defaultSerial();
     const two = (n: number) => pad(n, 2);
     return text.replace(PATTERN, (_, name: string) => {
         switch (name) {
             case "N":
-                return pad(s.next, s.digits);
+                return pad(s.next + offset * s.step, s.digits);
             case "date":
                 return `${two(now.getDate())}.${two(now.getMonth() + 1)}.${now.getFullYear()}`;
             case "time":
@@ -65,11 +70,19 @@ export function expandVariables(text: string, serial: SerialSettings | undefined
 
 /** The serial the editor lays the job out with (set before its figures are regenerated). */
 let current: SerialSettings | undefined;
+let currentOffset = 0;
 
-export function setCurrentSerial(value: SerialSettings | undefined) {
+/** The serial, and the batch copy (its offset in steps) whose figure is laid out next. */
+export function setCurrentSerial(value: SerialSettings | undefined, offset = 0) {
     current = value;
+    currentOffset = offset;
 }
 
 export function expandCurrent(text: string): string {
-    return expandVariables(text, current);
+    return expandVariables(text, current, new Date(), currentOffset);
+}
+
+/** How many numbers one marking of the job uses (its batch copies). */
+export function serialsPerMarking(offsets: (number | undefined)[]): number {
+    return 1 + Math.max(0, ...offsets.map((x) => x ?? 0));
 }

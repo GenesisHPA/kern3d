@@ -95,6 +95,8 @@ interface LaserObjectBase {
     rotaryAngle?: number;
     /** Left out of the job and the preview, but kept. */
     hidden?: boolean;
+    /** A copy in a batch: its {N} is the serial plus this many steps (see variables.ts). */
+    serialOffset?: number;
     op: LaserOperation;
 }
 
@@ -280,6 +282,10 @@ function parseObject(raw: any): LaserObject | undefined {
         angle: finite(raw.angle, 0),
         lockAspect: raw.lockAspect !== false,
         hidden: raw.hidden === true ? true : undefined,
+        serialOffset:
+            typeof raw.serialOffset === "number" && Number.isInteger(raw.serialOffset) && raw.serialOffset > 0
+                ? raw.serialOffset
+                : undefined,
         rotaryAngle:
             typeof raw.rotaryAngle === "number" && Number.isFinite(raw.rotaryAngle)
                 ? raw.rotaryAngle

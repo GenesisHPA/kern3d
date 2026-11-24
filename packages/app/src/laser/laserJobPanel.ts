@@ -47,6 +47,8 @@ export interface LaserJobPanelHost {
     select(id: string | undefined, additive?: boolean): void;
     alignSelected(align: Align, toBed: boolean): void;
     distributeSelected(axis: "x" | "y"): void;
+    /** A batch: the selection copied into a grid, numbered copy by copy if asked. */
+    arraySelected(columns: number, rows: number, gapX: number, gapY: number, numbered: boolean): void;
     /** Applies `edit` to the selected object and writes the job back as one undo step. */
     editSelected(edit: (o: LaserObject) => void): void;
     /** Applies `edit` to the job itself (its rotary settings) as one undo step. */
@@ -86,6 +88,8 @@ export class LaserJobPanel {
     private modelSource = "";
     /** Align to the bed rather than to the selection's box. */
     private alignToBed = false;
+    /** The batch grid last asked for (kept while the panel lives). */
+    private batch = { columns: 3, rows: 2, gapX: 5, gapY: 5, numbered: true };
     private modelView: ModelView = "top";
 
     constructor(private readonly host: LaserJobPanelHost) {}
@@ -105,6 +109,7 @@ export class LaserJobPanel {
             ...this.objectsSection(),
             ...this.modelSection(),
             ...this.arrangeSection(),
+            ...this.batchSection(),
             ...this.objectSection(),
         );
         if (path !== undefined) restoreFocus(this.element, path, caret);
@@ -346,6 +351,53 @@ export class LaserJobPanel {
                 ),
             );
         return rows;
+    }
+
+    /** «Партия»: the selection copied into a grid on the bed — a sheet of tags, a jig of parts. */
+    private batchSection(): HTMLElement[] {
+        if (this.host.selectedIds.length === 0) return [];
+        const b = this.batch;
+        const int = (v: number) => Math.max(1, Math.min(100, Math.round(v)));
+        return [
+            heading("laser.batch"),
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.batch.columns",
+                    numberField(b.columns, (v) => (b.columns = int(v)), { min: 1, step: 1 }),
+                ),
+                row(
+                    "laser.batch.rows",
+                    numberField(b.rows, (v) => (b.rows = int(v)), { min: 1, step: 1 }),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.batch.gapX",
+                    numberField(b.gapX, (v) => (b.gapX = v)),
+                ),
+                row(
+                    "laser.batch.gapY",
+                    numberField(b.gapY, (v) => (b.gapY = v)),
+                ),
+            ),
+            row(
+                "laser.batch.numbered",
+                checkbox(b.numbered, (v) => (b.numbered = v)),
+            ),
+            el(
+                "div",
+                { className: style.buttons },
+                button(
+                    "laser.batch.make",
+                    () => this.host.arraySelected(b.columns, b.rows, b.gapX, b.gapY, b.numbered),
+                    "laser.batch.make.hint",
+                ),
+            ),
+        ];
     }
 
     private modelSection(): HTMLElement[] {

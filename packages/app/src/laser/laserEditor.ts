@@ -91,7 +91,7 @@ import { defaultQuiet, type LaserShape, needsFont } from "./shapes";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
 import { formatDuration } from "./toolpath";
-import { hasVariables, setCurrentSerial } from "./variables";
+import { defaultSerial, hasVariables, serialsPerMarking, setCurrentSerial } from "./variables";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -749,6 +749,45 @@ export class LaserEditor {
         this.render();
     }
 
+    /**
+     * A batch: the selection copied into a grid of `columns` × `rows`, each copy `gapX` / `gapY`
+     * mm beyond the last (the selection's box plus the gap). Numbered — each copy's {N} one step
+     * further on — the serial is switched on if it was not.
+     */
+    private arraySelected(columns: number, rows: number, gapX: number, gapY: number, numbered: boolean) {
+        const chosen = this.selectedObjects();
+        if (chosen.length === 0 || columns * rows < 2) return;
+        const minX = Math.min(...chosen.map((o) => o.x));
+        const minY = Math.min(...chosen.map((o) => o.y));
+        const stepX = Math.max(...chosen.map((o) => o.x + o.width)) - minX + gapX;
+        const stepY = Math.max(...chosen.map((o) => o.y + o.height)) - minY + gapY;
+        const copies: LaserObject[] = [];
+        for (let r = 0; r < rows; r++)
+            for (let c = 0; c < columns; c++) {
+                const index = r * columns + c;
+                if (index === 0) continue;
+                for (const o of chosen)
+                    copies.push({
+                        ...structuredClone(o),
+                        id: newLaserId(),
+                        x: o.x + c * stepX,
+                        // rows go down the bed, as a sheet is read
+                        y: o.y - r * stepY,
+                        serialOffset: numbered ? index : undefined,
+                    });
+            }
+        if (numbered) {
+            this.data.serial ??= defaultSerial();
+            for (const o of chosen) o.serialOffset = undefined;
+        }
+        this.data.objects.push(...copies);
+        this.chosen = [...chosen.map((o) => o.id), ...copies.map((o) => o.id)];
+        void this.refreshVariables().then(() => {
+            this.commit();
+            this.render();
+        });
+    }
+
     private move(id: string, delta: -1 | 1) {
         const list = this.data.objects;
         const i = list.findIndex((o) => o.id === id);
@@ -777,6 +816,8 @@ export class LaserEditor {
             select: (id, additive) => this.select(id, additive),
             alignSelected: (align, toBed) => this.alignSelected(align, toBed),
             distributeSelected: (axis) => this.distributeSelected(axis),
+            arraySelected: (columns, rows, gapX, gapY, numbered) =>
+                this.arraySelected(columns, rows, gapX, gapY, numbered),
             editSelected: (edit) => {
                 const o = this.selected();
                 if (o === undefined) return;
@@ -1768,7 +1809,7 @@ ${t(hint)}`;
         if (o?.kind !== "vector" || o.shape === undefined) return;
         const before = structuredClone(o.shape);
         edit(o.shape);
-        setCurrentSerial(this.data.serial);
+        setCurrentSerial(this.data.serial, o.serialOffset);
         const font = await this.fontFor(o.shape);
         if (o.shape.type === "text" && font === undefined) {
             o.shape = before;
@@ -1795,7 +1836,6 @@ ${t(hint)}`;
      * serial and the present time. Returns whether any changed.
      */
     private async refreshVariables(): Promise<boolean> {
-        setCurrentSerial(this.data.serial);
         let changed = false;
         for (const o of this.data.objects) {
             if (o.kind !== "vector" || o.shape === undefined) continue;
@@ -1803,6 +1843,7 @@ ${t(hint)}`;
                 o.shape.type === "text" ? o.shape.text : o.shape.type === "barcode" ? o.shape.data : "";
             if (!hasVariables(text)) continue;
             const font = await this.fontFor(o.shape);
+            setCurrentSerial(this.data.serial, o.serialOffset);
             if (regenerate(o, font).ok) changed = true;
         }
         return changed;
@@ -1820,7 +1861,7 @@ ${t(hint)}`;
     private async nextSerial() {
         const serial = this.data.serial;
         if (serial === undefined) return;
-        serial.next += serial.step;
+        serial.next += serial.step * serialsPerMarking(this.data.objects.map((o) => o.serialOffset));
         await this.refreshVariables();
         this.commit();
         this.render();
