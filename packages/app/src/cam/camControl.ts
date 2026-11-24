@@ -246,10 +246,17 @@ export class MachineControl {
         if (s.state === "Idle") this.checkTravel();
         this.stateBadge.textContent = s.state;
         this.stateBadge.style.backgroundColor = stateColor(s.state);
+        this.stateBadge.setAttribute("data-state", s.state.split(":")[0].toLowerCase());
         AXES.forEach((a, i) => {
             const d = this.dro.get(a);
             if (!d) return;
-            d.work.textContent = s.wpos ? s.wpos[i].toFixed(3) : "—";
+            const value = s.wpos ? s.wpos[i].toFixed(3) : "—";
+            if (d.work.textContent !== value) {
+                d.work.textContent = value;
+                d.work.classList.remove(style.changed);
+                void d.work.offsetWidth; // restart the glow
+                d.work.classList.add(style.changed);
+            }
             d.machine.textContent = s.mpos ? `${t("cnc.machineShort")} ${s.mpos[i].toFixed(3)}` : "";
         });
         this.spindleText.textContent =
