@@ -69,6 +69,8 @@ export interface CamOperation {
     lead?: number;
     /** Pocket: «dogbone» notches in inside corners so a square part fits (CNC joinery). */
     dogbones?: boolean;
+    /** The shape (job.shapes) the geometry came from. */
+    shapeId?: string;
     /** Finishing: a last spring pass at full depth with no step-over. */
     springPass?: boolean;
 }

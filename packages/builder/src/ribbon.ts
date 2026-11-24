@@ -281,6 +281,21 @@ export const DrawingRibbonProfiles: RibbonProfileExtra[] = [
  * The laser workspace: a job opens on the bed editor (import, operations, G-code, the
  * machine); the tab only starts one or reopens the job selected in the tree.
  */
+/** The milling (CNC) workspace: a job opens on the milling editor. */
+export const MillRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.mill",
+        before: "ribbon.tab.manager",
+        workspace: "ribbon.workspace.mill",
+        groups: [
+            {
+                groupName: "ribbon.group.mill",
+                items: ["mill.open", "mill.new"],
+            },
+        ],
+    },
+];
+
 export const LaserRibbonProfiles: RibbonProfileExtra[] = [
     {
         tabName: "ribbon.tab.laser",

@@ -27,6 +27,7 @@ import {
     DefaultRibbon,
     DrawingRibbonProfiles,
     LaserRibbonProfiles,
+    MillRibbonProfiles,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
@@ -116,6 +117,7 @@ export class AppBuilder {
                 ...parametric.SketchRibbonProfiles,
                 ...DrawingRibbonProfiles,
                 ...LaserRibbonProfiles,
+                ...MillRibbonProfiles,
             );
         });
         return this;

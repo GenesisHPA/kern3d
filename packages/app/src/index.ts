@@ -3,6 +3,7 @@
 
 export * from "./application";
 export * from "./bodys";
+export * from "./cam";
 export * from "./commands";
 export * from "./document";
 export * from "./drawing";
