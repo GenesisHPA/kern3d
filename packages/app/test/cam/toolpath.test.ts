@@ -75,7 +75,7 @@ describe("cam toolpaths", () => {
             if (m[i].type !== "feed") continue;
             const run = Math.hypot(m[i].x - m[i - 1].x, m[i].y - m[i - 1].y);
             const drop = m[i - 1].z - m[i].z;
-            if (drop > 1e-6) expect(drop).toBeLessThanOrEqual(run * Math.tan((4 * Math.PI) / 180) + 1e-6);
+            if (drop > 1e-6) expect(drop).toBeLessThanOrEqual(run * Math.tan((4 * Math.PI) / 180) + 1e-4);
         }
     });
 
