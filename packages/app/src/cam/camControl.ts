@@ -86,9 +86,13 @@ export class MachineControl {
 
     constructor(private readonly host: ControlHost) {
         this.element.className = style.root;
-        this.build();
         document.addEventListener("keydown", this.onKey);
         document.addEventListener("keyup", this.onKeyUp);
+    }
+
+    /** Built on first show: the job is not loaded yet when the panel is made. */
+    show() {
+        if (this.element.childElementCount === 0) this.build();
     }
 
     dispose() {

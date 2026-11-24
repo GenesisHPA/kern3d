@@ -176,6 +176,7 @@ export class MillEditor {
         this.mode = mode;
         if (mode === "control") {
             this.control.element.style.cssText = "flex:1.4;min-width:0;height:100%";
+            this.control.show();
             this.body.replaceChildren(this.control.element, this.stage);
         } else this.body.replaceChildren(this.left, this.stage);
         this.showModes();
