@@ -8,6 +8,10 @@ import { type CamOperation, cutData, type Heights, type MillMove, operationMoves
 export interface MillMachine {
     /** GRBL has no tool changer: a change is a pause (M0) to swap by hand, then re-zero Z. */
     toolChange: "pause" | "m6";
+    /** The controller's G-code dialect (see `POSTS`). */
+    post: PostKind;
+    /** Air blast / coolant per operation: M7 (mist / air) or M8 (flood); off — none. */
+    air: "off" | "m7" | "m8";
     /** Wait after starting the spindle, s. */
     spindleDelay: number;
     /** Rapid speed for the time estimate, mm/min. */
@@ -23,6 +27,8 @@ export interface MillMachine {
 export function defaultMillMachine(): MillMachine {
     return {
         toolChange: "pause",
+        post: "grbl",
+        air: "off",
         spindleDelay: 3,
         rapidFeed: 3000,
         heights: { safeZ: 5, clearance: 1 },
@@ -32,6 +38,25 @@ export function defaultMillMachine(): MillMachine {
         coolant: false,
     };
 }
+
+export const POST_KINDS = ["grbl", "mach3", "linuxcnc"] as const;
+export type PostKind = (typeof POST_KINDS)[number];
+
+/**
+ * What differs between controllers. GRBL: no tool changer (M6 ignored), no tool length
+ * offsets. Mach3 (and the LAN motion boards it drives): M6 runs the change macro, G43 Hn takes
+ * the tool's length. LinuxCNC: the same, the program wrapped in %.
+ */
+interface Post {
+    begin: string[];
+    end: string[];
+    lengthOffset: boolean;
+}
+const POSTS: Record<PostKind, Post> = {
+    grbl: { begin: [], end: ["M30"], lengthOffset: false },
+    mach3: { begin: ["G40 G49 G80"], end: ["M30"], lengthOffset: true },
+    linuxcnc: { begin: ["%", "G40 G49 G80 G64 P0.01"], end: ["M2", "%"], lengthOffset: true },
+};
 
 export interface MillProgram {
     gcode: string;
@@ -55,7 +80,13 @@ export function millProgram(
     tools: readonly CamTool[],
     m: MillMachine,
 ): MillProgram {
-    const out: string[] = ["(Kern3D milling)", "G21 G90 G17 G94", `G0 Z${f(m.heights.safeZ)}`];
+    const post = POSTS[m.post] ?? POSTS.grbl;
+    const out: string[] = [
+        ...post.begin,
+        `(Kern3D milling, ${m.post})`,
+        "G21 G90 G17 G94",
+        `G0 Z${f(m.heights.safeZ)}`,
+    ];
     const moves: MillProgram["moves"] = [];
     const skipped: MillProgram["skipped"] = [];
     let seconds = 0;
@@ -81,14 +112,16 @@ export function millProgram(
         );
         if (tool?.id !== t.id) {
             if (tool !== undefined) out.push("M5", `G0 Z${f(m.heights.safeZ)}`);
-            if (m.toolChange === "m6") out.push(`T${t.number} M6`);
+            if (post.lengthOffset) out.push(`T${t.number} M6 G43 H${t.number}`);
+            else if (m.toolChange === "m6") out.push(`T${t.number} M6`);
             else if (tool !== undefined)
                 out.push(`(change to T${t.number} ${t.name.replace(/[()]/g, "")}, set Z0)`, "M0");
             tool = t;
         }
         out.push(`S${Math.round(c.rpm)} M3`);
         if (m.spindleDelay > 0) out.push(`G4 P${f(m.spindleDelay)}`);
-        if (m.coolant) out.push("M8");
+        if (m.coolant || m.air === "m8") out.push("M8");
+        else if (m.air === "m7") out.push("M7");
         seconds += m.spindleDelay;
         let mode = "";
         let feed = -1;
@@ -117,9 +150,9 @@ export function millProgram(
                 b.minZ = Math.min(b.minZ, mv.z);
             }
         }
-        if (m.coolant) out.push("M9");
+        if (m.coolant || m.air !== "off") out.push("M9");
         moves.push({ op, tool: t, moves: list });
     }
-    out.push("", "M5", `G0 Z${f(m.heights.safeZ)}`, "M30", "");
+    out.push("", "M5", `G0 Z${f(m.heights.safeZ)}`, ...post.end, "");
     return { gcode: out.join("\n"), moves, seconds, skipped, bounds: b };
 }

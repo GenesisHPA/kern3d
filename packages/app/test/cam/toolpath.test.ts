@@ -104,7 +104,7 @@ describe("cam toolpaths", () => {
             tools,
             defaultMillMachine(),
         );
-        expect(p.gcode.startsWith("(Kern3D milling)\nG21 G90")).toBe(true);
+        expect(p.gcode.startsWith("(Kern3D milling, grbl)\nG21 G90")).toBe(true);
         expect(p.gcode).toContain("S18000 M3");
         expect(p.gcode).toContain("M0");
         expect(p.gcode.trim().endsWith("M30")).toBe(true);
@@ -162,5 +162,17 @@ describe("cam toolpaths", () => {
         const m = cutting(operationMoves(op({ kind: "vcarve", depth: 1.5 }), v, h));
         expect(m.length).toBeGreaterThan(10);
         expect(Math.min(...m.map((p) => p.z))).toBeGreaterThanOrEqual(-1.5 - 1e-6);
+    });
+
+    test("posts: Mach3 takes tool length offsets, LinuxCNC wraps in %, air on M7", () => {
+        const tools = defaultTools();
+        const ops = [op({ toolId: tools[0].id })];
+        const mach3 = millProgram(ops, tools, { ...defaultMillMachine(), post: "mach3", air: "m7" }).gcode;
+        expect(mach3).toContain("T1 M6 G43 H1");
+        expect(mach3).toContain("M7");
+        expect(mach3).toContain("M9");
+        const lcnc = millProgram(ops, tools, { ...defaultMillMachine(), post: "linuxcnc" }).gcode.trim();
+        expect(lcnc.startsWith("%")).toBe(true);
+        expect(lcnc.endsWith("M2\n%")).toBe(true);
     });
 });
