@@ -1703,6 +1703,16 @@ export default {
         "cnc.probe.calibrate": "Calibrate the ball",
         "cnc.probe.calibrate.hint":
             "Probe calibration: put the probe inside a ring of known diameter and press — the ball diameter is corrected",
+        "cnc.level": "Height map",
+        "cnc.level.hint":
+            "For a warped table, sheet or board: the probe touches the stock on a grid over the program's extent, and depth is then kept from the real surface. Set XY and Z zero at the first point (front-left) first.",
+        "cnc.level.nx": "Points in X",
+        "cnc.level.ny": "Points in Y",
+        "cnc.level.clearance": "Lift between points, mm",
+        "cnc.level.run": "Probe the map",
+        "cnc.level.clear": "Clear the map",
+        "cnc.level.apply": "apply to the program",
+        "cnc.level.done": "done, {0} mm difference",
         "ribbon.workspace.laser": "Laser",
         "ribbon.tab.laser": "Laser",
         "ribbon.group.laser": "Laser job",

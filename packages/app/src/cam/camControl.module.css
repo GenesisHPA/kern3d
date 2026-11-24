@@ -803,3 +803,18 @@
         transition: none !important;
     }
 }
+
+.heightMap {
+    display: grid;
+    gap: 2px;
+    max-width: 420px;
+
+    & span {
+        padding: 4px 0;
+        border-radius: 3px;
+        text-align: center;
+        font-family: Consolas, monospace;
+        font-size: 11px;
+        color: #fff;
+    }
+}

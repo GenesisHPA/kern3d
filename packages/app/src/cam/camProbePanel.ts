@@ -4,6 +4,7 @@
 import type { GrblController } from "../laser/grblController";
 import { el, t } from "../laser/laserUi";
 import style from "./camControl.module.css";
+import { type HeightMap, probeHeightMap } from "./camLevel";
 import {
     applyOffsetLines,
     type Corner,
@@ -110,6 +111,10 @@ export class ProbeWorkflow {
     private cornerZ = true;
     private bossDiameter = 30;
     private ring = 20;
+    /** The probed surface, and whether programs run over it. */
+    heightMap: HeightMap | undefined;
+    applyMap = true;
+    private mapGrid = { nx: 5, ny: 4, clearance: 3 };
     /** A tool change waiting for the operator. */
     waiting: { tool: number; resolve: () => void; reject: (e: Error) => void } | undefined;
 
@@ -118,6 +123,7 @@ export class ProbeWorkflow {
         private readonly tools: () => CamTool[],
         private readonly changed: () => void,
         private readonly log: (text: string) => void,
+        private readonly bounds: () => { minX: number; minY: number; maxX: number; maxY: number },
     ) {}
 
     private save() {
@@ -492,6 +498,86 @@ export class ProbeWorkflow {
                 ),
             ),
         );
+
+        // height map
+        const apply = el("input", { type: "checkbox" });
+        apply.checked = this.applyMap;
+        apply.onchange = () => (this.applyMap = apply.checked);
+        const m = this.heightMap;
+        out.push(
+            el("h5", { textContent: t("cnc.level") }),
+            el("div", { className: style.caption, textContent: t("cnc.level.hint") }),
+            this.field(
+                t("cnc.level.nx"),
+                () => this.mapGrid.nx,
+                (v) => (this.mapGrid.nx = Math.max(2, Math.round(v))),
+            ),
+            this.field(
+                t("cnc.level.ny"),
+                () => this.mapGrid.ny,
+                (v) => (this.mapGrid.ny = Math.max(2, Math.round(v))),
+            ),
+            this.field(
+                t("cnc.level.clearance"),
+                () => this.mapGrid.clearance,
+                (v) => (this.mapGrid.clearance = Math.max(0.5, v)),
+            ),
+            el(
+                "div",
+                { className: style.row },
+                this.b(
+                    `▦ ${t("cnc.level.run")}`,
+                    () =>
+                        void this.task(t("cnc.level"), async (io) => {
+                            const g = this.mapGrid;
+                            this.heightMap = await probeHeightMap(
+                                io,
+                                s,
+                                this.bounds(),
+                                g.nx,
+                                g.ny,
+                                g.clearance,
+                                (d, n) => {
+                                    this.result = `${t("cnc.level")}… ${d} / ${n}`;
+                                    this.changed();
+                                },
+                            );
+                            const z = this.heightMap.z;
+                            return t("cnc.level.done", (Math.max(...z) - Math.min(...z)).toFixed(3));
+                        }),
+                ),
+                this.b(
+                    t("cnc.level.clear"),
+                    () => {
+                        this.heightMap = undefined;
+                        this.changed();
+                    },
+                    style.small,
+                ),
+                el(
+                    "label",
+                    { className: style.row },
+                    apply,
+                    el("span", { textContent: t("cnc.level.apply") }),
+                ),
+            ),
+        );
+        if (m) {
+            const lo = Math.min(...m.z);
+            const hi = Math.max(...m.z);
+            const grid = el("div");
+            grid.className = style.heightMap;
+            grid.style.gridTemplateColumns = `repeat(${m.nx}, 1fr)`;
+            for (let j = m.ny - 1; j >= 0; j--)
+                for (let i = 0; i < m.nx; i++) {
+                    const v = m.z[j * m.nx + i];
+                    const k = hi > lo ? (v - lo) / (hi - lo) : 0.5;
+                    const cell = el("span", { textContent: v.toFixed(2) });
+                    cell.style.background = `hsl(${240 - 240 * k} 70% 35%)`;
+                    grid.append(cell);
+                }
+            out.push(grid);
+        }
 
         // speeds, the change position, the plate
         out.push(

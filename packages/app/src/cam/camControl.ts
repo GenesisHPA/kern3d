@@ -7,6 +7,7 @@ import { el, t } from "../laser/laserUi";
 import { WebSerialConnection } from "../laser/webSerial";
 import style from "./camControl.module.css";
 import type { MillMachine } from "./camGcode";
+import { levelProgram } from "./camLevel";
 import { type ProgramSegment, splitAtToolChanges } from "./camProbe";
 import { ProbeWorkflow } from "./camProbePanel";
 import { clock, frameLines, outsideTravel, parseOffsetLine, runFromLine, timeLeft } from "./camRun";
@@ -113,6 +114,7 @@ export class MachineControl {
         () => this.host.tools(),
         () => this.workflowChanged(),
         (text) => this.addLog(text),
+        () => this.host.summary().bounds,
     );
 
     // live parts, updated in place on every status report
@@ -336,7 +338,8 @@ export class MachineControl {
 
     private startSegment(seg: ProgramSegment | undefined) {
         if (!seg || !this.grbl) return;
-        this.running = seg.lines;
+        const map = this.workflow.heightMap;
+        this.running = map && this.workflow.applyMap ? levelProgram(seg.lines, map) : seg.lines;
         this.acked = 0;
         this.spindleAt = 0;
         this.grbl.startJob(this.running);
