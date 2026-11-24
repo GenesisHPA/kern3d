@@ -489,7 +489,10 @@ function main() {
 
 /** Keep the generated file biome-clean so regeneration never produces format diffs. */
 function formatGenerated() {
-    const fmt = spawnSync("npx", ["biome", "format", "--write", outPath], { stdio: "inherit" });
+    const fmt = spawnSync("npx", ["biome", "format", "--write", outPath], {
+        stdio: "inherit",
+        shell: process.platform === "win32", // npx is npx.cmd on Windows
+    });
     if (fmt.status !== 0) {
         console.warn("warning: biome format failed; the generated file may not match repo formatting");
     }
