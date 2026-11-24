@@ -91,6 +91,7 @@ import { defaultQuiet, type LaserShape, needsFont } from "./shapes";
 import type { SvgImport } from "./svgImport";
 import { importSvg } from "./svgImport";
 import { formatDuration } from "./toolpath";
+import { hasVariables, setCurrentSerial } from "./variables";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -312,6 +313,8 @@ export class LaserEditor {
             },
             setProfile: (edit) => this.setProfile(edit),
             program: async () => {
+                // the date and time as of this marking
+                await this.applyVariables();
                 const r = this.output.current ?? (await this.output.generate());
                 if (r === undefined || !r.moves.some((m) => m.power > 0)) return undefined;
                 return {
@@ -411,6 +414,7 @@ export class LaserEditor {
                 else if (event.state === "paused") this.beam.pause();
                 else if (event.state === "done") {
                     this.beam.finish();
+                    void this.nextSerial();
                     this.setStatus(this.output.summary());
                 } else if (event.state === "stopped" || event.state === "error") {
                     this.beam.halt();
@@ -782,9 +786,11 @@ export class LaserEditor {
                 this.render();
             },
             editJob: (edit) => {
+                const serial = JSON.stringify(this.data.serial);
                 edit(this.data);
                 this.commit();
                 this.render();
+                if (JSON.stringify(this.data.serial) !== serial) void this.applyVariables();
             },
             editShape: (edit) => void this.editShape(edit),
             convertToCurves: () => {
@@ -1762,6 +1768,7 @@ ${t(hint)}`;
         if (o?.kind !== "vector" || o.shape === undefined) return;
         const before = structuredClone(o.shape);
         edit(o.shape);
+        setCurrentSerial(this.data.serial);
         const font = await this.fontFor(o.shape);
         if (o.shape.type === "text" && font === undefined) {
             o.shape = before;
@@ -1779,6 +1786,42 @@ ${t(hint)}`;
         // single-line letters are open strokes: traced, never filled
         if (o.shape.type === "text" && o.shape.font.stroke !== undefined && o.op.mode === "fill")
             o.op.mode = "line";
+        this.commit();
+        this.render();
+    }
+
+    /**
+     * The texts and barcodes with variables ({N}, {date}...) laid out again with the job's
+     * serial and the present time. Returns whether any changed.
+     */
+    private async refreshVariables(): Promise<boolean> {
+        setCurrentSerial(this.data.serial);
+        let changed = false;
+        for (const o of this.data.objects) {
+            if (o.kind !== "vector" || o.shape === undefined) continue;
+            const text =
+                o.shape.type === "text" ? o.shape.text : o.shape.type === "barcode" ? o.shape.data : "";
+            if (!hasVariables(text)) continue;
+            const font = await this.fontFor(o.shape);
+            if (regenerate(o, font).ok) changed = true;
+        }
+        return changed;
+    }
+
+    /** The serial settings changed: the figures with the new number. */
+    private async applyVariables() {
+        if (await this.refreshVariables()) {
+            this.commit();
+            this.render();
+        }
+    }
+
+    /** A marking finished: the serial moves on, the next piece shows its number. */
+    private async nextSerial() {
+        const serial = this.data.serial;
+        if (serial === undefined) return;
+        serial.next += serial.step;
+        await this.refreshVariables();
         this.commit();
         this.render();
     }

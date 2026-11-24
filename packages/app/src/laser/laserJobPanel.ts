@@ -28,6 +28,7 @@ import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
 import { defaultRotaryJob, type RotaryJob } from "./rotary";
 import { ALIGNS, type Align } from "./selection";
 import { defaultQuiet, type LaserFontRef, type LaserShape, TEXT_ALIGNS } from "./shapes";
+import { defaultSerial, type SerialSettings } from "./variables";
 
 /** The installed fonts, once listed (asking the browser's permission) this session. */
 let localFamilies: LaserFontRef[] | undefined;
@@ -100,6 +101,7 @@ export class LaserJobPanel {
         this.element.replaceChildren(
             ...this.rotarySection(),
             ...this.bedSection(),
+            ...this.serialSection(),
             ...this.objectsSection(),
             ...this.modelSection(),
             ...this.arrangeSection(),
@@ -153,6 +155,56 @@ export class LaserJobPanel {
                       ),
                   ]),
         ];
+    }
+
+    /** The serial number for {N} in texts and barcodes, moved on after every finished marking. */
+    private serialSection(): HTMLElement[] {
+        const s = this.host.data.serial;
+        const set = (change: (q: SerialSettings) => void) =>
+            this.host.editJob((job) => {
+                const next = { ...(job.serial ?? defaultSerial()) };
+                change(next);
+                job.serial = next;
+            });
+        const rows: HTMLElement[] = [
+            heading("laser.serial"),
+            row(
+                "laser.serial.on",
+                checkbox(s !== undefined, (v) =>
+                    this.host.editJob((job) => {
+                        job.serial = v ? (job.serial ?? defaultSerial()) : undefined;
+                    }),
+                ),
+            ),
+        ];
+        if (s !== undefined)
+            rows.push(
+                el(
+                    "div",
+                    { className: style.pair },
+                    row(
+                        "laser.serial.next",
+                        numberField(s.next, (v) => set((q) => (q.next = Math.round(v))), { step: 1 }),
+                    ),
+                    row(
+                        "laser.serial.step",
+                        numberField(s.step, (v) => set((q) => (q.step = Math.round(v))), { step: 1 }),
+                    ),
+                ),
+                row(
+                    "laser.serial.digits",
+                    numberField(
+                        s.digits,
+                        (v) => set((q) => (q.digits = Math.min(12, Math.max(0, Math.round(v))))),
+                        {
+                            min: 0,
+                            step: 1,
+                        },
+                    ),
+                ),
+            );
+        rows.push(el("div", { className: style.muted, textContent: t("laser.serial.hint") }));
+        return rows;
     }
 
     /** A rotary job: the part (its size sets the unrolled bed) and how it is marked round. */

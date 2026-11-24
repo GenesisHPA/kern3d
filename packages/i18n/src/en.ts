@@ -1359,6 +1359,13 @@ export default {
         "command.laser.rotary": "Rotary engraving",
         "laser.defaultName.rotary": "Rotary job",
         "laser.rotary.length": "Part length, mm",
+        "laser.serial": "Serial number and variables",
+        "laser.serial.on": "Number the parts",
+        "laser.serial.next": "Next number",
+        "laser.serial.step": "Step",
+        "laser.serial.digits": "Digits (zero-padded)",
+        "laser.serial.hint":
+            "In a text or barcode: {N} is the number, {date}, {time}, {year} {month} {day}. After every finished marking the number grows by the step.",
         "laser.rotary.part": "Part",
         "laser.rotary.needsJcz": "The rotary axis works with a JCZ board — choose it on the Machine tab",
         "laser.newJob": "New job",

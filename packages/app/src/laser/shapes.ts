@@ -9,6 +9,7 @@ import { type LaserPath, type Pt, pathsBounds } from "./geometry";
 import { flattenSubPaths, parseSubPaths, type SubPath } from "./pathShape";
 import { defaultScale, type ScaleSpec, scalePaths } from "./scaleShape";
 import { isStrokeFont } from "./strokeFonts";
+import { expandCurrent } from "./variables";
 
 /**
  * The parametric figures the laser editor draws (as EzCAD and LightBurn do): a polyline, a
@@ -81,7 +82,8 @@ const MIN_SIZE = 0.01;
 /** The figure's outlines in its own frame, the box from 0, 0. */
 export function shapeGeometry(shape: LaserShape, font?: FontOutline): ShapeGeometry {
     // a barcode's box is its symbol and quiet zone, not just the ink
-    if (shape.type === "barcode") return barcodeGeometry(shape, font, captionPaths);
+    if (shape.type === "barcode")
+        return barcodeGeometry({ ...shape, data: expandCurrent(shape.data) }, font, captionPaths);
     return normalize(rawPaths(shape, font));
 }
 
@@ -244,7 +246,7 @@ interface GlyphRun {
 export function textPaths(shape: Extract<LaserShape, { type: "text" }>, font: FontOutline): LaserPath[] {
     const size = Math.max(shape.size, 0.1);
     const scale = size / font.unitsPerEm;
-    const lines = shape.text.split(/\r?\n/);
+    const lines = expandCurrent(shape.text).split(/\r?\n/);
     const laid = lines.map((line) => layout(line, font, scale, shape.letterSpacing));
     const widest = Math.max(0, ...laid.map((l) => l.width));
     const out: LaserPath[] = [];

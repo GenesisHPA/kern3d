@@ -1197,6 +1197,13 @@ export default {
         "command.laser.rotary": "Гравировка на оси",
         "laser.defaultName.rotary": "Гравировка на оси",
         "laser.rotary.length": "Длина детали, мм",
+        "laser.serial": "Серийный номер и переменные",
+        "laser.serial.on": "Нумеровать детали",
+        "laser.serial.next": "Следующий номер",
+        "laser.serial.step": "Шаг",
+        "laser.serial.digits": "Знаков (с нулями)",
+        "laser.serial.hint":
+            "В тексте или штрихкоде: {N} — номер, {date} — дата, {time} — время, {year} {month} {day}. После каждой завершённой маркировки номер растёт на шаг.",
         "laser.rotary.part": "Деталь",
         "laser.rotary.needsJcz": "Поворотная ось работает с платой JCZ — выберите её во вкладке «Станок»",
         "laser.newJob": "Новый проект",

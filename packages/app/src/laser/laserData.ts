@@ -16,6 +16,7 @@ import {
 import type { BedOrigin, MachineProfile } from "./machineProfile";
 import { defaultRotaryJob, type RotaryJob } from "./rotary";
 import { type LaserShape, parseShape } from "./shapes";
+import { parseSerial, type SerialSettings } from "./variables";
 
 /**
  * A laser job as the document keeps it: the objects on the bed and how each is burnt. The
@@ -127,6 +128,8 @@ export interface LaserJobData {
     objects: LaserObject[];
     /** Marking round a part in a rotary chuck (see rotary.ts); absent = flat. */
     rotary?: RotaryJob;
+    /** The serial number `{N}` in texts and barcodes (see variables.ts); absent = 1, never moved on. */
+    serial?: SerialSettings;
 }
 
 export function defaultRaster(): RasterSettings {
@@ -324,6 +327,7 @@ export function parseLaserJob(json: string | undefined): LaserJobData {
             origin: raw?.origin === "center" ? "center" : "corner",
             objects: objects.filter((o: LaserObject | undefined) => o !== undefined),
             rotary: parseRotary(raw?.rotary),
+            serial: parseSerial(raw?.serial),
         };
     } catch {
         return defaultLaserJob();
