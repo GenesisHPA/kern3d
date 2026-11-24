@@ -86,6 +86,7 @@ export class MillEditor {
         const body = el("div", {}, this.left, stage);
         body.style.cssText = "display:flex;height:calc(100% - 44px)";
         this.dialog.append(this.topBar(), body);
+        this.node.onPropertyChanged(this.onNodeChanged);
         this.view.onProgress = (done, total) => {
             this.progressText = `${done} / ${total}`;
             this.showStatus();
@@ -106,7 +107,14 @@ export class MillEditor {
         this.schedule();
     }
 
+    /** Undo / redo replaced the job under us; a rename shows on the tab. */
+    private readonly onNodeChanged = (property: string | number | symbol) => {
+        if (property === "name") workspaceTabs.changed();
+        if (property === "content" && this.node.content !== JSON.stringify(this.data)) this.reload();
+    };
+
     private close() {
+        this.node.removePropertyChanged(this.onNodeChanged);
         this.view.dispose();
         void this.vfdPort?.close();
         this.dialog.close();
