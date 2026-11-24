@@ -25,6 +25,14 @@ import {
 } from "./laserFonts";
 import { button, checkbox, el, heading, numberField, row, select, t, textField } from "./laserUi";
 import { BED_ORIGINS, type MachineProfile } from "./machineProfile";
+import {
+    applyMaterial,
+    defaultTestMatrix,
+    loadMaterials,
+    removeMaterial,
+    saveMaterial,
+    type TestMatrixSpec,
+} from "./materials";
 import { defaultRotaryJob, type RotaryJob } from "./rotary";
 import { ALIGNS, type Align } from "./selection";
 import { defaultQuiet, type LaserFontRef, type LaserShape, TEXT_ALIGNS } from "./shapes";
@@ -49,6 +57,8 @@ export interface LaserJobPanelHost {
     distributeSelected(axis: "x" | "y"): void;
     /** A batch: the selection copied into a grid, numbered copy by copy if asked. */
     arraySelected(columns: number, rows: number, gapX: number, gapY: number, numbered: boolean): void;
+    /** Power × speed squares with their values written beside, on the bed's top-left. */
+    makeTestMatrix(spec: TestMatrixSpec): void;
     /** Applies `edit` to the selected object and writes the job back as one undo step. */
     editSelected(edit: (o: LaserObject) => void): void;
     /** Applies `edit` to the job itself (its rotary settings) as one undo step. */
@@ -90,6 +100,8 @@ export class LaserJobPanel {
     private alignToBed = false;
     /** The batch grid last asked for (kept while the panel lives). */
     private batch = { columns: 3, rows: 2, gapX: 5, gapY: 5, numbered: true };
+    /** The test matrix last asked for. */
+    private matrix: TestMatrixSpec = defaultTestMatrix();
     private modelView: ModelView = "top";
 
     constructor(private readonly host: LaserJobPanelHost) {}
@@ -106,6 +118,7 @@ export class LaserJobPanel {
             ...this.rotarySection(),
             ...this.bedSection(),
             ...this.serialSection(),
+            ...this.testMatrixSection(),
             ...this.objectsSection(),
             ...this.modelSection(),
             ...this.arrangeSection(),
@@ -1083,7 +1096,141 @@ export class LaserJobPanel {
             );
         }
         if (op.mode === "image") rows.push(...this.rasterSection(op.raster));
+        rows.push(...this.materialRows(op));
         return rows;
+    }
+
+    /** The material library: pick a saved setting for the selection, save this one under a name. */
+    private materialRows(op: LaserOperation): HTMLElement[] {
+        const list = loadMaterials();
+        const rows: HTMLElement[] = [heading("laser.material")];
+        if (list.length > 0) {
+            const options = [
+                { value: "", label: t("laser.material.pick") },
+                ...list.map((m) => ({ value: m.name, label: m.name })),
+            ];
+            rows.push(
+                row(
+                    "laser.material.apply",
+                    select(options, "", (name) => {
+                        const m = list.find((x) => x.name === name);
+                        if (m !== undefined) this.host.editSelected((x) => applyMaterial(x.op, m));
+                    }),
+                ),
+            );
+        }
+        const name = el("input", { type: "text", placeholder: t("laser.material.name") });
+        const save = () => {
+            if (name.value.trim() === "") {
+                name.focus();
+                return;
+            }
+            saveMaterial(name.value, op);
+            this.render();
+        };
+        name.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") save();
+        });
+        rows.push(
+            el(
+                "div",
+                { className: style.pair },
+                name,
+                button("laser.material.save", save, "laser.material.save.hint"),
+            ),
+        );
+        if (list.length > 0) {
+            const which = select(
+                list.map((m) => ({ value: m.name, label: m.name })),
+                list[0].name,
+                () => {},
+            );
+            rows.push(
+                el(
+                    "div",
+                    { className: style.pair },
+                    which,
+                    button("laser.material.remove", () => {
+                        const v = which.value;
+                        if (v && confirm(t("laser.material.remove.confirm", v))) {
+                            removeMaterial(v);
+                            this.render();
+                        }
+                    }),
+                ),
+            );
+        }
+        return rows;
+    }
+
+    /** The test matrix (power × speed squares) for a new material: made on the bed in one go. */
+    private testMatrixSection(): HTMLElement[] {
+        const m = this.matrix;
+        const int = (v: number) => Math.max(1, Math.min(20, Math.round(v)));
+        return [
+            heading("laser.matrix"),
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.matrix.powerFrom",
+                    numberField(m.powerFrom, (v) => (m.powerFrom = v), { min: 0, max: 100 }),
+                ),
+                row(
+                    "laser.matrix.powerTo",
+                    numberField(m.powerTo, (v) => (m.powerTo = v), { min: 0, max: 100 }),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.matrix.speedFrom",
+                    numberField(m.speedFrom, (v) => (m.speedFrom = v), { min: 1 }),
+                ),
+                row(
+                    "laser.matrix.speedTo",
+                    numberField(m.speedTo, (v) => (m.speedTo = v), { min: 1 }),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.matrix.columns",
+                    numberField(m.columns, (v) => (m.columns = int(v)), { min: 1, step: 1 }),
+                ),
+                row(
+                    "laser.matrix.rows",
+                    numberField(m.rows, (v) => (m.rows = int(v)), { min: 1, step: 1 }),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                row(
+                    "laser.matrix.cell",
+                    numberField(m.cell, (v) => (m.cell = Math.max(0.5, v)), { min: 0.5 }),
+                ),
+                row(
+                    "laser.matrix.gap",
+                    numberField(m.gap, (v) => (m.gap = Math.max(0, v)), { min: 0 }),
+                ),
+            ),
+            row(
+                "laser.matrix.fill",
+                checkbox(m.mode === "fill", (v) => (m.mode = v ? "fill" : "line")),
+            ),
+            el(
+                "div",
+                { className: style.buttons },
+                button(
+                    "laser.matrix.make",
+                    () => this.host.makeTestMatrix({ ...m }),
+                    "laser.matrix.make.hint",
+                ),
+            ),
+        ];
     }
 
     private rasterSection(r: RasterSettings): HTMLElement[] {

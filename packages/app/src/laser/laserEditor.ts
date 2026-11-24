@@ -56,6 +56,7 @@ import { LaserNode } from "./laserNode";
 import { LaserOutput } from "./laserOutput";
 import { button, el, t } from "./laserUi";
 import { bedRect, loadMachineProfile, type MachineProfile, saveMachineProfile } from "./machineProfile";
+import { matrixCells, steps, type TestMatrixSpec } from "./materials";
 import {
     breakAt,
     deleteNode,
@@ -788,6 +789,71 @@ export class LaserEditor {
         });
     }
 
+    /**
+     * The test matrix: a square per power (across) and speed (down), the values written above
+     * and to the left in thin lines at the matrix's lowest power and fastest speed.
+     */
+    private async makeTestMatrix(spec: TestMatrixSpec) {
+        const font = defaultLaserFont();
+        const outline = await loadLaserFont(font);
+        const p = this.profile;
+        const left = p.origin === "center" ? -p.bedWidth / 2 : 0;
+        const top = p.origin === "center" ? p.bedHeight / 2 : p.bedHeight;
+        const label = Math.min(3, Math.max(1.2, spec.cell * 0.5));
+        const x0 = left + 5 + label * 5;
+        const y0 = top - 5 - label * 2;
+        const objects: LaserObject[] = [];
+        for (const c of matrixCells(spec)) {
+            const o = shapeObject(
+                { type: "rect", width: spec.cell, height: spec.cell, radius: 0 },
+                `P${c.power} S${c.speed}`,
+                { corner: { x: x0 + c.x, y: y0 + c.y } },
+            );
+            if (o === undefined) continue;
+            o.op = { ...defaultOperation(spec.mode), power: c.power, speed: c.speed };
+            if (spec.mode === "fill") o.op.fillOutline = true;
+            objects.push(o);
+        }
+        if (outline !== undefined) {
+            const text = (value: string, at: Pt) => {
+                const o = shapeObject(
+                    {
+                        type: "text",
+                        text: value,
+                        font,
+                        size: label,
+                        letterSpacing: 0,
+                        lineSpacing: 1.2,
+                        align: "left",
+                        arcRadius: 0,
+                    },
+                    value,
+                    { centre: at },
+                    outline,
+                );
+                if (o === undefined) return;
+                o.op = {
+                    ...defaultOperation("line"),
+                    power: spec.powerFrom,
+                    speed: Math.max(spec.speedFrom, spec.speedTo),
+                };
+                objects.push(o);
+            };
+            const pitch = spec.cell + spec.gap;
+            steps(spec.powerFrom, spec.powerTo, spec.columns).forEach((power, i) =>
+                text(`${power}`, { x: x0 + i * pitch + spec.cell / 2, y: y0 + label }),
+            );
+            steps(spec.speedFrom, spec.speedTo, spec.rows).forEach((speed, i) =>
+                text(`${speed}`, { x: x0 - label * 2.6, y: y0 - i * pitch - spec.cell / 2 }),
+            );
+            text(t("laser.matrix.legend"), { x: x0 + (spec.columns * pitch) / 2, y: y0 + label * 2.6 });
+        }
+        this.data.objects.push(...objects);
+        this.chosen = objects.map((o) => o.id);
+        this.commit();
+        this.render();
+    }
+
     private move(id: string, delta: -1 | 1) {
         const list = this.data.objects;
         const i = list.findIndex((o) => o.id === id);
@@ -816,6 +882,7 @@ export class LaserEditor {
             select: (id, additive) => this.select(id, additive),
             alignSelected: (align, toBed) => this.alignSelected(align, toBed),
             distributeSelected: (axis) => this.distributeSelected(axis),
+            makeTestMatrix: (spec) => void this.makeTestMatrix(spec),
             arraySelected: (columns, rows, gapX, gapY, numbered) =>
                 this.arraySelected(columns, rows, gapX, gapY, numbered),
             editSelected: (edit) => {
