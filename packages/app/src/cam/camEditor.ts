@@ -62,6 +62,10 @@ export class MillEditor {
                 .map((l) => l.trim())
                 .filter((l) => l !== ""),
         tools: () => this.data.tools,
+        summary: () => {
+            const p = this.program();
+            return { bounds: p.bounds, seconds: p.seconds };
+        },
         vfd: () => (this.data.vfd.enabled ? this.vfd : undefined),
     });
     private stage!: HTMLElement;

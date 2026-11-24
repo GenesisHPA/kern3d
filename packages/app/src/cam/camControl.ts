@@ -9,6 +9,7 @@ import style from "./camControl.module.css";
 import type { MillMachine } from "./camGcode";
 import { type ProgramSegment, splitAtToolChanges } from "./camProbe";
 import { ProbeWorkflow } from "./camProbePanel";
+import { clock, frameLines, outsideTravel, parseOffsetLine, runFromLine, timeLeft } from "./camRun";
 import type { CamTool } from "./camTools";
 import {
     AXES,
@@ -30,8 +31,33 @@ export interface ControlHost {
     programLines(): string[];
     /** The job's tools. */
     tools(): CamTool[];
+    /** The program's extent (work coordinates) and estimated time, s. */
+    summary(): {
+        bounds: { minX: number; minY: number; minZ: number; maxX: number; maxY: number };
+        seconds: number;
+    };
     /** The inverter when it is on and connected. */
     vfd(): VfdSpindle | undefined;
+}
+
+const PREFS = "kern3d.cam.panel";
+
+/** A panel preference kept between sessions (step, speeds, the plate). */
+function pref<T>(key: string, fallback: T): T {
+    try {
+        const v = JSON.parse(localStorage.getItem(PREFS) ?? "{}")[key];
+        return v === undefined || typeof v !== typeof fallback ? fallback : (v as T);
+    } catch {
+        return fallback;
+    }
+}
+
+function storePref(key: string, value: unknown) {
+    try {
+        const all = JSON.parse(localStorage.getItem(PREFS) ?? "{}");
+        all[key] = value;
+        localStorage.setItem(PREFS, JSON.stringify(all));
+    } catch {}
 }
 
 const AXIS_COLORS: Record<Axis, string> = { X: "#ff6b6b", Y: "#51cf66", Z: "#4dabf7" };
@@ -63,17 +89,23 @@ export class MachineControl {
     private status: GrblStatus = { state: "—" };
     private accessories = "";
     private overrides: [number, number, number] = [100, 100, 100];
-    private step = 1;
-    private jogFeed = 1000;
-    private rpm = 12000;
+    private step = pref("step", 1);
+    private jogFeed = pref("jogFeed", 1000);
+    private rpm = pref("rpm", 12000);
+    private readonly offsets = new Map<string, number[]>();
+    private fromLine = 1;
+    private started = 0;
+    private checkMode = false;
+    private readonly timeText = el("div");
+    private readonly travelText = el("div");
     private running: string[] = [];
     private acked = 0;
     private spindleAt = 0;
     private readonly log: string[] = [];
     private readonly history: string[] = [];
     private settings = new Map<number, string>();
-    private probe = { thickness: 20, travel: 30, feed: 100, retract: 5 };
-    private tab: "program" | "mdi" | "probe" | "settings" = "program";
+    private probe = pref("plate", { thickness: 20, travel: 30, feed: 100, retract: 5 });
+    private tab: "program" | "mdi" | "probe" | "offsets" | "settings" = "program";
     private segments: ProgramSegment[] = [];
     private readonly bannerHost = el("div");
     private readonly workflow = new ProbeWorkflow(
@@ -140,8 +172,10 @@ export class MachineControl {
                     this.addLog(`— ${t(`laser.job.${e.state}`)}`);
                     if (e.state === "done") void this.nextSegment();
                     else if (e.state === "stopped" || e.state === "error") this.segments = [];
-                } else if (e.type === "alarm") this.addLog(`ALARM:${e.code}`);
-                else if (e.type === "error") this.addLog(`error:${e.code} ← ${e.line}`);
+                } else if (e.type === "alarm")
+                    this.addLog(`ALARM:${e.code} — ${t(`laser.grbl.alarm.${e.code}`)}`);
+                else if (e.type === "error")
+                    this.addLog(`error:${e.code} — ${t(`laser.grbl.error.${e.code}`)} ← ${e.line}`);
             });
             this.grbl = controller;
             this.port = port;
@@ -187,6 +221,11 @@ export class MachineControl {
     }
 
     private onLine(dir: "in" | "out", text: string) {
+        const offset = dir === "in" ? parseOffsetLine(text) : undefined;
+        if (offset) {
+            this.offsets.set(offset.name, offset.values);
+            if (this.tab === "offsets") this.renderTab();
+        }
         const setting = dir === "in" ? parseSetting(text) : undefined;
         if (setting) {
             this.settings.set(setting.id, setting.value);
@@ -204,6 +243,7 @@ export class MachineControl {
 
     private showStatus() {
         const s = this.status;
+        if (s.state === "Idle") this.checkTravel();
         this.stateBadge.textContent = s.state;
         this.stateBadge.style.backgroundColor = stateColor(s.state);
         AXES.forEach((a, i) => {
@@ -235,6 +275,11 @@ export class MachineControl {
         const pct = total > 0 ? (this.acked / total) * 100 : 0;
         this.progressBar.style.width = `${pct.toFixed(1)}%`;
         this.progress.title = `${this.acked} / ${total}`;
+        if (this.started > 0 && total > 0) {
+            const elapsed = (performance.now() - this.started) / 1000;
+            const left = timeLeft(this.host.summary().seconds, this.acked, total, elapsed);
+            this.timeText.textContent = `${t("cnc.time.elapsed")} ${clock(elapsed)}${left !== undefined ? ` · ${t("cnc.time.left")} ${clock(left)}` : ""} · ${this.acked} / ${total}`;
+        }
         if (this.tab === "program") this.showLines();
     }
 
@@ -276,6 +321,7 @@ export class MachineControl {
             g.resume();
             return;
         }
+        this.started = 0;
         this.segments = splitAtToolChanges(this.host.programLines());
         this.workflow.current ??= this.host.tools()[0]?.number;
         this.startSegment(this.segments.shift());
@@ -287,6 +333,7 @@ export class MachineControl {
         this.acked = 0;
         this.spindleAt = 0;
         this.grbl.startJob(this.running);
+        if (this.started === 0) this.started = performance.now();
         this.showProgress();
     }
 
@@ -307,6 +354,42 @@ export class MachineControl {
         const banner = this.workflow.changeBanner();
         this.bannerHost.replaceChildren(...(banner ? [banner] : []));
         if (this.tab === "probe") this.renderTab();
+    }
+
+    /** Trace the part's outline over the stock, at the safe height. */
+    private frame() {
+        const m = this.host.machine();
+        this.send(...frameLines(this.host.summary().bounds, m.heights.safeZ, this.jogFeed));
+    }
+
+    /** Run from the chosen line of the current program (its first part with no tool change after). */
+    private runFrom() {
+        const g = this.grbl;
+        if (!g || g.jobActive) return;
+        const segs = splitAtToolChanges(this.host.programLines());
+        // which part the line is in, counted over all parts
+        let n = this.fromLine - 1;
+        let i = 0;
+        while (i < segs.length - 1 && n >= segs[i].lines.length) {
+            n -= segs[i].lines.length;
+            i++;
+        }
+        const seg = segs[i];
+        this.segments = segs.slice(i + 1);
+        this.started = 0;
+        if (seg.tool !== undefined) this.workflow.current = seg.tool;
+        this.startSegment({ lines: runFromLine(seg.lines, n, this.host.machine().heights.safeZ) });
+    }
+
+    /** Warn when the program, at the current work zero, would leave the machine's travel. */
+    private checkTravel() {
+        const m = this.host.machine();
+        const wco =
+            this.status.mpos && this.status.wpos
+                ? (this.status.mpos.map((v, i) => v - this.status.wpos![i]) as [number, number, number])
+                : undefined;
+        const axes = outsideTravel(this.host.summary().bounds, wco, { x: m.width, y: m.depth, z: m.height });
+        this.travelText.textContent = axes.length > 0 ? `⚠ ${t("cnc.travel.outside", axes.join(", "))}` : "";
     }
 
     private stopAll() {
@@ -543,6 +626,7 @@ export class MachineControl {
             ...JOG_STEPS.map((s) => {
                 const b = btn(s === 0 ? t("cnc.continuous") : String(s), () => {
                     this.step = s;
+                    storePref("step", s);
                     for (const c of steps.children) c.classList.remove(style.on);
                     b.classList.add(style.on);
                 });
@@ -555,6 +639,7 @@ export class MachineControl {
         const feed = el("input", { type: "range", min: "50", max: "5000", step: "50" });
         feed.value = String(this.jogFeed);
         const feedLabel = el("span", { textContent: `${this.jogFeed} ${t("cnc.mmMin")}` });
+        feed.onchange = () => storePref("jogFeed", this.jogFeed);
         feed.oninput = () => {
             this.jogFeed = Number(feed.value);
             feedLabel.textContent = `${this.jogFeed} ${t("cnc.mmMin")}`;
@@ -590,7 +675,10 @@ export class MachineControl {
         this.feedText.className = style.caption;
         const rpm = el("input", { type: "number", min: "0", step: "100" });
         rpm.value = String(this.rpm);
-        rpm.onchange = () => (this.rpm = Math.max(0, Number(rpm.value) || 0));
+        rpm.onchange = () => {
+            this.rpm = Math.max(0, Number(rpm.value) || 0);
+            storePref("rpm", this.rpm);
+        };
         const set = el("label", {}, el("span", { textContent: t("cnc.setRpm") }), rpm);
         set.className = style.slider;
         const spin = el(
@@ -665,14 +753,42 @@ export class MachineControl {
         this.progress.className = style.progress;
         this.progressBar.className = style.bar;
         this.progress.replaceChildren(this.progressBar);
-        return card(t("cnc.program"), buttons, this.progress);
+        this.timeText.className = style.caption;
+        this.travelText.className = style.note;
+        const from = el("input", { type: "number", min: "1", step: "1" });
+        from.value = String(this.fromLine);
+        from.style.width = "80px";
+        from.onchange = () => (this.fromLine = Math.max(1, Math.round(Number(from.value) || 1)));
+        const check = btn(
+            t("cnc.check"),
+            () => {
+                this.send("$C");
+                this.checkMode = !this.checkMode;
+                check.classList.toggle(style.on, this.checkMode);
+            },
+            style.small,
+            t("cnc.check.hint"),
+        );
+        if (this.checkMode) check.classList.add(style.on);
+        const extras = el(
+            "div",
+            {},
+            btn(`▭ ${t("cnc.frame")}`, () => this.frame(), style.small, t("cnc.frame.hint")),
+            check,
+            el("span", { className: style.caption, textContent: t("cnc.fromLine") }),
+            from,
+            btn(`▶ ${t("cnc.fromLine.run")}`, () => this.runFrom(), style.small, t("cnc.fromLine.hint")),
+        );
+        extras.className = style.row;
+        this.checkTravel();
+        return card(t("cnc.program"), buttons, this.progress, this.timeText, extras, this.travelText);
     }
 
     private tabsCard(): HTMLElement {
         const tabs = el(
             "div",
             {},
-            ...(["program", "mdi", "probe", "settings"] as const).map((k) => {
+            ...(["program", "mdi", "probe", "offsets", "settings"] as const).map((k) => {
                 const b = btn(t(`cnc.tab.${k}`), () => {
                     this.tab = k;
                     for (const c of tabs.children) c.classList.remove(style.on);
@@ -699,6 +815,7 @@ export class MachineControl {
         } else if (this.tab === "mdi") this.tabBody.replaceChildren(...this.mdi());
         else if (this.tab === "probe")
             this.tabBody.replaceChildren(...this.workflow.tab(this.status.mpos, this.probeTab()));
+        else if (this.tab === "offsets") this.tabBody.replaceChildren(...this.offsetsTab());
         else this.tabBody.replaceChildren(...this.settingsTab());
     }
 
@@ -739,7 +856,10 @@ export class MachineControl {
         const field = (key: keyof typeof this.probe, label: string) => {
             const input = el("input", { type: "number", step: "any" });
             input.value = String(this.probe[key]);
-            input.onchange = () => (this.probe[key] = Number(input.value) || 0);
+            input.onchange = () => {
+                this.probe[key] = Number(input.value) || 0;
+                storePref("plate", this.probe);
+            };
             const l = el("label", {}, el("span", { textContent: label }), input);
             l.className = style.slider;
             return l;
@@ -758,12 +878,110 @@ export class MachineControl {
         ];
     }
 
+    /** The work offsets G54…G59, the stored positions G28 / G30, G92 and the tool length offset. */
+    private offsetsTab(): HTMLElement[] {
+        const rows: HTMLElement[] = [
+            el(
+                "div",
+                { className: style.row },
+                btn(t("cnc.offsets.read"), () => this.send("$#"), style.primary),
+                el("span", { className: style.caption, textContent: t("cnc.offsets.hint") }),
+            ),
+        ];
+        const table = el("div");
+        table.className = style.toolTable;
+        const value = (name: string) => {
+            const v = this.offsets.get(name);
+            return v ? v.map((x) => x.toFixed(3)).join("  ") : "—";
+        };
+        for (const w of WCS) {
+            const p = Number(w.slice(2)) - 53;
+            table.append(
+                el(
+                    "div",
+                    {},
+                    el("code", { textContent: w }),
+                    el("span", { textContent: value(w) }),
+                    btn(t("cnc.offsets.use"), () => this.send(w), style.small),
+                    btn(t("cnc.offsets.clear"), () => this.send(`G10 L2 P${p} X0 Y0 Z0`, "$#"), style.small),
+                ),
+            );
+        }
+        for (const [name, set, go] of [
+            ["G28", "G28.1", "G28"],
+            ["G30", "G30.1", "G30"],
+        ] as const)
+            table.append(
+                el(
+                    "div",
+                    {},
+                    el("code", { textContent: name }),
+                    el("span", { textContent: value(name) }),
+                    btn(t("cnc.offsets.store"), () => this.send(set, "$#"), style.small),
+                    btn(
+                        t("cnc.offsets.go"),
+                        () => this.send(`G0 Z${this.host.machine().heights.safeZ}`, go),
+                        style.small,
+                    ),
+                ),
+            );
+        table.append(
+            el(
+                "div",
+                {},
+                el("code", { textContent: "G92" }),
+                el("span", { textContent: value("G92") }),
+                btn(t("cnc.offsets.clear"), () => this.send("G92.1", "$#"), style.small),
+                el("span"),
+            ),
+            el(
+                "div",
+                {},
+                el("code", { textContent: "TLO" }),
+                el("span", { textContent: value("TLO") }),
+                el("span"),
+                el("span"),
+            ),
+        );
+        rows.push(table);
+        return rows;
+    }
+
+    /** `$$` to a text file and back. */
+    private saveSettings() {
+        const text = [...this.settings.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([id, v]) => `$${id}=${v}`)
+            .join("\n");
+        const a = el("a", {
+            href: URL.createObjectURL(new Blob([`${text}\n`], { type: "text/plain" })),
+            download: "grbl-settings.txt",
+        });
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    private loadSettings() {
+        const input = el("input", { type: "file", accept: ".txt,.nc,.gcode" });
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+            const lines = (await file.text()).split(/\r?\n/).filter((l) => parseSetting(l) !== undefined);
+            if (lines.length === 0) return;
+            if (!confirm(t("cnc.settings.confirmLoad", lines.length))) return;
+            this.send(...lines, "$$");
+        };
+        input.click();
+    }
+
     private settingsTab(): HTMLElement[] {
         const rows: HTMLElement[] = [
             el(
                 "div",
                 { className: style.row },
                 btn(t("cnc.settings.read"), () => this.send("$$"), style.primary),
+                btn(t("cnc.settings.save"), () => this.saveSettings(), style.small),
+                btn(t("cnc.settings.load"), () => this.loadSettings(), style.small),
                 el("span", { className: style.caption, textContent: t("cnc.settings.hint") }),
             ),
         ];

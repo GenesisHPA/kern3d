@@ -22,6 +22,7 @@ import {
     toChangeLines,
     type Vec3,
 } from "./camProbe";
+import { calibratedTip } from "./camRun";
 import type { CamTool } from "./camTools";
 
 /** The probing routines over a GRBL connection: lines sent and their `ok`s waited for. */
@@ -108,6 +109,7 @@ export class ProbeWorkflow {
     private holeZero = true;
     private cornerZ = true;
     private bossDiameter = 30;
+    private ring = 20;
     /** A tool change waiting for the operator. */
     waiting: { tool: number; resolve: () => void; reject: (e: Error) => void } | undefined;
 
@@ -464,6 +466,30 @@ export class ProbeWorkflow {
                 t("cnc.probe.bossDiameter"),
                 () => this.bossDiameter,
                 (v) => (this.bossDiameter = Math.max(1, v)),
+            ),
+        );
+
+        // ball calibration on a ring gauge
+        out.push(
+            el("div", { className: style.caption, textContent: t("cnc.probe.calibrate.hint") }),
+            this.field(
+                t("cnc.probe.ring"),
+                () => this.ring,
+                (v) => (this.ring = Math.max(1, v)),
+            ),
+            el(
+                "div",
+                { className: style.row },
+                this.b(
+                    t("cnc.probe.calibrate"),
+                    () =>
+                        void this.task(t("cnc.probe.calibrate"), async (io) => {
+                            const r = await probeHole(io, s, false);
+                            s.tip = calibratedTip(s.tip, this.ring, r.d);
+                            this.save();
+                            return `Ø${r.d.toFixed(3)} → ${t("cnc.probe3d.tip")} ${s.tip.toFixed(3)}`;
+                        }),
+                ),
             ),
         );
 
