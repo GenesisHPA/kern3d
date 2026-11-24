@@ -31,6 +31,7 @@ import {
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
 } from "./ribbon";
+import { SandboxTriangulator } from "./stlSafeMesh";
 
 export class AppBuilder {
     protected readonly _inits: (() => Promise<void>)[] = [];
@@ -92,6 +93,9 @@ export class AppBuilder {
             const wasm = await import("@chili3d/wasm");
             await wasm.initWasm();
             this._shapeProvider = new wasm.OccShapeProvider();
+            // the STL rebuild meshes its bodies in a kernel of their own (a crash there is harmless)
+            const { setSafeTriangulator } = await import("@chili3d/parametric");
+            setSafeTriangulator(new SandboxTriangulator(wasm));
         });
         return this;
     }

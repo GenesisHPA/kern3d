@@ -6,7 +6,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type IEdge, type IShape, Plane, ShapeTypes, XYZ } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
+import * as wasmKernel from "@chili3d/wasm";
 import { initWasm, OccShapeConverter, ShapeFactory } from "@chili3d/wasm";
+import { SandboxTriangulator } from "../../builder/src/stlSafeMesh";
 import { OccShape } from "../../wasm/src/shape";
 import { meshToSolid } from "../src/commands/meshToSolid";
 import { appendTreatment, buildModel, treatmentEdges } from "../src/stlRebuild/build";
@@ -15,6 +17,7 @@ import { meshVolume, weldTriangles } from "../src/stlRebuild/mesh";
 import { type EdgeTreatment, planExtrusions, setPlanDebug } from "../src/stlRebuild/plan";
 import { meshDifference } from "../src/stlRebuild/raycast";
 import { rebuildPart, setRebuildDebug } from "../src/stlRebuild/rebuild";
+import { setSafeTriangulator } from "../src/stlRebuild/safeMesh";
 import { loopArea, slabsOf, sliceFrames } from "../src/stlRebuild/slices";
 import { deviation, solidVolume, surfaceFit, trianglesOf } from "../src/stlRebuild/verify";
 import "../src/features";
@@ -32,6 +35,8 @@ beforeAll(async () => {
     ] as const) {
         Object.defineProperty(globalThis, name, { value, writable: true, configurable: true });
     }
+    // as in the app: bodies meshed in a kernel of their own (KERN3D_STL_INPLACE=1: in place)
+    if (process.env["KERN3D_STL_INPLACE"] !== "1") setSafeTriangulator(new SandboxTriangulator(wasmKernel));
 });
 
 const at = (x: number, y: number, z: number) => new XYZ({ x, y, z });

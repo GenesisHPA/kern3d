@@ -69,3 +69,45 @@ export async function runInSandboxKernel<T>(action: () => T): Promise<SandboxRes
         global.wasm = shared;
     }
 }
+
+/**
+ * A kernel instance kept aside for risky work done again and again (the STL rebuild meshing its
+ * bodies): like `runInSandboxKernel`, but made once and reused while it lives, and reported dead
+ * after a crash so its owner can make a new one (`create` is asynchronous; `run` is not).
+ */
+export class KernelSandbox {
+    private alive = true;
+    private runs = 0;
+
+    private constructor(private readonly module: MainModule) {}
+
+    static async create(): Promise<KernelSandbox> {
+        return new KernelSandbox(await createModule(initOptions));
+    }
+
+    get usable(): boolean {
+        return this.alive;
+    }
+
+    /** How many actions it has run (its owner renews it now and then: nothing frees its heap). */
+    get count(): number {
+        return this.runs;
+    }
+
+    /** `action` against this kernel; same rules as `runInSandboxKernel` (synchronous, plain data out). */
+    run<T>(action: () => T): SandboxResult<T> {
+        if (!this.alive) return { ok: false, crashed: true, error: "sandbox kernel is gone" };
+        this.runs++;
+        const shared = global.wasm;
+        global.wasm = this.module;
+        try {
+            return { ok: true, value: action() };
+        } catch (error) {
+            const crashed = isKernelCrash(error);
+            if (crashed) this.alive = false;
+            return { ok: false, crashed, error: errorText(error) };
+        } finally {
+            global.wasm = shared;
+        }
+    }
+}

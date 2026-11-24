@@ -10,4 +10,6 @@ export * from "./parametricBodyNode";
 export * from "./plane";
 export * from "./program";
 export * from "./sketch";
+export { type SafeTriangulator, setSafeTriangulator } from "./stlRebuild/safeMesh";
+export { trianglesOf } from "./stlRebuild/verify";
 import "./commands";

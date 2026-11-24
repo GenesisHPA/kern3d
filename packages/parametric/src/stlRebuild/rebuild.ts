@@ -14,6 +14,7 @@ import { profileArea } from "./fit2d";
 import { meshVolume, soupMesh, type TriMesh, weldTriangles } from "./mesh";
 import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan";
 import { meshDifference } from "./raycast";
+import { safeMeshReady, safeTriangles } from "./safeMesh";
 import { sliceFrames } from "./slices";
 import { deviation, solidVolume, surfaceFit, trianglesOf } from "./verify";
 
@@ -52,6 +53,23 @@ export interface RebuildOptions {
     readonly progress?: IProgress;
 }
 
+/**
+ * A trap that means the kernel's heap is damaged, as opposed to OCCT's own «Aborted()» (an
+ * uncaught exception in an operation, which the kernel survives — the rebuild just drops that
+ * axis). Seen on huge STL imports: «memory access out of bounds», «null function or function
+ * signature mismatch».
+ */
+const KERNEL_CORRUPTED = /memory access out of bounds|null function|signature mismatch|unreachable/i;
+
+/** The rebuild stopped because the kernel's memory was damaged: save the work and restart. */
+export class KernelCorrupted extends Error {
+    constructor(cause: string) {
+        // the cause first: the main window words such a message as «save and restart» (isKernelCrash)
+        super(cause.replace(/^.*?(RuntimeError: )/, "$1"));
+        this.name = "KernelCorrupted";
+    }
+}
+
 /** Diagnostics for the corpus test (unset in the app). */
 let debugHook: ((line: string) => void) | undefined;
 /** The kernel's heap, MB, for the diagnostics (0 when it cannot be read). */
@@ -62,10 +80,23 @@ function heapMb(): number {
     ).process?.memoryUsage?.();
     return usage ? Math.round(usage.rss / 1048576) : 0;
 }
+/**
+ * The kernel's own heap (the wasm memory), MB: Node counts an ArrayBuffer's backing store — the
+ * wasm memory is one — under `arrayBuffers`; 0 in a browser.
+ */
+export function kernelHeapMb(): number {
+    const usage = (
+        globalThis as { process?: { memoryUsage?: () => { arrayBuffers?: number } } }
+    ).process?.memoryUsage?.();
+    return usage?.arrayBuffers ? Math.round(usage.arrayBuffers / 1048576) : 0;
+}
 export let REBUILD_DEBUG: ((line: string) => void) | undefined;
 export function setRebuildDebug(hook: ((line: string) => void) | undefined) {
     debugHook = hook;
-    REBUILD_DEBUG = hook === undefined ? undefined : (line) => debugHook?.(`${line} [rss ${heapMb()} MB]`);
+    REBUILD_DEBUG =
+        hook === undefined
+            ? undefined
+            : (line) => debugHook?.(`${line} [rss ${heapMb()} MB, kernel ${kernelHeapMb()} MB]`);
 }
 
 /** Longest feature tree an axis may plan, and most pieces of the part it may keep. */
@@ -104,12 +135,27 @@ function bodyShape(model: BuiltModel): IShape | undefined {
  * both meshes (`meshDifference`) — the booleans give up on near-coincident solids, so they only
  * find the pieces to correct; whether a correction helped is measured here.
  */
-function measure(reference: TriMesh, shape: IShape | undefined): number {
-    return shape === undefined ? 1 : difference(reference, shape).ratio;
+function measure(reference: TriMesh, shape: IShape | undefined, sound = true): number {
+    return shape === undefined ? 1 : (difference(reference, shape, sound)?.ratio ?? 1);
 }
 
-function difference(reference: TriMesh, shape: IShape): { ratio: number; missing: number; extra: number } {
-    const d = meshDifference(reference, soupMesh(trianglesOf(shape)));
+/**
+ * The rebuild's difference from the reference by ray columns, or undefined when the body could
+ * not be meshed. A sound body is meshed in place (fast, as it always was); an unsound one — the
+ * kind that aborted the mesher (gidrik) — in a kernel of its own (see `safeMesh.ts`), and it is
+ * otherwise left as it is: no rounds, no corrections.
+ */
+function difference(
+    reference: TriMesh,
+    shape: IShape,
+    sound = true,
+): { ratio: number; missing: number; extra: number } | undefined {
+    const tri = sound ? trianglesOf(shape) : safeTriangles(shape);
+    if (tri === undefined) {
+        REBUILD_DEBUG?.("body could not be meshed: judged off");
+        return undefined;
+    }
+    const d = meshDifference(reference, soupMesh(tri));
     return { ratio: d.aVolume > 0 ? (d.aOnly + d.bOnly) / d.aVolume : 1, missing: d.aOnly, extra: d.bOnly };
 }
 
@@ -202,6 +248,9 @@ export async function rebuildPart(
         live.add(model);
         const shape = bodyShape(model);
         const failed = failedFeature(model);
+        // the kernel's memory itself damaged (not OCCT's own «Aborted()», which it survives):
+        // nothing it computes from here on can be trusted — stop, keep nothing
+        if (failed !== undefined && KERNEL_CORRUPTED.test(failed)) throw new KernelCorrupted(failed);
         // an unsound body is still a result (the mesh pieces' sewn faces often fail the strict
         // check); it only takes no more booleans — corrections and rounds are for sound ones
         const sound = soundBody(shape, partSolids);
@@ -213,7 +262,8 @@ export async function rebuildPart(
         // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
         await step.report(0.7, "stl.stage.measure");
         const tm = Date.now();
-        let ratio = measure(referenceMesh, shape);
+        if (!sound) await safeMeshReady();
+        let ratio = measure(referenceMesh, shape, sound);
         REBUILD_DEBUG?.(`axis ${axisName}: measure ${Date.now() - tm} ms → ${(ratio * 100).toFixed(3)}%`);
         let rounded = 0;
         const tt = Date.now();
@@ -321,6 +371,7 @@ export async function rebuildPart(
             if (current === undefined) break;
             const td = Date.now();
             const expected = difference(referenceMesh, current);
+            if (expected === undefined) break;
             const diff = deviation(reference, current, true, expected);
             REBUILD_DEBUG?.(`correction pass ${pass}: deviation ${Date.now() - td} ms`);
             const pieces: { shape: IShape; operation: "fuse" | "cut" }[] = [];
