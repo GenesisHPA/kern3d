@@ -113,6 +113,40 @@ export class MillSimulation {
         return this.tipCache ?? this.pos;
     }
 
+    /** The move being made now (its type tells rapid / feed / plunge), or undefined at the end. */
+    get current(): MillMove | undefined {
+        return this.moves[this.moveIndex]?.move;
+    }
+
+    /** Fresh stock, the tool back at the start. */
+    reset() {
+        this.z.fill(this.stock.top);
+        this.moveIndex = 0;
+        this.along = 0;
+        this.tipCache = undefined;
+        const first = this.moves[0]?.move;
+        this.pos = first
+            ? { x: first.x, y: first.y, z: Math.max(first.z, this.stock.top + 5) }
+            : { x: 0, y: 0, z: 5 };
+        this.dirty = { minC: 0, minR: 0, maxC: this.cols - 1, maxR: this.rows - 1 };
+    }
+
+    /** Jump to the start of move `index` (forward cuts on, backward starts over). */
+    seek(index: number) {
+        const target = Math.max(0, Math.min(this.moves.length, Math.round(index)));
+        if (target < this.moveIndex || (target === this.moveIndex && this.along > 0)) this.reset();
+        while (this.moveIndex < target) this.advance(this.remainingInMove());
+        this.advance(0);
+    }
+
+    private remainingInMove(): number {
+        const { move } = this.moves[this.moveIndex];
+        return Math.max(
+            1e-12,
+            Math.hypot(move.x - this.pos.x, move.y - this.pos.y, move.z - this.pos.z) - this.along,
+        );
+    }
+
     /** Everything at once (the end result). */
     finish() {
         while (!this.done) this.advance(1e9);

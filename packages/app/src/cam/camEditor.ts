@@ -9,6 +9,7 @@ import { MachineControl } from "./camControl";
 import { type MillJob, type MillNode, parseMillJob } from "./camData";
 import style from "./camEditor.module.css";
 import { millProgram, POST_KINDS } from "./camGcode";
+import { toolIconSvg, toolSvg } from "./camToolShape";
 import { type CamTool, loadTools, newToolId, storeTools, TOOL_KINDS } from "./camTools";
 import { CamView } from "./camView";
 import type { Pt } from "./offset";
@@ -42,6 +43,13 @@ function circleCentres(rings: Pt[][]): Pt[] {
  * spindle's inverter on the left; the stock in 3D with the paths and the cut animated on the
  * right; G-code out. It covers the model as the laser editor does.
  */
+/** A tool's picture (our own generated SVG, no user text in it) as an element. */
+function toolPicture(svg: string, className: string): HTMLSpanElement {
+    const span = el("span", { className });
+    span.innerHTML = svg;
+    return span;
+}
+
 /** A glyph per operation kind for its card. */
 const KIND_ICON: Record<OperationKind, string> = {
     profile: "◻",
@@ -439,7 +447,12 @@ export class MillEditor {
                     className: style.name,
                     textContent: `${i + 1}. ${op.name || t(`mill.op.${op.kind}`)} ${op.hidden ? "(откл.)" : ""}`,
                 }),
-                el("span", { className: style.tool, textContent: tool ? `T${tool.number}` : "?" }),
+                el(
+                    "span",
+                    { className: style.tool },
+                    ...(tool ? [toolPicture(toolIconSvg(tool, 16), style.toolIcon)] : []),
+                    tool ? `T${tool.number}` : "?",
+                ),
                 button("mill.up", () => this.moveOp(i, -1)),
                 button("mill.down", () => this.moveOp(i, 1)),
             );
@@ -735,7 +748,15 @@ export class MillEditor {
                     numberField(get(tool), (v) => edit((x) => set(x, v)), { min: 0 }),
                 );
             out.push(
-                el("h3", { textContent: `T${tool.number} ${tool.name}` }),
+                el(
+                    "h3",
+                    { className: style.toolHead },
+                    toolPicture(toolIconSvg(tool, 20), style.toolIcon),
+                    `T${tool.number} ${tool.name}`,
+                ),
+                Object.assign(toolPicture(toolSvg(tool, { width: 180, height: 170 }), style.toolProfile), {
+                    title: t("mill.tool.profile"),
+                }),
                 row(
                     "mill.name",
                     Object.assign(el("input", { type: "text", value: tool.name }), {
