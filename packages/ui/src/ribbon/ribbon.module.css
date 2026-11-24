@@ -256,13 +256,16 @@
     margin: 0 4px;
 }
 .fileMenuButton {
-    padding: 3px 10px;
-    border-radius: 4px;
+    padding: 4px 14px;
+    border-radius: 5px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 700;
     white-space: nowrap;
+    color: #fff;
+    background-color: var(--accent-color);
     &:hover {
-        background-color: var(--hover-background-color);
+        filter: brightness(1.12);
     }
 }
 .fileMenuList {
