@@ -39,8 +39,31 @@
     width: 0%;
     height: 100%;
     border-radius: 4px;
-    background-color: var(--primary-color, #ff6a13);
+    position: relative;
+    overflow: hidden;
+    background: var(--accent-gradient, var(--primary-color, #ff6a13));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent-color, #ff7a1a) 55%, transparent);
     transition: width 0.2s ease-out;
+
+    /* a moving highlight so a slow stage still looks alive */
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+        background-size: 50% 100%;
+        background-repeat: no-repeat;
+        animation: progressSweep 1.4s linear infinite;
+    }
+}
+
+@keyframes progressSweep {
+    from {
+        background-position: -100% 0;
+    }
+    to {
+        background-position: 250% 0;
+    }
 }
 
 .row {

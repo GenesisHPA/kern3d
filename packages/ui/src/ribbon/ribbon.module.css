@@ -214,8 +214,39 @@
             left: 8px;
             right: 8px;
             height: 3px;
-            background-color: var(--primary-color);
+            border-radius: 3px 3px 0 0;
+            background: var(--accent-gradient);
+            animation: ribbonUnderline var(--dur) var(--ease-out) backwards;
         }
+    }
+}
+
+@keyframes ribbonUnderline {
+    from {
+        transform: scaleX(0);
+    }
+}
+
+@keyframes menuDrop {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+}
+
+@keyframes menuItemIn {
+    from {
+        opacity: 0;
+        transform: translateX(-8px);
+    }
+}
+
+@keyframes shine {
+    from {
+        transform: translateX(-120%) skewX(-20deg);
+    }
+    to {
+        transform: translateX(260%) skewX(-20deg);
     }
 }
 
@@ -256,46 +287,114 @@
     margin: 0 4px;
 }
 .fileMenuButton {
-    padding: 4px 14px;
-    border-radius: 5px;
+    position: relative;
+    overflow: hidden;
+    padding: 3px 14px;
+    border-radius: 7px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
+    letter-spacing: 0.02em;
     white-space: nowrap;
-    color: #fff;
-    background-color: var(--accent-color);
+    background: var(--accent-gradient);
+    box-shadow: var(--accent-glow);
+    transition:
+        box-shadow var(--dur) var(--ease-out),
+        transform var(--dur) var(--ease-spring);
+
+    & span {
+        color: var(--accent-text-color);
+    }
+
+    /* a light sweep across the button on hover */
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+        transform: translateX(-120%) skewX(-20deg);
+        pointer-events: none;
+    }
+
     &:hover {
-        filter: brightness(1.12);
+        transform: translateY(-1px);
+        box-shadow:
+            var(--accent-glow),
+            0 0 0 3px color-mix(in srgb, var(--accent-color) 22%, transparent);
+    }
+
+    &:hover::after {
+        animation: shine 0.8s var(--ease-out);
+    }
+
+    &:active {
+        transform: scale(0.96);
     }
 }
 .fileMenuList {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 6px);
     left: 0;
     z-index: 2000;
-    min-width: 280px;
-    padding: 4px;
-    border-radius: 6px;
-    background-color: var(--background-color);
-    border: 1px solid var(--border-color);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    min-width: 300px;
+    padding: 6px;
+    border-radius: 12px;
+    background-color: var(--surface-glass);
+    backdrop-filter: blur(18px) saturate(1.5);
+    border: 1px solid var(--chrome-border-color);
+    box-shadow: var(--panel-shadow);
+    transform-origin: top left;
+    animation: menuDrop var(--dur) var(--ease-out) backwards;
+
+    & > * {
+        animation: menuItemIn var(--dur) var(--ease-out) backwards;
+    }
+
+    & > :nth-child(2) {
+        animation-delay: 20ms;
+    }
+    & > :nth-child(3) {
+        animation-delay: 40ms;
+    }
+    & > :nth-child(4) {
+        animation-delay: 60ms;
+    }
+    & > :nth-child(5) {
+        animation-delay: 80ms;
+    }
+    & > :nth-child(6) {
+        animation-delay: 100ms;
+    }
+    & > :nth-child(n + 7) {
+        animation-delay: 120ms;
+    }
 }
 .fileMenuItem {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    border-radius: 4px;
+    gap: 12px;
+    padding: 7px 10px;
+    border-radius: 8px;
     cursor: pointer;
+    transition:
+        background-color var(--dur-fast) var(--ease-out),
+        transform var(--dur) var(--ease-out);
     &:hover {
-        background-color: var(--hover-background-color);
+        background-color: var(--accent-soft-color);
+        transform: translateX(3px);
+    }
+    &:hover .fileMenuIcon {
+        transform: scale(1.15) rotate(-6deg);
     }
 }
 .fileMenuIcon {
     width: 18px;
     height: 18px;
     flex: none;
+    transition: transform var(--dur) var(--ease-spring);
 }
+
 .fileMenuText {
     display: flex;
     flex-direction: column;

@@ -677,3 +677,134 @@
     opacity: 1;
     border-color: var(--primary-color, #ff6a13);
 }
+
+/* --- orange look for the laser start page: cards arrive in turn, lift and glow under the pointer --- */
+
+@keyframes laserHomeIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.985);
+    }
+}
+
+@keyframes laserShine {
+    from {
+        transform: translateX(-130%) skewX(-20deg);
+    }
+    to {
+        transform: translateX(360%) skewX(-20deg);
+    }
+}
+
+.homeTop {
+    animation: laserHomeIn var(--dur-slow, 0.48s) var(--ease-out, ease-out) backwards;
+}
+
+.homeHeading {
+    letter-spacing: -0.01em;
+}
+
+.homeCard {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    transition:
+        transform var(--dur, 0.24s) var(--ease-spring, ease-out),
+        box-shadow var(--dur, 0.24s) var(--ease-out, ease-out),
+        border-color var(--dur, 0.24s) var(--ease-out, ease-out);
+    animation: laserHomeIn var(--dur-slow, 0.48s) var(--ease-out, ease-out) 80ms backwards;
+
+    & + .homeCard {
+        animation-delay: 170ms;
+    }
+
+    /* an orange glow in the card's corner that wakes up on hover */
+    &::before {
+        content: "";
+        position: absolute;
+        inset: -40% -40% auto auto;
+        width: 70%;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: radial-gradient(
+            circle,
+            color-mix(in srgb, var(--accent-color, #ff7a1a) 22%, transparent),
+            transparent 65%
+        );
+        opacity: 0.35;
+        transition:
+            opacity var(--dur-slow, 0.48s) var(--ease-out, ease-out),
+            transform var(--dur-slow, 0.48s) var(--ease-out, ease-out);
+        pointer-events: none;
+    }
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow:
+            var(--panel-shadow),
+            0 0 0 3px color-mix(in srgb, var(--accent-color, #ff7a1a) 14%, transparent);
+    }
+
+    &:hover::before {
+        opacity: 1;
+        transform: scale(1.15);
+    }
+
+    &:hover .homeIcon {
+        transform: scale(1.15) rotate(-8deg);
+    }
+}
+
+.homeIcon {
+    transition: transform var(--dur, 0.24s) var(--ease-spring, ease-out);
+}
+
+.homePoints li::marker {
+    color: var(--accent-color, #ff7a1a);
+}
+
+.homePrimary {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--accent-gradient, var(--primary-color, #ff6a13));
+    box-shadow: var(--accent-glow, none);
+    transition:
+        transform var(--dur, 0.24s) var(--ease-spring, ease-out),
+        box-shadow var(--dur, 0.24s) var(--ease-out, ease-out);
+
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 25%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+        transform: translateX(-130%) skewX(-20deg);
+        pointer-events: none;
+    }
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow:
+            var(--accent-glow, none),
+            0 14px 30px -12px color-mix(in srgb, var(--accent-color, #ff7a1a) 75%, transparent);
+    }
+
+    &:hover::after {
+        animation: laserShine 0.9s var(--ease-out, ease-out);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+}
+
+.homeJob {
+    transition:
+        background-color var(--dur-fast, 0.14s) var(--ease-out, ease-out),
+        transform var(--dur, 0.24s) var(--ease-out, ease-out);
+
+    &:hover {
+        transform: translateX(3px);
+    }
+}

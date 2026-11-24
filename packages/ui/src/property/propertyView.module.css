@@ -13,6 +13,17 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--foreground-secondary-color);
+
+    /* a short orange mark before the panel's name */
+    &::before {
+        content: "";
+        width: 3px;
+        height: 12px;
+        margin-right: 8px;
+        border-radius: 2px;
+        background: var(--accent-gradient);
+        flex: none;
+    }
     border-top: 1px solid var(--chrome-border-color);
     border-bottom: 1px solid var(--chrome-border-color);
 }

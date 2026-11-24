@@ -9,6 +9,30 @@ select {
     color: var(--input-text-color);
     background-color: var(--input-background-color);
     border: 1px solid var(--input-border-color);
+    transition:
+        border-color var(--dur-fast) var(--ease-out),
+        box-shadow var(--dur-fast) var(--ease-out),
+        background-color var(--dur-fast) var(--ease-out);
+}
+
+input:hover,
+textarea:hover,
+select:hover {
+    border-color: var(--border-hover-color);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: var(--accent-ring);
+}
+
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+    accent-color: var(--accent-color);
 }
 
 button,
@@ -16,6 +40,48 @@ button,
     color: var(--foreground-color);
     background-color: var(--control-background-color);
     border: 1px solid var(--border-color);
+    transition:
+        background-color var(--dur-fast) var(--ease-out),
+        border-color var(--dur-fast) var(--ease-out),
+        box-shadow var(--dur) var(--ease-out),
+        color var(--dur-fast) var(--ease-out),
+        transform var(--dur-fast) var(--ease-out);
+}
+
+button:hover,
+.button:hover {
+    border-color: var(--border-hover-color);
+}
+
+button:active:not(:disabled),
+.button:active {
+    transform: scale(0.97);
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+::selection {
+    background-color: color-mix(in srgb, var(--accent-color) 35%, transparent);
+}
+
+svg {
+    transition:
+        color var(--dur-fast) var(--ease-out),
+        transform var(--dur) var(--ease-spring);
+}
+
+/* anyone who asked the system for less motion gets the colours without the movement */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 a {
@@ -54,114 +120,139 @@ chili3d-main-window {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--control-background-colo);
+    background: transparent;
     border-radius: 2em;
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: var(--foreground-muted-color);
+    background-color: color-mix(in srgb, var(--foreground-muted-color) 55%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
     border-radius: 2em;
-    transition: background-color 0.3s;
     cursor: pointer;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(144, 147, 153, 0.3);
+    background-color: var(--accent-color);
 }
 
 :root[theme="light"] {
-    --checked-color: rgba(25, 25, 25, 0.2);
+    --checked-color: rgba(242, 107, 15, 0.18);
     --control-background-color: #ffffff;
-    --primary-color: #0e62d7;
-    --secondary-color: #6a9ee6;
-    --foreground-color: #333;
-    --foreground-secondary-color: #666;
-    --foreground-muted-color: #999;
-    --border-color: #dddddd;
-    --border-hover-color: #bbbbbb;
-    --background-color: #e7e9ec;
-    --panel-background-color: #fbfbfc;
-    --panel-hover-background-color: #f5f5f5;
-    --hover-background-color: rgba(25, 25, 25, 0.15);
-    --active-background-color: rgba(25, 25, 25, 0.25);
+    --primary-color: #f26b0f;
+    --secondary-color: #ff9a52;
+    --foreground-color: #26211d;
+    --foreground-secondary-color: #5f5852;
+    --foreground-muted-color: #9a928b;
+    --border-color: #e3ded8;
+    --border-hover-color: #cbc3ba;
+    --background-color: #efece8;
+    --panel-background-color: #fdfcfa;
+    --panel-hover-background-color: #f6f2ee;
+    --hover-background-color: rgba(242, 107, 15, 0.09);
+    --active-background-color: rgba(242, 107, 15, 0.16);
     --titlebar-forground-color: #333;
-    --titlebar-background-color: #eeeeee;
-    --title-background: rgba(25, 25, 25, 0.08);
+    --titlebar-background-color: #ebe7e2;
+    --title-background: rgba(60, 40, 20, 0.06);
     --title-checked: #ffffff;
     --statusbar-foreground-color: #333;
-    --statusbar-background-color: #eeeeee;
+    --statusbar-background-color: #ebe7e2;
     --bridge-connected-color: #187a2e;
     --bridge-retrying-color: #8a5700;
     --bridge-muted-color: #59636e;
-    --viewport-background-color: #d5d9de;
+    --viewport-background-color: #dcd8d3;
     --input-background-color: #ffffff;
-    --input-border-color: #dddddd;
+    --input-border-color: #e0dad3;
     --input-text-color: #333;
-    --button-primary-background: #0e62d7;
-    --button-primary-hover: #0d5bc7;
+    --button-primary-background: #f26b0f;
+    --button-primary-hover: #e05e05;
     --button-secondary-background: #ffffff;
-    --button-secondary-hover: #f5f5f5;
-    --backdrop-color: rgba(0, 0, 0, 0.45);
+    --button-secondary-hover: #f8f3ee;
+    --backdrop-color: rgba(30, 20, 10, 0.38);
     --loading-border-color: rgba(0, 0, 0, 0.2);
-    --panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --panel-shadow: 0 12px 32px -12px rgba(60, 30, 5, 0.28), 0 2px 6px rgba(60, 30, 5, 0.08);
     --resizer-gradient: linear-gradient(to right, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.12));
     --resizer-gradient-hover: linear-gradient(to right, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.18));
     --error-color: #d92d20;
     --warning-color: #c98a00;
     /* chrome of the toolbar, browser, timeline and canvas overlays */
-    --appbar-background-color: #dcdfe3;
-    --toolbar-background-color: #f4f5f7;
-    --chrome-border-color: #c9cdd3;
-    --accent-color: #0b6bd6;
-    --accent-soft-color: rgba(11, 107, 214, 0.14);
-    --contextual-color: #c26a00;
+    --appbar-background-color: #e6e1db;
+    --toolbar-background-color: #f8f6f3;
+    --chrome-border-color: #d9d2ca;
+    --accent-color: #f26b0f;
+    --accent-soft-color: rgba(242, 107, 15, 0.13);
+    --contextual-color: #7a5af8;
     --prominent-color: #178a52;
+    /* orange look: gradients, glow and motion shared by every part of the chrome */
+    --accent-gradient: linear-gradient(135deg, #ffa24a 0%, #ff7a1a 45%, #f0520a 100%);
+    --accent-gradient-hover: linear-gradient(135deg, #ffb066 0%, #ff8a33 45%, #ff5f14 100%);
+    --accent-text-color: #ffffff;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --dur-fast: 140ms;
+    --dur: 240ms;
+    --dur-slow: 480ms;
+    --accent-glow: 0 6px 18px -6px rgba(242, 107, 15, 0.55);
+    --accent-ring: 0 0 0 3px rgba(242, 107, 15, 0.22);
+    --surface-glass: rgba(253, 252, 250, 0.78);
 }
 
 :root[theme="dark"] {
-    --checked-color: rgba(255, 255, 255, 0.2);
-    --control-background-color: #2a2a2a;
-    --primary-color: #4a9eff;
-    --secondary-color: #6a9ee6;
-    --foreground-color: #e8e9eb;
-    --foreground-secondary-color: #aeb1b6;
-    --foreground-muted-color: #808080;
-    --border-color: #4a4d52;
-    --border-hover-color: #5a5d62;
-    --background-color: #1f2023;
-    --panel-background-color: #26282c;
-    --panel-hover-background-color: #323232;
-    --hover-background-color: rgba(255, 255, 255, 0.2);
-    --active-background-color: rgba(255, 255, 255, 0.15);
+    --checked-color: rgba(255, 122, 26, 0.25);
+    --control-background-color: #202126;
+    --primary-color: #ff8a33;
+    --secondary-color: #ffb37a;
+    --foreground-color: #f1eeea;
+    --foreground-secondary-color: #b4ada6;
+    --foreground-muted-color: #7d7770;
+    --border-color: #33343a;
+    --border-hover-color: #4a4b52;
+    --background-color: #131417;
+    --panel-background-color: #1a1b1f;
+    --panel-hover-background-color: #24252a;
+    --hover-background-color: rgba(255, 138, 51, 0.12);
+    --active-background-color: rgba(255, 138, 51, 0.2);
     --titlebar-forground-color: #ffffff;
-    --titlebar-background-color: #1a1a1a;
+    --titlebar-background-color: #0f1013;
     --title-background: rgba(255, 255, 255, 0.08);
     --title-checked: rgba(255, 255, 255, 0.3);
     --statusbar-foreground-color: #ffffff;
-    --statusbar-background-color: #1a1a1a;
+    --statusbar-background-color: #0f1013;
     --bridge-connected-color: #3fb950;
     --bridge-retrying-color: #d29922;
     --bridge-muted-color: #8b949e;
-    --viewport-background-color: #3b3e44;
-    --input-background-color: #1e1e1e;
-    --input-border-color: #404040;
+    --viewport-background-color: #26272c;
+    --input-background-color: #141519;
+    --input-border-color: #34353b;
     --input-text-color: #ffffff;
-    --button-primary-background: #4a9eff;
-    --button-primary-hover: #3a8eef;
-    --button-secondary-background: #2a2a2a;
-    --button-secondary-hover: #323232;
-    --backdrop-color: rgba(0, 0, 0, 0.45);
+    --button-primary-background: #ff7a1a;
+    --button-primary-hover: #ff8c38;
+    --button-secondary-background: #202126;
+    --button-secondary-hover: #2a2b31;
+    --backdrop-color: rgba(0, 0, 0, 0.55);
     --loading-border-color: rgba(255, 255, 255, 0.2);
-    --panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --panel-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
     --resizer-gradient: linear-gradient(to right, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.12));
     --resizer-gradient-hover: linear-gradient(to right, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.18));
     --error-color: #ff6b6b;
     --warning-color: #ffd93d;
-    --appbar-background-color: #1b1c1f;
-    --toolbar-background-color: #2c2e33;
-    --chrome-border-color: #3d4046;
-    --accent-color: #4c9bff;
-    --accent-soft-color: rgba(76, 155, 255, 0.2);
-    --contextual-color: #f0a640;
+    --appbar-background-color: #0f1013;
+    --toolbar-background-color: #1b1c21;
+    --chrome-border-color: #2b2c32;
+    --accent-color: #ff7a1a;
+    --accent-soft-color: rgba(255, 122, 26, 0.18);
+    --contextual-color: #a48bff;
     --prominent-color: #3cc47c;
+    /* orange look: gradients, glow and motion shared by every part of the chrome */
+    --accent-gradient: linear-gradient(135deg, #ffa24a 0%, #ff7a1a 45%, #f0520a 100%);
+    --accent-gradient-hover: linear-gradient(135deg, #ffb066 0%, #ff8a33 45%, #ff5f14 100%);
+    --accent-text-color: #ffffff;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --dur-fast: 140ms;
+    --dur: 240ms;
+    --dur-slow: 480ms;
+    --accent-glow: 0 8px 24px -6px rgba(255, 122, 26, 0.6);
+    --accent-ring: 0 0 0 3px rgba(255, 122, 26, 0.28);
+    --surface-glass: rgba(26, 27, 31, 0.72);
 }

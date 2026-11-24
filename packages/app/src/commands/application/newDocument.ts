@@ -7,7 +7,7 @@ let count = 1;
 
 @command({
     key: "doc.new",
-    icon: "icon-new",
+    icon: "icon-plus",
     isApplicationCommand: true,
 })
 export class NewDocument implements ICommand {

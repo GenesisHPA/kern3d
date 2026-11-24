@@ -1,0 +1,110 @@
+{
+    "//": "A look at the app's chrome for design work, nothing asserted beyond the screens existing: the home screen, a model in the design workspace, the File menu open, the laser start page and the milling editor, then the same in the dark theme. Run with SCENARIO_WINDOW=1600,900.",
+    "steps": [
+        {
+            "kind": "wait",
+            "ms": 1200
+        },
+        {
+            "kind": "screenshot",
+            "name": "01-home"
+        },
+        {
+            "kind": "runCommand",
+            "name": "doc.new"
+        },
+        {
+            "kind": "waitFor",
+            "selector": "canvas"
+        },
+        {
+            "kind": "wait",
+            "ms": 600
+        },
+        {
+            "kind": "screenshot",
+            "name": "02-design"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const b = [...document.querySelectorAll('div')].find((x) => /^(Файл|File) ▾$/.test(x.textContent.trim())); if (!b) throw new Error('no File menu button'); b.click(); return b.textContent; })()",
+            "log": true
+        },
+        {
+            "kind": "wait",
+            "ms": 500
+        },
+        {
+            "kind": "screenshot",
+            "name": "03-file-menu"
+        },
+        {
+            "kind": "key",
+            "text": "Escape"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.body.click(); return true; })()"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 800
+        },
+        {
+            "kind": "screenshot",
+            "name": "04-laser"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.mill'); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 1200
+        },
+        {
+            "kind": "screenshot",
+            "name": "05-mill"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.documentElement.setAttribute('theme', 'dark'); document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.design'); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 800
+        },
+        {
+            "kind": "screenshot",
+            "name": "06-dark-design"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { const b = [...document.querySelectorAll('div')].find((x) => /^(Файл|File) ▾$/.test(x.textContent.trim())); b.click(); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 500
+        },
+        {
+            "kind": "screenshot",
+            "name": "07-dark-file-menu"
+        },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); const logo = [...document.querySelectorAll('div')].find((x) => x.textContent.trim() === 'Kern3D' && x.children.length >= 1 && x.querySelector('svg')); if (!logo) throw new Error('no app icon'); logo.click(); return true; })()"
+        },
+        {
+            "kind": "wait",
+            "ms": 1400
+        },
+        {
+            "kind": "screenshot",
+            "name": "08-dark-home"
+        }
+    ]
+}

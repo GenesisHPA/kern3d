@@ -721,3 +721,339 @@
         }
     }
 }
+
+/* --- orange look: a warm glow behind the page, the main action in orange, things arriving in turn --- */
+
+@keyframes homeFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+}
+
+@keyframes homeAurora {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    }
+    50% {
+        transform: translate3d(-4%, 3%, 0) scale(1.08) rotate(6deg);
+    }
+    100% {
+        transform: translate3d(3%, -2%, 0) scale(1.02) rotate(-4deg);
+    }
+}
+
+@keyframes homeShine {
+    from {
+        transform: translateX(-130%) skewX(-20deg);
+    }
+    to {
+        transform: translateX(330%) skewX(-20deg);
+    }
+}
+
+@keyframes homeFloat {
+    50% {
+        transform: translateY(-3px) rotate(-4deg);
+    }
+}
+
+@keyframes homeTitle {
+    to {
+        background-position: 200% 0;
+    }
+}
+
+.root {
+    overflow: hidden;
+}
+
+.right {
+    position: relative;
+    isolation: isolate;
+
+    /* slow drifting orange light behind the content */
+    &::before {
+        content: "";
+        position: absolute;
+        inset: -25%;
+        z-index: -1;
+        pointer-events: none;
+        background:
+            radial-gradient(38% 32% at 78% 18%, color-mix(in srgb, #ff7a1a 26%, transparent), transparent 70%),
+            radial-gradient(30% 28% at 18% 86%, color-mix(in srgb, #ffb347 20%, transparent), transparent 70%),
+            radial-gradient(26% 24% at 52% 52%, color-mix(in srgb, #ff4d00 10%, transparent), transparent 70%);
+        filter: blur(20px);
+        animation: homeAurora 18s ease-in-out infinite alternate;
+    }
+
+    /* a fine dot grid, like a drawing sheet, fading out towards the bottom */
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background-image: radial-gradient(
+            color-mix(in srgb, var(--foreground-muted-color) 35%, transparent) 1px,
+            transparent 1.2px
+        );
+        background-size: 22px 22px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 70%);
+    }
+
+    & .header {
+        animation: homeFadeUp var(--dur-slow) var(--ease-out) backwards;
+
+        & .welcome {
+            font-size: 34px;
+            font-weight: 750;
+            letter-spacing: -0.02em;
+            background: linear-gradient(
+                100deg,
+                var(--foreground-color) 0%,
+                var(--foreground-color) 40%,
+                var(--accent-color) 50%,
+                #ffb347 55%,
+                var(--foreground-color) 65%,
+                var(--foreground-color) 100%
+            );
+            background-size: 200% 100%;
+            background-position: 100% 0;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: homeTitle 2.4s var(--ease-out) 0.3s backwards;
+        }
+    }
+
+    & .sectionTitle,
+    & .sectionVideo {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        color: var(--accent-color);
+    }
+
+    & .contentRow {
+        & .recentColumn {
+            animation: homeFadeUp var(--dur-slow) var(--ease-out) 90ms backwards;
+
+            & .empty {
+                border: 1.5px dashed color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
+                background-color: color-mix(in srgb, var(--accent-color) 4%, transparent);
+                border-radius: 16px;
+                transition:
+                    border-color var(--dur) var(--ease-out),
+                    background-color var(--dur) var(--ease-out);
+
+                &:hover {
+                    border-color: var(--accent-color);
+                    background-color: color-mix(in srgb, var(--accent-color) 8%, transparent);
+                }
+            }
+
+            & .documents .document {
+                border-radius: 14px;
+                transition:
+                    transform var(--dur) var(--ease-spring),
+                    box-shadow var(--dur) var(--ease-out),
+                    border-color var(--dur) var(--ease-out);
+                animation: homeFadeUp var(--dur-slow) var(--ease-out) backwards;
+
+                &:nth-child(2) {
+                    animation-delay: 60ms;
+                }
+                &:nth-child(3) {
+                    animation-delay: 120ms;
+                }
+                &:nth-child(4) {
+                    animation-delay: 180ms;
+                }
+                &:nth-child(n + 5) {
+                    animation-delay: 240ms;
+                }
+
+                & .img {
+                    transition: transform var(--dur-slow) var(--ease-out);
+                }
+
+                &:hover {
+                    transform: translateY(-4px);
+                    border-color: color-mix(in srgb, var(--accent-color) 60%, transparent);
+                    box-shadow:
+                        var(--panel-shadow),
+                        0 0 0 3px color-mix(in srgb, var(--accent-color) 16%, transparent);
+                }
+
+                &:hover .img {
+                    transform: scale(1.04);
+                }
+
+                & .delete:hover {
+                    color: var(--error-color);
+                    border-color: var(--error-color);
+                }
+            }
+        }
+
+        & .videoColumn {
+            animation: homeFadeUp var(--dur-slow) var(--ease-out) 180ms backwards;
+
+            & .release {
+                & .releaseItem::before {
+                    background: var(--accent-gradient);
+                    opacity: 1;
+                }
+
+                &.current .releaseVersion {
+                    background: var(--accent-gradient);
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    color: transparent;
+                }
+            }
+        }
+    }
+
+    & .community {
+        animation: homeFadeUp var(--dur-slow) var(--ease-out) 260ms backwards;
+
+        & a {
+            color: var(--accent-color);
+            background-image: linear-gradient(currentColor, currentColor);
+            background-size: 0% 1.5px;
+            background-position: 0 100%;
+            background-repeat: no-repeat;
+            transition: background-size var(--dur) var(--ease-out);
+        }
+
+        & a:hover {
+            text-decoration: none;
+            background-size: 100% 1.5px;
+        }
+    }
+}
+
+.left {
+    background:
+        radial-gradient(
+            120% 60% at 0% 0%,
+            color-mix(in srgb, var(--accent-color) 10%, transparent),
+            transparent 60%
+        ),
+        var(--background-color);
+
+    & .top {
+        & .logo {
+            animation: homeFadeUp var(--dur-slow) var(--ease-out) backwards;
+
+            & svg {
+                color: var(--accent-color);
+                filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--accent-color) 40%, transparent));
+                animation: homeFloat 5s ease-in-out infinite;
+            }
+
+            & .logoText .version {
+                color: var(--accent-color);
+                background-color: var(--accent-soft-color);
+                border: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+            }
+        }
+
+        & .button {
+            border-radius: 12px;
+            transition:
+                background-color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur) var(--ease-out),
+                transform var(--dur) var(--ease-spring);
+            animation: homeFadeUp var(--dur-slow) var(--ease-out) backwards;
+
+            & svg {
+                transition: transform var(--dur) var(--ease-spring);
+            }
+
+            &:hover {
+                border-color: color-mix(in srgb, var(--accent-color) 55%, transparent);
+                background-color: var(--panel-background-color);
+                box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--accent-color) 70%, transparent);
+                transform: translateY(-2px);
+            }
+
+            &:hover svg {
+                color: var(--accent-color);
+                transform: scale(1.15) rotate(-8deg);
+            }
+
+            &:active {
+                transform: scale(0.98);
+            }
+        }
+
+        & .buttons > .button:nth-child(2) {
+            animation-delay: 70ms;
+        }
+
+        & .buttons > .button:nth-child(n + 3) {
+            animation-delay: 140ms;
+        }
+
+        /* the first action — a new document — is the one in orange */
+        & .buttons > .button:first-child {
+            position: relative;
+            overflow: hidden;
+            border-color: transparent;
+            background: var(--accent-gradient);
+            box-shadow: var(--accent-glow);
+
+            & span,
+            & div,
+            & svg {
+                color: var(--accent-text-color);
+            }
+
+            &::after {
+                content: "";
+                position: absolute;
+                inset: 0 auto 0 0;
+                width: 35%;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+                transform: translateX(-130%) skewX(-20deg);
+                pointer-events: none;
+            }
+
+            &:hover {
+                background: var(--accent-gradient-hover);
+                box-shadow:
+                    var(--accent-glow),
+                    0 14px 30px -12px color-mix(in srgb, var(--accent-color) 80%, transparent);
+            }
+
+            &:hover::after {
+                animation: homeShine 0.9s var(--ease-out);
+            }
+
+            &:hover svg {
+                color: var(--accent-text-color);
+                transform: rotate(90deg) scale(1.1);
+            }
+        }
+    }
+
+    & .settingsPanel .settingItem,
+    & .socialPanel .socialItem {
+        transition:
+            border-color var(--dur-fast) var(--ease-out),
+            transform var(--dur) var(--ease-spring);
+    }
+
+    & .socialPanel .socialItem:hover {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+        transform: translateY(-2px);
+    }
+
+    & .settingsPanel .settingItem:hover {
+        border-color: var(--border-hover-color);
+    }
+}

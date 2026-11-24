@@ -1,13 +1,33 @@
 dialog {
-    border: none;
-    box-shadow: 0px 5px 10px var(--foreground-muted-color);
+    border: 1px solid var(--chrome-border-color);
+    border-radius: 14px;
+    box-shadow: var(--panel-shadow);
     padding: 0px;
     background-color: var(--panel-background-color);
     backdrop-filter: blur(5px);
 }
 
+dialog[open] {
+    animation: dialogIn var(--dur) var(--ease-out) backwards;
+}
+
 dialog::backdrop {
     background-color: var(--backdrop-color);
+    backdrop-filter: blur(4px);
+    animation: backdropIn var(--dur) var(--ease-out) backwards;
+}
+
+@keyframes dialogIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+    }
+}
+
+@keyframes backdropIn {
+    from {
+        opacity: 0;
+    }
 }
 
 .root {
@@ -40,7 +60,8 @@ dialog::backdrop {
     flex-shrink: 0;
     justify-content: flex-end;
     padding: 8px;
-    background-color: rgba(128, 128, 128, 0.25);
+    background-color: color-mix(in srgb, var(--background-color) 70%, transparent);
+    border-top: 1px solid var(--border-color);
 
     & button {
         width: fit-content;
@@ -48,16 +69,31 @@ dialog::backdrop {
         padding: 8px 16px;
         font-size: 1em;
         border: 1px solid var(--border-color);
-        border-radius: 6px;
+        border-radius: 8px;
         background-color: var(--panel-background-color);
         color: var(--foreground-color);
 
         &:hover {
             background-color: var(--hover-background-color);
+            border-color: var(--accent-color);
+            color: var(--accent-color);
         }
         &:active {
             background-color: var(--primary-color);
-            color: var(--title-checked);
+            color: var(--accent-text-color);
+        }
+    }
+
+    /* the first button is the dialog's answer (OK / Save) */
+    & button:first-child {
+        border-color: transparent;
+        background: var(--accent-gradient);
+        color: var(--accent-text-color);
+        box-shadow: var(--accent-glow);
+
+        &:hover {
+            background: var(--accent-gradient-hover);
+            color: var(--accent-text-color);
         }
     }
 }

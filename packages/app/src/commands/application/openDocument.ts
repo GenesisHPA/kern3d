@@ -14,7 +14,7 @@ import {
 
 @command({
     key: "doc.open",
-    icon: "icon-open",
+    icon: "icon-folder",
     isApplicationCommand: true,
 })
 export class OpenDocument implements ICommand {

@@ -9,6 +9,14 @@
     overflow: hidden;
     z-index: 1000;
     min-width: 0;
+    animation: floatIn var(--dur) var(--ease-out) backwards;
+}
+
+@keyframes floatIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
 }
 
 .header {
@@ -61,9 +69,15 @@
         height: 14px;
     }
 
+    transition:
+        background-color var(--dur-fast) var(--ease-out),
+        color var(--dur-fast) var(--ease-out),
+        transform var(--dur) var(--ease-spring);
+
     &:hover {
         background-color: var(--hover-background-color);
-        color: var(--foreground-color);
+        color: var(--accent-color);
+        transform: rotate(90deg);
     }
 }
 

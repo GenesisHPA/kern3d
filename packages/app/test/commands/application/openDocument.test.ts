@@ -11,7 +11,7 @@ describe("OpenDocument", () => {
         const data = (OpenDocument as any).prototype.data;
         expect(data).not.toBeNull();
         expect(data.key).toBe("doc.open");
-        expect(data.icon).toBe("icon-open");
+        expect(data.icon).toBe("icon-folder");
     });
 
     test("should have isApplicationCommand flag", () => {
