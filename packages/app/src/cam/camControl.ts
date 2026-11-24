@@ -7,6 +7,9 @@ import { el, t } from "../laser/laserUi";
 import { WebSerialConnection } from "../laser/webSerial";
 import style from "./camControl.module.css";
 import type { MillMachine } from "./camGcode";
+import { type ProgramSegment, splitAtToolChanges } from "./camProbe";
+import { ProbeWorkflow } from "./camProbePanel";
+import type { CamTool } from "./camTools";
 import {
     AXES,
     type Axis,
@@ -23,8 +26,10 @@ import type { VfdSpindle } from "./vfd";
 
 export interface ControlHost {
     machine(): MillMachine;
-    /** The program to run, lines without comments. */
+    /** The program to run, its lines (comments kept: they mark the tool changes). */
     programLines(): string[];
+    /** The job's tools. */
+    tools(): CamTool[];
     /** The inverter when it is on and connected. */
     vfd(): VfdSpindle | undefined;
 }
@@ -69,6 +74,14 @@ export class MachineControl {
     private settings = new Map<number, string>();
     private probe = { thickness: 20, travel: 30, feed: 100, retract: 5 };
     private tab: "program" | "mdi" | "probe" | "settings" = "program";
+    private segments: ProgramSegment[] = [];
+    private readonly bannerHost = el("div");
+    private readonly workflow = new ProbeWorkflow(
+        () => this.grbl,
+        () => this.host.tools(),
+        () => this.workflowChanged(),
+        (text) => this.addLog(text),
+    );
 
     // live parts, updated in place on every status report
     private readonly stateBadge = el("span");
@@ -123,8 +136,11 @@ export class MachineControl {
                     this.acked = e.acked;
                     this.showProgress();
                     void this.followSpindle();
-                } else if (e.type === "job") this.addLog(`— ${t(`laser.job.${e.state}`)}`);
-                else if (e.type === "alarm") this.addLog(`ALARM:${e.code}`);
+                } else if (e.type === "job") {
+                    this.addLog(`— ${t(`laser.job.${e.state}`)}`);
+                    if (e.state === "done") void this.nextSegment();
+                    else if (e.state === "stopped" || e.state === "error") this.segments = [];
+                } else if (e.type === "alarm") this.addLog(`ALARM:${e.code}`);
                 else if (e.type === "error") this.addLog(`error:${e.code} ← ${e.line}`);
             });
             this.grbl = controller;
@@ -260,14 +276,42 @@ export class MachineControl {
             g.resume();
             return;
         }
-        this.running = this.host.programLines();
+        this.segments = splitAtToolChanges(this.host.programLines());
+        this.workflow.current ??= this.host.tools()[0]?.number;
+        this.startSegment(this.segments.shift());
+    }
+
+    private startSegment(seg: ProgramSegment | undefined) {
+        if (!seg || !this.grbl) return;
+        this.running = seg.lines;
         this.acked = 0;
         this.spindleAt = 0;
-        g.startJob(this.running);
+        this.grbl.startJob(this.running);
         this.showProgress();
     }
 
+    /** A part of the program finished: change the tool, then run the next part. */
+    private async nextSegment() {
+        const seg = this.segments.shift();
+        if (!seg) return;
+        try {
+            if (seg.tool !== undefined) await this.workflow.toolChange(seg.tool);
+            this.startSegment(seg);
+        } catch (e) {
+            this.segments = [];
+            this.addLog(`[change] ${e instanceof Error ? e.message : String(e)}`);
+        }
+    }
+
+    private workflowChanged() {
+        const banner = this.workflow.changeBanner();
+        this.bannerHost.replaceChildren(...(banner ? [banner] : []));
+        if (this.tab === "probe") this.renderTab();
+    }
+
     private stopAll() {
+        this.segments = [];
+        this.workflow.waiting?.reject(new Error(t("cnc.change.cancelled")));
         this.grbl?.stop();
         void this.host.vfd()?.stop();
     }
@@ -400,7 +444,7 @@ export class MachineControl {
             this.tabsCard(),
         );
         grid.className = style.grid;
-        this.element.replaceChildren(header, grid);
+        this.element.replaceChildren(header, this.bannerHost, grid);
         this.showStatus();
         this.showProgress();
         if (!g) {
@@ -653,7 +697,8 @@ export class MachineControl {
             this.tabBody.replaceChildren(this.lines);
             this.showLines();
         } else if (this.tab === "mdi") this.tabBody.replaceChildren(...this.mdi());
-        else if (this.tab === "probe") this.tabBody.replaceChildren(...this.probeTab());
+        else if (this.tab === "probe")
+            this.tabBody.replaceChildren(...this.workflow.tab(this.status.mpos, this.probeTab()));
         else this.tabBody.replaceChildren(...this.settingsTab());
     }
 

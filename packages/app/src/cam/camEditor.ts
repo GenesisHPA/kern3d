@@ -60,7 +60,8 @@ export class MillEditor {
             this.program()
                 .gcode.split("\n")
                 .map((l) => l.trim())
-                .filter((l) => l !== "" && !l.startsWith("(")),
+                .filter((l) => l !== ""),
+        tools: () => this.data.tools,
         vfd: () => (this.data.vfd.enabled ? this.vfd : undefined),
     });
     private stage!: HTMLElement;

@@ -428,3 +428,69 @@
     border-radius: 10px;
     pointer-events: none;
 }
+
+/* --- probing, tool changes --- */
+
+.banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 10px 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #5c3b00;
+    border: 2px solid #fab005;
+    color: #fff3bf;
+
+    & b {
+        font-size: 16px;
+    }
+}
+
+.result {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #0d1014;
+    border-left: 3px solid #4dabf7;
+    font-family: Consolas, monospace;
+}
+
+.tabBody h5 {
+    margin: 10px 0 0;
+    color: #4dabf7;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.toolTable {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    & > div {
+        display: grid;
+        grid-template-columns: 40px 1fr 80px auto;
+        gap: 8px;
+        align-items: center;
+        padding: 3px 6px;
+        border-radius: 4px;
+        background: #171b20;
+    }
+
+    & span:nth-child(3) {
+        font-family: Consolas, monospace;
+        color: #ffd43b;
+        text-align: right;
+    }
+}
+
+.corners {
+    display: grid;
+    grid-template-columns: repeat(3, 34px);
+    grid-auto-rows: 34px;
+    gap: 4px;
+    align-items: center;
+    justify-items: center;
+}
