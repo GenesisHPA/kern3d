@@ -117,4 +117,50 @@ describe("cam toolpaths", () => {
         expect(cutWidthAt(v, 1)).toBeCloseTo(2, 6);
         expect(cutWidthAt(v, 10)).toBe(6);
     });
+
+    test("facing covers the box past its edges, at every level", () => {
+        const m = cutting(operationMoves(op({ kind: "facing", depth: 1 }), tool, h));
+        expect(Math.min(...xs(m))).toBeLessThan(-1);
+        expect(Math.max(...xs(m))).toBeGreaterThan(11);
+        expect(Math.min(...m.map((p) => p.z))).toBeCloseTo(-1, 6);
+    });
+
+    test("helix bore: the centre on a circle of (hole - tool)/2, a flat turn at the bottom", () => {
+        const m = cutting(
+            operationMoves(
+                op({ kind: "helix", depth: 2, holeDiameter: 6, points: [{ x: 0, y: 0 }] }),
+                tool,
+                h,
+            ),
+        );
+        const ring = m.filter((p) => Math.hypot(p.x, p.y) > 1e-6);
+        for (const p of ring) expect(Math.hypot(p.x, p.y)).toBeCloseTo(2, 3);
+        expect(m.filter((p) => Math.abs(p.z + 2) < 1e-9).length).toBeGreaterThan(20);
+    });
+
+    test("thread milling climbs one pitch per turn from the bottom", () => {
+        const m = cutting(
+            operationMoves(
+                op({ kind: "thread", depth: 3, holeDiameter: 8, pitch: 1.25, points: [{ x: 0, y: 0 }] }),
+                tool,
+                h,
+            ),
+        );
+        expect(Math.min(...m.map((p) => p.z))).toBeCloseTo(-3, 6);
+        const zs = m.map((p) => p.z);
+        expect(Math.max(...zs)).toBeLessThanOrEqual(0);
+    });
+
+    test("chamfer sinks a V-bit so the bevel is the width asked", () => {
+        const v = { ...tool, kind: "vbit" as const, angle: 90, diameter: 6 };
+        const m = cutting(operationMoves(op({ kind: "chamfer", chamferWidth: 1, side: "outside" }), v, h));
+        expect(Math.min(...m.map((p) => p.z))).toBeCloseTo(-1.05, 6);
+    });
+
+    test("v-carve goes no deeper than asked", () => {
+        const v = { ...tool, kind: "vbit" as const, angle: 60, diameter: 6 };
+        const m = cutting(operationMoves(op({ kind: "vcarve", depth: 1.5 }), v, h));
+        expect(m.length).toBeGreaterThan(10);
+        expect(Math.min(...m.map((p) => p.z))).toBeGreaterThanOrEqual(-1.5 - 1e-6);
+    });
 });
