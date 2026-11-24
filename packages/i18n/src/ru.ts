@@ -1556,6 +1556,11 @@ export default {
         "cnc.level.clear": "Удалить карту",
         "cnc.level.apply": "применять к программе",
         "cnc.level.done": "готово, перепад {0} мм",
+        "cnc.connectNet": "По сети",
+        "cnc.connectNet.hint": "grblHAL с сетевой платой: впишите IP-адрес платы (WebSocket, порт 81)",
+        "cnc.gamepad": "Геймпад",
+        "cnc.gamepad.hint":
+            "Левый стик — X/Y, правый стик или курки — Z (скорость растёт с отклонением); B — стоп, X — пауза, Y — пуск",
         "ribbon.workspace.laser": "Лазер",
         "ribbon.tab.laser": "Лазер",
         "ribbon.group.laser": "Задание",

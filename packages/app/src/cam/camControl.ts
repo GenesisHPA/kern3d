@@ -8,6 +8,7 @@ import { WebSerialConnection } from "../laser/webSerial";
 import style from "./camControl.module.css";
 import type { MillMachine } from "./camGcode";
 import { levelProgram } from "./camLevel";
+import { GamepadJog, WebSocketConnection } from "./camNet";
 import { type ProgramSegment, splitAtToolChanges } from "./camProbe";
 import { ProbeWorkflow } from "./camProbePanel";
 import { clock, frameLines, outsideTravel, parseOffsetLine, runFromLine, timeLeft } from "./camRun";
@@ -85,7 +86,16 @@ function card(title: string, ...children: Node[]): HTMLElement {
 export class MachineControl {
     readonly element = el("div");
     private grbl?: GrblController;
-    private port?: WebSerialConnection;
+    private port?: { close(): Promise<void> };
+    private address = pref("address", "");
+    private readonly gamepad = new GamepadJog(
+        (line) => this.grbl?.send(line, true) ?? false,
+        () => this.jogRelease(),
+        () => this.jogFeed,
+        () => (this.grbl?.pending ?? 0) > 3,
+        (name) =>
+            name === "stop" ? this.stopAll() : name === "hold" ? this.grbl?.pause() : this.cycleStart(),
+    );
     private poll?: ReturnType<typeof setInterval>;
     private status: GrblStatus = { state: "—" };
     private accessories = "";
@@ -143,6 +153,7 @@ export class MachineControl {
     }
 
     dispose() {
+        this.gamepad.stop();
         document.removeEventListener("keydown", this.onKey);
         document.removeEventListener("keyup", this.onKeyUp);
         void this.disconnect();
@@ -154,14 +165,14 @@ export class MachineControl {
 
     // ---- connection ---------------------------------------------------------------------------
 
-    private async connect() {
+    /** Over USB, or over the network to a grblHAL board (WebSocket). */
+    private async connect(net = false) {
         try {
             let controller: GrblController | undefined;
-            const port = await WebSerialConnection.request(
-                115200,
-                (text) => controller?.receive(text),
-                () => this.dropped(),
-            );
+            const onData = (text: string) => controller?.receive(text);
+            const port = net
+                ? await WebSocketConnection.open(this.address, onData, () => this.dropped())
+                : await WebSerialConnection.request(115200, onData, () => this.dropped());
             controller = new GrblController(port);
             controller.on((e) => {
                 if (e.type === "status") this.onStatus(e.status);
@@ -518,6 +529,17 @@ export class MachineControl {
             g
                 ? btn(t("cnc.disconnect"), () => void this.disconnect())
                 : btn(t("cnc.connect"), () => void this.connect(), style.primary),
+            ...(g
+                ? []
+                : [
+                      this.netField(),
+                      btn(
+                          `🖧 ${t("cnc.connectNet")}`,
+                          () => void this.connect(true),
+                          "",
+                          t("cnc.connectNet.hint"),
+                      ),
+                  ]),
             btn(t("cnc.reset"), () => this.rt(REALTIME.reset), "", t("cnc.reset.hint")),
             btn(t("cnc.unlock"), () => this.send("$X"), "", t("cnc.unlock.hint")),
             btn(t("cnc.homeAll"), () => this.send("$H"), "", t("cnc.home.hint")),
@@ -612,6 +634,32 @@ export class MachineControl {
         if (w !== undefined) this.send(`G10 L20 P0 ${axis}${(w / 2).toFixed(3)}`);
     }
 
+    private gamepadButton(): HTMLButtonElement {
+        const b = btn(
+            `🎮 ${t("cnc.gamepad")}`,
+            () => {
+                if (this.gamepad.active) this.gamepad.stop();
+                else this.gamepad.start();
+                b.classList.toggle(style.on, this.gamepad.active);
+            },
+            style.small,
+            t("cnc.gamepad.hint"),
+        );
+        if (this.gamepad.active) b.classList.add(style.on);
+        return b;
+    }
+
+    private netField(): HTMLInputElement {
+        const input = el("input", { type: "text", placeholder: "192.168.1.50:81" });
+        input.value = this.address;
+        input.style.width = "150px";
+        input.onchange = () => {
+            this.address = input.value.trim();
+            storePref("address", this.address);
+        };
+        return input;
+    }
+
     private jogCard(): HTMLElement {
         const pad = el(
             "div",
@@ -663,6 +711,7 @@ export class MachineControl {
             steps,
             feedRow,
             el("div", { className: style.caption, textContent: t("cnc.keys") }),
+            this.gamepadButton(),
         );
     }
 

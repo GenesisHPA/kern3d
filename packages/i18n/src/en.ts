@@ -1713,6 +1713,11 @@ export default {
         "cnc.level.clear": "Clear the map",
         "cnc.level.apply": "apply to the program",
         "cnc.level.done": "done, {0} mm difference",
+        "cnc.connectNet": "Over the network",
+        "cnc.connectNet.hint": "grblHAL with networking: enter the board's IP address (WebSocket, port 81)",
+        "cnc.gamepad": "Gamepad",
+        "cnc.gamepad.hint":
+            "Left stick X/Y, right stick or triggers Z (speed grows with deflection); B stop, X hold, Y start",
         "ribbon.workspace.laser": "Laser",
         "ribbon.tab.laser": "Laser",
         "ribbon.group.laser": "Laser job",
