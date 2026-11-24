@@ -20,6 +20,7 @@ import {
     type RibbonTab,
 } from "@chili3d/core";
 import { collection, createIcon, div, label, span, svg } from "@chili3d/element";
+import { FileMenu } from "./fileMenu";
 import style from "./ribbon.module.css";
 import { RibbonPushButton } from "./ribbonButton";
 import { RibbonGroupElement } from "./ribbonGroup";
@@ -103,6 +104,7 @@ export class RibbonUI extends HTMLElement {
                     icon: "icon-home",
                     onclick: () => PubSub.default.pub("displayHome", true),
                 }),
+                FileMenu(),
                 collection({
                     className: style.quickCommands,
                     sources: this.dataContent.quickCommands,
