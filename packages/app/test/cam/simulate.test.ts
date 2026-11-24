@@ -59,4 +59,25 @@ describe("mill simulation", () => {
         expect(sim.heightAt(-1, 5)).toBeCloseTo(-2, 3);
         expect(sim.heightAt(5, 5)).toBe(0);
     });
+
+    test("seek forward and back matches playing through", () => {
+        const moves = operationMoves({ ...base, kind: "pocket", depth: 1 }, tool, { safeZ: 5, clearance: 1 });
+        const list = moves.map((move) => ({ move, tool }));
+        const sim = new MillSimulation(stock, list, 0.2);
+        sim.finish();
+        const full = sim.removedVolume();
+        sim.seek(list.length);
+        expect(sim.removedVolume()).toBeCloseTo(full, 3);
+        const half = Math.floor(list.length / 2);
+        sim.seek(half);
+        expect(sim.progress).toBe(half);
+        const v = sim.removedVolume();
+        expect(v).toBeLessThan(full);
+        sim.seek(0);
+        expect(sim.removedVolume()).toBe(0);
+        sim.seek(half);
+        expect(sim.removedVolume()).toBeCloseTo(v, 3);
+        sim.reset();
+        expect(sim.progress).toBe(0);
+    });
 });

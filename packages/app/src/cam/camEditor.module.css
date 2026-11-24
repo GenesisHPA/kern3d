@@ -478,6 +478,37 @@
     font-variant-numeric: tabular-nums;
 }
 
+.toolIcon {
+    display: inline-flex;
+    flex: none;
+    vertical-align: middle;
+}
+
+.toolIcon svg {
+    display: block;
+}
+
+.tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.toolHead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolProfile {
+    display: flex;
+    justify-content: center;
+    margin: 2px 0 8px;
+    padding: 6px;
+    border-radius: 8px;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
 .opOn {
     border-color: var(--k);
     box-shadow: 0 4px 14px color-mix(in srgb, var(--k) 25%, transparent);
