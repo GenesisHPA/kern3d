@@ -3,9 +3,11 @@
 
 import { Id, PubSub, ShapeNode, Transaction, workspaceTabs } from "@chili3d/core";
 import { bodyOutline, type ModelView } from "../laser/fromModel";
+import { GrblController } from "../laser/grblController";
 import style from "../laser/laserEditor.module.css";
 import { button, checkbox, el, heading, numberField, row, select, t } from "../laser/laserUi";
 import { importSvg } from "../laser/svgImport";
+import { WebSerialConnection } from "../laser/webSerial";
 import { type MillJob, type MillNode, parseMillJob } from "./camData";
 import { millProgram, POST_KINDS } from "./camGcode";
 import { type CamTool, loadTools, newToolId, storeTools, TOOL_KINDS } from "./camTools";
@@ -53,6 +55,12 @@ export class MillEditor {
     private regen = 0;
     private vfd?: VfdSpindle;
     private vfdPort?: { close(): Promise<void> };
+    private grbl?: GrblController;
+    private grblPort?: WebSerialConnection;
+    private grblState = "";
+    /** The program lines being run (to act on the spindle words as they are reached). */
+    private running: string[] = [];
+    private spindleAt = 0;
     readonly tab;
 
     static open(node: MillNode) {
@@ -777,6 +785,7 @@ export class MillEditor {
                 ),
             ),
             el("div", { className: style.muted, textContent: t("mill.stock.hint") }),
+            ...this.connectionRows(),
             heading("mill.machine"),
             row(
                 "mill.post",
@@ -1037,6 +1046,112 @@ export class MillEditor {
         this.vfd = undefined;
         this.vfdPort = undefined;
         this.render();
+    }
+
+    /**
+     * The machine over USB (GRBL / grblHAL): connect, run the program streamed line by line,
+     * pause / resume / stop, home, set the work zero. The inverter (if on) follows the
+     * program's S / M3 / M4 / M5 as the controller takes those lines.
+     */
+    private connectionRows(): HTMLElement[] {
+        const g = this.grbl;
+        const rows: HTMLElement[] = [heading("mill.cnc")];
+        if (this.data.machine.post !== "grbl") {
+            rows.push(el("div", { className: style.muted, textContent: t("mill.cnc.otherPost") }));
+            return rows;
+        }
+        if (!g) {
+            rows.push(
+                el(
+                    "div",
+                    { className: style.buttons },
+                    button("mill.cnc.connect", () => void this.connectGrbl()),
+                ),
+            );
+            return rows;
+        }
+        rows.push(
+            el("div", { className: style.muted, textContent: this.grblState }),
+            el(
+                "div",
+                { className: style.buttons },
+                button("mill.cnc.run", () => this.runProgram()),
+                button("mill.cnc.pause", () => g.pause()),
+                button("mill.cnc.resume", () => g.resume()),
+                button("mill.cnc.stop", () => {
+                    g.stop();
+                    void this.vfd?.stop();
+                }),
+            ),
+            el(
+                "div",
+                { className: style.buttons },
+                button("mill.cnc.home", () => g.send("$H")),
+                button("mill.cnc.zeroXY", () => g.send("G10 L20 P1 X0 Y0")),
+                button("mill.cnc.zeroZ", () => g.send("G10 L20 P1 Z0")),
+                button("mill.cnc.unlock", () => g.send("$X")),
+                button("mill.cnc.disconnect", () => void this.disconnectGrbl()),
+            ),
+        );
+        return rows;
+    }
+
+    private async connectGrbl() {
+        try {
+            let controller: GrblController | undefined;
+            const port = await WebSerialConnection.request(
+                115200,
+                (text) => controller?.receive(text),
+                () => {
+                    this.grbl = undefined;
+                    this.grblPort = undefined;
+                    this.render();
+                },
+            );
+            controller = new GrblController(port);
+            controller.on((e) => {
+                if (e.type === "status") this.grblState = `${e.status.state}`;
+                else if (e.type === "job") this.grblState = t(`laser.job.${e.state}`);
+                else if (e.type === "error") this.grblState = `error:${e.code} ${e.line}`;
+                else if (e.type === "alarm") this.grblState = `ALARM:${e.code}`;
+                else if (e.type === "progress") {
+                    this.grblState = `${e.acked} / ${e.total}`;
+                    void this.followSpindle(e.acked);
+                } else return;
+                if (this.panel === "machine") this.render();
+            });
+            this.grbl = controller;
+            this.grblPort = port;
+            this.render();
+        } catch (e) {
+            PubSub.default.pub("showToast", "mill.vfd.failed" as never, String(e));
+        }
+    }
+
+    private async disconnectGrbl() {
+        await this.grblPort?.close().catch(() => {});
+        this.grbl = undefined;
+        this.grblPort = undefined;
+        this.render();
+    }
+
+    private runProgram() {
+        const lines = this.program()
+            .gcode.split("\n")
+            .map((l) => l.trim())
+            .filter((l) => l !== "" && !l.startsWith("("));
+        this.running = lines;
+        this.spindleAt = 0;
+        this.grbl?.startJob(lines);
+    }
+
+    /** The spindle words of the lines the controller has taken so far, sent to the inverter. */
+    private async followSpindle(acked: number) {
+        if (!this.vfd || !this.data.vfd.enabled) return;
+        while (this.spindleAt < Math.min(acked, this.running.length)) {
+            await this.vfd.onLine(this.running[this.spindleAt]);
+            this.spindleAt++;
+        }
     }
 
     /** Called by the undo stack: the job replaced under us. */
