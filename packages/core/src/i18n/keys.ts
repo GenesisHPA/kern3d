@@ -657,6 +657,8 @@ export const I18N_KEYS = [
     "home.recent.empty",
     "home.community",
     "home.community.telegram",
+    "home.report",
+    "home.report.hint",
     "laser.rotary.timeout",
     "laser.text.hatch",
     "laser.text.hatch.on",

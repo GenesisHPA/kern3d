@@ -607,6 +607,9 @@ export default {
         "home.recent": "Недавние проекты",
         "home.recent.empty": "Пока нет недавних документов. Создайте или откройте документ, чтобы начать.",
         "home.community": "Вопросы, тесты и новости —",
+        "home.report": "Сообщить о проблеме",
+        "home.report.hint":
+            "Откроет форму на GitHub: версия и последние ошибки уже подставлены, допишите, что случилось",
         "home.community.telegram": "группа в Telegram",
         "laser.rotary": "Поворотная ось",
         "laser.rotary.enabled": "Маркировка по кругу",

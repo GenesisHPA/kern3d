@@ -16,7 +16,10 @@ import { a, button, collection, div, img, span, svg } from "@chili3d/element";
 import { type ChangelogRelease, parseChangelog } from "./changelog";
 import style from "./home.module.css";
 import { LanguageSelector } from "./languageSelector";
+import { problemReportUrl, watchErrors } from "./problemReport";
 import { ThemeSelector } from "./themeSelector";
+
+watchErrors();
 
 /** The users' group: questions, testing, release news. */
 const TELEGRAM_GROUP = "https://t.me/HPA_AirSoft_System_Development/71332";
@@ -171,6 +174,16 @@ export class Home extends HTMLElement {
                         target: "_blank",
                         rel: "noopener",
                         textContent: new Localize("home.community.telegram"),
+                    }),
+                    span({ textContent: "·" }),
+                    a({
+                        href: "#",
+                        textContent: new Localize("home.report"),
+                        title: new Localize("home.report.hint"),
+                        onclick: (e: MouseEvent) => {
+                            e.preventDefault();
+                            window.open(problemReportUrl(__APP_VERSION__), "_blank", "noopener");
+                        },
                     }),
                 ),
                 div({ className: style.credits, textContent: new Localize("home.credits") }),

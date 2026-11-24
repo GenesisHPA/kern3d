@@ -693,6 +693,9 @@ export default {
         "home.recent": "Recent Projects",
         "home.recent.empty": "No recent documents yet. Create or open a document to get started.",
         "home.community": "Questions, testing and news —",
+        "home.report": "Report a problem",
+        "home.report.hint":
+            "Opens a GitHub form with the version and recent errors filled in: add what happened",
         "home.community.telegram": "Telegram group",
         "laser.rotary": "Rotary axis",
         "laser.rotary.enabled": "Mark round the part",
