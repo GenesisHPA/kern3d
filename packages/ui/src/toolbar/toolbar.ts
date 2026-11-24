@@ -21,6 +21,7 @@ import {
 import { collection, div, span, svg } from "@chili3d/element";
 import { type GlyphName, glyph } from "../glyphs";
 import { DropdownController } from "../ribbon/dropdownController";
+import { FileMenu } from "../ribbon/fileMenu";
 import { QuickButton } from "../ribbon/ribbon";
 import { RibbonPushButton } from "../ribbon/ribbonButton";
 import style from "./toolbar.module.css";
@@ -241,6 +242,7 @@ export class MainToolbar extends HTMLElement {
                 svg({ className: style.appLogo, icon: "icon-kern3d-small" }),
                 span({ className: style.appName, textContent: "Kern3D" }),
             ),
+            FileMenu(),
             collection({
                 className: style.quickCommands,
                 sources: this.ribbon.quickCommands,
