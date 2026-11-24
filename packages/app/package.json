@@ -8,6 +8,7 @@
         "@chili3d/wasm": "*"
     },
     "dependencies": {
+        "clipper-lib": "6.4.2",
         "three": "0.184.0"
     }
 }
