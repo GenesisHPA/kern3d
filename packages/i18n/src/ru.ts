@@ -1216,6 +1216,7 @@ export default {
         "mill.view.side": "Сбоку",
         "mill.view.fit": "Показать всё",
         "mill.view.section": "Разрез заготовки",
+        "mill.view.sketch": "Эскиз на заготовке",
         "mill.timeline": "Ход программы: перетащите, чтобы перейти",
         "mill.move.rapid": "холостой",
         "mill.move.feed": "резание",

@@ -1518,6 +1518,7 @@ export const I18N_KEYS = [
     "mill.view.side",
     "mill.view.fit",
     "mill.view.section",
+    "mill.view.sketch",
     "mill.timeline",
     "mill.move.rapid",
     "mill.move.feed",

@@ -87,6 +87,9 @@ export class CamView {
     private chipLife = new Float32Array(0);
     private chipNext = 0;
     private section?: Three.Plane;
+    private sketch?: Three.Group;
+    /** The sketch (the outlines operations cut, the shapes brought in) drawn on the stock top. */
+    sketchVisible = true;
     private sim?: MillSimulation;
     private moves: Entry[] = [];
     private frame = 0;
@@ -176,6 +179,15 @@ export class CamView {
             b.onmouseleave = () => (b.style.background = b.dataset["on"] ? "#4dabf755" : "transparent");
             return b;
         };
+        const sketchBtn = btn("✎", "mill.view.sketch", () => {
+            this.sketchVisible = !this.sketchVisible;
+            if (this.sketch) this.sketch.visible = this.sketchVisible;
+            sketchBtn.dataset["on"] = this.sketchVisible ? "1" : "";
+            sketchBtn.style.background = this.sketchVisible ? "#4dabf755" : "transparent";
+            this.dirty = true;
+        });
+        sketchBtn.dataset["on"] = "1";
+        sketchBtn.style.background = "#4dabf755";
         const sectionBtn = btn("◧", "mill.view.section", () => {
             this.toggleSection();
             sectionBtn.dataset["on"] = this.section ? "1" : "";
@@ -187,6 +199,7 @@ export class CamView {
             btn(t("mill.view.front"), "mill.view.front", () => this.preset("front")),
             btn(t("mill.view.side"), "mill.view.side", () => this.preset("side")),
             btn("⤢", "mill.view.fit", () => this.fit()),
+            sketchBtn,
             sectionBtn,
         );
         this.readout.style.cssText = `position:absolute;left:8px;bottom:44px;padding:5px 9px;font:11px/1.45 ui-monospace,Consolas,monospace;white-space:pre;pointer-events:none;${glass}`;
@@ -390,6 +403,7 @@ export class CamView {
         world.add(axes);
         this.applyHeights(true);
 
+        this.buildSketch(world, job);
         this.buildPaths(world);
 
         this.cutter = new THREE.Group();
@@ -415,6 +429,81 @@ export class CamView {
         this.placeCutter();
         this.dirty = true;
         this.report();
+    }
+
+    /**
+     * The sketch on the stock: each shown operation's outlines and hole centres in its colour, the
+     * shapes no operation uses in grey — a thin line just above the top, seen through the cut too.
+     */
+    private buildSketch(world: Three.Group, job: MillJob) {
+        const THREE = this.three!;
+        const z = job.stock.top + 0.05;
+        const pos: number[] = [];
+        const col: number[] = [];
+        const color = new THREE.Color();
+        const seg = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+            pos.push(a.x, a.y, z, b.x, b.y, z);
+            col.push(color.r, color.g, color.b, color.r, color.g, color.b);
+        };
+        const ring = (r: readonly { x: number; y: number }[], closed: boolean) => {
+            for (let i = 1; i < r.length; i++) seg(r[i - 1], r[i]);
+            if (closed && r.length >= 3) seg(r.at(-1)!, r[0]);
+        };
+        const mark = (c: { x: number; y: number }, d: number) => {
+            const k = Math.max(0.5, d / 2);
+            seg({ x: c.x - k, y: c.y }, { x: c.x + k, y: c.y });
+            seg({ x: c.x, y: c.y - k }, { x: c.x, y: c.y + k });
+            for (let i = 0; i < 24; i++) {
+                const a = (i / 24) * Math.PI * 2;
+                const b = ((i + 1) / 24) * Math.PI * 2;
+                seg(
+                    { x: c.x + Math.cos(a) * k, y: c.y + Math.sin(a) * k },
+                    { x: c.x + Math.cos(b) * k, y: c.y + Math.sin(b) * k },
+                );
+            }
+        };
+        const used = new Set<string>();
+        for (const op of job.operations) {
+            if (op.shapeId) used.add(op.shapeId);
+            if (op.hidden) continue;
+            color.setHex(OP_COLORS[op.kind] ?? 0x4dabf7);
+            // engraving follows open lines as they are; the other kinds cut closed outlines
+            for (const r of op.rings) ring(r, op.kind !== "engrave");
+            const tool = job.tools.find((t) => t.id === op.toolId);
+            for (const c of op.points) mark(c, op.holeDiameter ?? tool?.diameter ?? 3);
+        }
+        color.setHex(0xadb5bd);
+        for (const sh of job.shapes) {
+            if (used.has(sh.id)) continue;
+            for (const r of sh.rings) ring(r, false);
+            for (const c of sh.points) mark(c, 3);
+        }
+        const group = new THREE.Group();
+        group.visible = this.sketchVisible;
+        this.sketch = group;
+        world.add(group);
+        if (pos.length === 0) return;
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+        geometry.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+        // seen through the cut: a faint copy drawn over everything, a solid one where it is on top
+        const behind = new THREE.LineSegments(
+            geometry,
+            new THREE.LineBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.35,
+                depthTest: false,
+                depthWrite: false,
+            }),
+        );
+        behind.renderOrder = 2;
+        const front = new THREE.LineSegments(
+            geometry,
+            new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95 }),
+        );
+        front.renderOrder = 2;
+        group.add(behind, front);
     }
 
     /** Paths per kind, a faint full copy (to come) and a bright copy drawn up to the progress. */

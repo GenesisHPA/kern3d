@@ -1378,6 +1378,7 @@ export default {
         "mill.view.side": "Side",
         "mill.view.fit": "Fit all",
         "mill.view.section": "Section of the stock",
+        "mill.view.sketch": "Sketch on the stock",
         "mill.timeline": "Program timeline: drag to jump",
         "mill.move.rapid": "rapid",
         "mill.move.feed": "cutting",
