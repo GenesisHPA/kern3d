@@ -9,7 +9,7 @@ import style from "./camControl.module.css";
 import type { MillMachine } from "./camGcode";
 import { levelProgram } from "./camLevel";
 import { GamepadJog, WebSocketConnection } from "./camNet";
-import { type ProgramSegment, splitAtToolChanges } from "./camProbe";
+import { correctedSteps, type ProgramSegment, splitAtToolChanges } from "./camProbe";
 import { ProbeWorkflow } from "./camProbePanel";
 import { clock, frameLines, outsideTravel, parseOffsetLine, runFromLine, timeLeft } from "./camRun";
 import type { CamTool } from "./camTools";
@@ -603,6 +603,21 @@ export class MachineControl {
                 () => this.send(...goZeroLines(this.host.machine().heights.safeZ, "xy")),
                 style.small,
             ),
+            btn(
+                t("cnc.park"),
+                () => this.send("G53 G0 Z-1", "G53 G0 X-1 Y-1"),
+                style.small,
+                t("cnc.park.hint"),
+            ),
+            btn(
+                t("cnc.centre"),
+                () => {
+                    const m = this.host.machine();
+                    this.send("G53 G0 Z-1", `G53 G0 X${-m.width / 2} Y${-m.depth / 2}`);
+                },
+                style.small,
+                t("cnc.centre.hint"),
+            ),
         );
         wcs.className = style.row;
         return card(t("cnc.position"), ...rows, wcs);
@@ -1033,6 +1048,75 @@ export class MachineControl {
         input.click();
     }
 
+    private calib = { axis: "X" as Axis, distance: 100, measured: 100 };
+
+    /** Steps per mm from a test move: move, measure with a rule, write the corrected value. */
+    private stepsCalibration(): HTMLElement {
+        const c = this.calib;
+        const id = 100 + AXES.indexOf(c.axis);
+        const steps = Number(this.settings.get(id));
+        const axis = el("select");
+        for (const a of AXES) axis.append(el("option", { value: a, textContent: a, selected: a === c.axis }));
+        axis.onchange = () => {
+            c.axis = axis.value as Axis;
+            this.renderTab();
+        };
+        const num = (get: () => number, set: (v: number) => void) => {
+            const i = el("input", { type: "number", step: "any" });
+            i.value = String(get());
+            i.style.width = "80px";
+            i.onchange = () => {
+                set(Number(i.value.replace(",", ".")) || 0);
+                this.renderTab();
+            };
+            return i;
+        };
+        const fixed = correctedSteps(steps, c.distance, c.measured);
+        const box = el(
+            "div",
+            {},
+            el("h5", { textContent: t("cnc.steps") }),
+            el("div", { className: style.caption, textContent: t("cnc.steps.hint") }),
+            el(
+                "div",
+                { className: style.row },
+                axis,
+                num(
+                    () => c.distance,
+                    (v) => (c.distance = v),
+                ),
+                btn(
+                    t("cnc.steps.move"),
+                    () => {
+                        const line = jogLine({ [c.axis]: c.distance }, this.jogFeed);
+                        if (line) this.send(line);
+                    },
+                    style.small,
+                ),
+                el("span", { className: style.caption, textContent: t("cnc.steps.measured") }),
+                num(
+                    () => c.measured,
+                    (v) => (c.measured = v),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.row },
+                el("span", {
+                    textContent: `$${id}: ${Number.isFinite(steps) ? steps : "—"} → ${Number.isFinite(fixed) ? fixed : "—"}`,
+                }),
+                btn(
+                    t("cnc.steps.write"),
+                    () => {
+                        if (Number.isFinite(fixed)) this.send(`$${id}=${fixed}`, "$$");
+                    },
+                    style.primary,
+                ),
+            ),
+        );
+        return box;
+    }
+
     private settingsTab(): HTMLElement[] {
         const rows: HTMLElement[] = [
             el(
@@ -1045,6 +1129,7 @@ export class MachineControl {
             ),
         ];
         if (this.settings.size === 0) return rows;
+        rows.push(this.stepsCalibration());
         const known = new Set(GRBL_SETTINGS.map((s) => s.id));
         const table = el("div");
         table.className = style.settings;

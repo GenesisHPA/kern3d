@@ -14,6 +14,7 @@ import {
     type ProbeIO,
     type ProbeSettings,
     parsePrb,
+    probeBlock,
     probeBoss,
     probeCorner,
     probeEdge,
@@ -111,6 +112,7 @@ export class ProbeWorkflow {
     private cornerZ = true;
     private bossDiameter = 30;
     private ring = 20;
+    private block = { thickness: 15, wallX: 10, wallY: 10, diameter: 6, corner: "frontLeft" as Corner };
     /** The probed surface, and whether programs run over it. */
     heightMap: HeightMap | undefined;
     applyMap = true;
@@ -472,6 +474,61 @@ export class ProbeWorkflow {
                 t("cnc.probe.bossDiameter"),
                 () => this.bossDiameter,
                 (v) => (this.bossDiameter = Math.max(1, v)),
+            ),
+        );
+
+        // XYZ block
+        const bc = (c: Corner, label: string) => {
+            const b = this.b(
+                label,
+                () => {
+                    this.block.corner = c;
+                    this.changed();
+                },
+                style.small,
+            );
+            if (this.block.corner === c) b.classList.add(style.on);
+            return b;
+        };
+        out.push(
+            el("h5", { textContent: t("cnc.block") }),
+            el("div", { className: style.caption, textContent: t("cnc.block.hint") }),
+            this.field(
+                t("cnc.block.thickness"),
+                () => this.block.thickness,
+                (v) => (this.block.thickness = v),
+            ),
+            this.field(
+                t("cnc.block.wallX"),
+                () => this.block.wallX,
+                (v) => (this.block.wallX = v),
+            ),
+            this.field(
+                t("cnc.block.wallY"),
+                () => this.block.wallY,
+                (v) => (this.block.wallY = v),
+            ),
+            this.field(
+                t("cnc.block.diameter"),
+                () => this.block.diameter,
+                (v) => (this.block.diameter = Math.max(0, v)),
+            ),
+            el(
+                "div",
+                { className: style.row },
+                bc("backLeft", "↖"),
+                bc("backRight", "↗"),
+                bc("frontLeft", "↙"),
+                bc("frontRight", "↘"),
+                this.b(
+                    `⤓ ${t("cnc.block.run")}`,
+                    () =>
+                        void this.task(t("cnc.block"), async (io) => {
+                            const r = await probeBlock(io, s, this.block.corner, this.block);
+                            return `X ${r.x.toFixed(3)} Y ${r.y.toFixed(3)} Z ${r.z.toFixed(3)}`;
+                        }),
+                    style.primary,
+                ),
             ),
         );
 

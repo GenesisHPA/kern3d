@@ -352,3 +352,36 @@ export function toChangeLines(s: ProbeSettings): string[] {
         `G53 G0 Z${f(s.change.z)}`,
     ];
 }
+
+/**
+ * An XYZ touch block on a corner of the stock, the cutter itself touching it: the block's
+ * top is `thickness` above the stock, its outer walls `wallX` / `wallY` outside the stock's
+ * faces. Z from the top, then X and Y from the walls (the cutter's radius allowed for).
+ */
+export async function probeBlock(
+    io: ProbeIO,
+    s: ProbeSettings,
+    corner: Corner,
+    block: { thickness: number; wallX: number; wallY: number; diameter: number },
+): Promise<{ x: number; y: number; z: number }> {
+    const dx: 1 | -1 = corner === "frontLeft" || corner === "backLeft" ? 1 : -1;
+    const dy: 1 | -1 = corner === "frontLeft" || corner === "frontRight" ? 1 : -1;
+    const top = await touch(io, s, "Z", -1);
+    const z = top[2] - block.thickness;
+    await io.send([`G10 L2 P0 Z${f(z)}`]);
+    // as a corner probe: the cutter as the ball, the walls as run-out outward
+    const as: ProbeSettings = {
+        ...s,
+        tip: block.diameter,
+        offsetX: dx * block.wallX,
+        offsetY: dy * block.wallY,
+    };
+    const r = await probeCorner(io, as, corner, false, 0);
+    return { x: r.x, y: r.y, z };
+}
+
+/** Steps per mm corrected from a test move: commanded, measured on the machine with a rule. */
+export function correctedSteps(steps: number, commanded: number, measured: number): number {
+    if (!(measured > 0) || !(commanded > 0)) return steps;
+    return Math.round(((steps * commanded) / measured) * 1000) / 1000;
+}

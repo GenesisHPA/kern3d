@@ -3,11 +3,13 @@
 
 import { describe, expect, test } from "@rstest/core";
 import {
+    correctedSteps,
     defaultProbeSettings,
     lengthOffset,
     measureTool,
     type ProbeIO,
     parsePrb,
+    probeBlock,
     probeBoss,
     probeCorner,
     probeEdge,
@@ -149,5 +151,21 @@ describe("probing", () => {
         expect(seg[0].lines).toEqual(["G21 G90", "S1000 M3", "G1 X1", "M5", "G0 Z5"]);
         expect(seg[1]).toEqual({ tool: 2, lines: ["S2000 M3", "G1 X2", "M30"] });
         expect(splitAtToolChanges(["G1 X1", "T3 M6", "G1 X2"])[1]).toEqual({ tool: 3, lines: ["G1 X2"] });
+    });
+
+    test("XYZ block on a corner, steps per mm", async () => {
+        // stock corner at (20, 30), top 0; block walls 10 mm outside, top 15 mm above; cutter Ø6
+        const block = box([10, 20, -20], [60, 70, 15], 3);
+        const m = machine(block, [15, 25, 20]);
+        const r = await probeBlock(m.io, s, "frontLeft", {
+            thickness: 15,
+            wallX: 10,
+            wallY: 10,
+            diameter: 6,
+        });
+        near(r.x, 20);
+        near(r.y, 30);
+        near(r.z, 0);
+        expect(correctedSteps(800, 100, 99.5)).toBe(804.02);
     });
 });
