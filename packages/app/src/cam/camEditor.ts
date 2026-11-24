@@ -92,8 +92,10 @@ export class MillEditor {
         stage.style.cssText = "position:relative;flex:1;min-width:0;height:100%";
         stage.append(this.view.element);
         const body = el("div", {}, this.left, stage);
-        body.style.cssText = "display:flex;height:calc(100% - 44px)";
-        this.dialog.append(this.topBar(), body);
+        body.style.cssText = "display:flex;flex:1;min-height:0";
+        const frame = el("div", {}, this.topBar(), body);
+        frame.style.cssText = "display:flex;flex-direction:column;height:100%";
+        this.dialog.append(frame);
         this.node.onPropertyChanged(this.onNodeChanged);
         this.view.onProgress = (done, total) => {
             this.progressText = `${done} / ${total}`;
@@ -187,7 +189,7 @@ export class MillEditor {
         );
         bar.className = style.panel;
         bar.style.cssText =
-            "display:flex;gap:6px;align-items:center;height:44px;padding:0 10px;box-sizing:border-box;flex-wrap:nowrap;overflow:auto";
+            "display:flex;flex-direction:row;width:auto;border-left:none;gap:6px;align-items:center;flex:none;min-height:44px;padding:6px 10px;box-sizing:border-box;flex-wrap:wrap";
         return bar;
     }
 
