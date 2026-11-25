@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { type BtApi, BtPanel } from "./btPanel";
 import { type WifiApi, WifiPanel } from "./wifiPanel";
 
 export type Layout = "auto" | "portrait" | "landscape";
@@ -83,8 +84,8 @@ function choices<T extends string | number>(
 }
 
 /**
- * ⚙ Settings: a sheet sliding up over the station screen, with sections — Wi-Fi, Экран (layout
- * and rotation). Bluetooth joins later.
+ * ⚙ Settings: a sheet sliding up over the station screen, with sections — Wi-Fi, Bluetooth (the
+ * gamepad), Экран (layout and rotation).
  */
 export class SettingsSheet {
     private readonly sheet = h("div", "sheet");
@@ -96,6 +97,7 @@ export class SettingsSheet {
     constructor(
         host: HTMLElement,
         wifi: WifiApi,
+        bt: BtApi,
         private readonly display: DisplayApi,
         private readonly onLayout: (layout: Layout) => void,
         toast: (text: string) => void,
@@ -115,6 +117,15 @@ export class SettingsSheet {
             wifiEl,
             () => wifiPanel.show(),
             () => wifiPanel.hide(),
+        );
+        const btEl = h("div", "section");
+        const btPanel = new BtPanel(btEl, bt, toast);
+        this.add(
+            "bt",
+            "Bluetooth",
+            btEl,
+            () => btPanel.show(),
+            () => btPanel.hide(),
         );
         this.add("screen", "Экран", this.screenSection(), () => {});
         this.open("wifi");

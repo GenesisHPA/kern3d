@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
+import type { BtApi } from "./btPanel";
 import { type DisplayApi, type Layout, resolveLayout, SettingsSheet, savedLayout } from "./settings";
 import type { StationMachine, StationSnapshot } from "./stationMachine";
 import { PathView } from "./view3d";
@@ -68,6 +69,7 @@ export class StationUi {
         private readonly askConnect: () => void,
         wifi: WifiApi,
         display: DisplayApi,
+        bt: BtApi,
     ) {
         const canvas = h("canvas");
         this.view = new PathView(canvas);
@@ -87,6 +89,7 @@ export class StationUi {
         this.settings = new SettingsSheet(
             this.root,
             wifi,
+            bt,
             display,
             (layout) => {
                 this.layout = layout;
@@ -134,6 +137,7 @@ export class StationUi {
             logo,
             link,
             this.ref("state", h("div", { class: "chip" })),
+            this.ref("padChip", h("div", { class: "chip padChip" }, "🎮")),
             h("div", { class: "sp" }),
             this.ref("clock", h("div", { class: "clock" })),
             this.gearButton(),
@@ -435,6 +439,10 @@ export class StationUi {
     /** Every frame: the numbers glide to where the machine is, the gauge, the 3D view. */
     private animate() {
         const s = this.machine.snapshot();
+        this.el["padChip"].classList.toggle(
+            "show",
+            [...(navigator.getGamepads?.() ?? [])].some((p) => p),
+        );
         const w = s.status.wpos;
         const m = s.status.mpos;
         (["X", "Y", "Z"] as Axis[]).forEach((a, i) => {

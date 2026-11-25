@@ -13,13 +13,20 @@ user (a polkit rule lets that user change the network).
     POST /api/wifi/connect    {"ssid": "...", "password": "..."}
     POST /api/wifi/forget     {"ssid": "..."}
     POST /api/wifi/radio      {"on": true|false}
+    GET  /api/bt              adapter on/searching, devices (paired first, gamepads first)
+    POST /api/bt/scan         search for 20 s
+    POST /api/bt/pair         {"mac": "..."}: pair, trust, connect (a gamepad then reconnects by itself)
+    POST /api/bt/connect      {"mac": "..."}
+    POST /api/bt/remove       {"mac": "..."}
     GET  /api/display         {"rotate": 0|90|180|270}
     POST /api/display         {"rotate": ...}: saved, the kiosk restarts turned
 """
 import json
 import os
+import re
 import subprocess
 import sys
+import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROTATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rotate")
@@ -50,6 +57,84 @@ def split_terse(line):
             cur += ch
     out.append(cur)
     return out
+
+
+MAC = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){5}$")
+
+
+def btctl(*args, timeout=15, agent=False):
+    """bluetoothctl, non-interactive; (exit code, output). `agent`: a no-input agent for pairing."""
+    cmd = ["bluetoothctl"]
+    if agent:
+        cmd += ["--agent", "NoInputNoOutput"]
+    try:
+        p = subprocess.run(cmd + list(args), capture_output=True, text=True, timeout=timeout)
+        return p.returncode, p.stdout + p.stderr
+    except subprocess.TimeoutExpired as e:
+        return 1, (e.stdout or "") if isinstance(e.stdout, str) else "timeout"
+
+
+def bt_info(mac):
+    _, out = btctl("info", mac, timeout=5)
+    info = {"mac": mac, "name": mac, "icon": "", "paired": False, "connected": False, "trusted": False}
+    for line in out.splitlines():
+        key, _, value = line.strip().partition(": ")
+        if key == "Name":
+            info["name"] = value
+        elif key == "Icon":
+            info["icon"] = value
+        elif key in ("Paired", "Connected", "Trusted"):
+            info[key.lower()] = value.strip() == "yes"
+    info["gamepad"] = info["icon"] in ("input-gaming", "input-joystick") or bool(
+        re.search(r"gamepad|controller|joy|xbox|dualshock|dualsense|8bitdo|pro controller", info["name"], re.I)
+    )
+    return info
+
+
+_scan_until = 0.0
+
+
+def bt_status():
+    import time
+
+    _, show = btctl("show", timeout=5)
+    devices = []
+    _, out = btctl("devices", timeout=5)
+    for line in out.splitlines():
+        parts = line.split(" ", 2)
+        if len(parts) >= 2 and parts[0] == "Device" and MAC.match(parts[1]):
+            d = bt_info(parts[1])
+            # nameless beacons nearby are noise
+            if d["name"] != d["mac"] and d["name"].replace("-", ":") != d["mac"]:
+                devices.append(d)
+    devices.sort(key=lambda d: (not d["connected"], not d["paired"], not d["gamepad"], d["name"].lower()))
+    return {
+        "powered": "Powered: yes" in show,
+        "present": "Controller" in show,
+        "scanning": time.time() < _scan_until,
+        "devices": devices,
+    }
+
+
+def bt_scan(seconds=20):
+    import time
+
+    global _scan_until
+    _scan_until = time.time() + seconds
+    btctl("power", "on", timeout=5)
+    threading.Thread(target=btctl, args=("--timeout", str(seconds), "scan", "on"), kwargs={"timeout": seconds + 5}, daemon=True).start()
+
+
+def bt_pair(mac):
+    btctl("power", "on", timeout=5)
+    btctl("pairable", "on", timeout=5)
+    code, out = btctl("--timeout", "25", "pair", mac, timeout=35, agent=True)
+    paired = bt_info(mac)["paired"]
+    if not paired:
+        return False, out.strip().splitlines()[-1] if out.strip() else "не удалось"
+    btctl("trust", mac, timeout=5)
+    btctl("--timeout", "15", "connect", mac, timeout=20)
+    return True, ""
 
 
 def rotation():
@@ -144,6 +229,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(200, wifi_status())
         if self.path == "/api/display":
             return self.reply(200, {"rotate": rotation()})
+        if self.path == "/api/bt":
+            return self.reply(200, bt_status())
         if self.path.startswith("/api/"):
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
@@ -153,6 +240,24 @@ class Handler(SimpleHTTPRequestHandler):
             req = self.body()
         except ValueError:
             return self.reply(400, {"error": "bad json"})
+        if self.path == "/api/bt/scan":
+            bt_scan()
+            return self.reply(200, bt_status())
+        if self.path.startswith("/api/bt/"):
+            mac = str(req.get("mac", "")).upper()
+            if not MAC.match(mac):
+                return self.reply(400, {"error": "mac"})
+            if self.path == "/api/bt/pair":
+                ok, err = bt_pair(mac)
+                return self.reply(200, {"ok": ok, "error": err, **bt_status()})
+            if self.path == "/api/bt/connect":
+                code, out = btctl("--timeout", "15", "connect", mac, timeout=20)
+                ok = bt_info(mac)["connected"]
+                return self.reply(200, {"ok": ok, "error": "" if ok else out.strip()[-120:], **bt_status()})
+            if self.path == "/api/bt/remove":
+                btctl("remove", mac, timeout=10)
+                return self.reply(200, {"ok": True, **bt_status()})
+            return self.reply(404, {"error": "unknown"})
         if self.path == "/api/display":
             value = int(req.get("rotate", 0))
             if value not in (0, 90, 180, 270):

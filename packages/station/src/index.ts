@@ -1,7 +1,9 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { GamepadJog } from "@chili3d/app/src/cam/camNet";
 import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
+import { demoBt, serverBt } from "./btPanel";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
 import { demoDisplay, serverDisplay } from "./settings";
 import { type Connect, StationMachine } from "./stationMachine";
@@ -51,6 +53,7 @@ const ui = new StationUi(
     },
     demo ? demoWifi() : serverWifi(),
     demo ? demoDisplay() : serverDisplay(),
+    demo ? demoBt() : serverBt(),
 );
 
 // a file dropped on the screen joins the queue
@@ -76,3 +79,32 @@ void machine.connect();
 setInterval(() => {
     if (!machine.connected) void machine.connect();
 }, 3000);
+
+/**
+ * Jogging with a gamepad (Bluetooth or USB): left stick X/Y, right stick (or the triggers) Z, the
+ * deflection sets the speed. B stops, X holds; Y starts — held for a second, like «Старт» on screen.
+ */
+const START_HOLD_MS = 1000;
+const gamepadJog = new GamepadJog(
+    (line) => machine.jogLine(line),
+    () => machine.jogStop(),
+    () => 3000,
+    () => false,
+    (button) => {
+        if (button === "stop") machine.stop();
+        else if (button === "hold") machine.pause();
+        else
+            setTimeout(() => {
+                const pad = [...(navigator.getGamepads?.() ?? [])].find((p) => p);
+                if (pad?.buttons[3]?.pressed && !machine.start())
+                    ui.toast("Нечего запускать или станок занят");
+            }, START_HOLD_MS);
+    },
+);
+addEventListener("gamepadconnected", (e) => {
+    gamepadJog.start();
+    ui.toast(`🎮 ${e.gamepad.id.replace(/\s*\(.*\)\s*/, "")}`);
+});
+addEventListener("gamepaddisconnected", () => {
+    if (![...(navigator.getGamepads?.() ?? [])].some((p) => p)) gamepadJog.stop();
+});

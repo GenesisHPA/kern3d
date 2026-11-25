@@ -216,6 +216,15 @@ export class StationMachine {
         return line !== undefined && this.grbl.send(line);
     }
 
+    /**
+     * A ready jog line from the gamepad (a stream of short jogs while a stick is held). Refused
+     * while a job runs, or while earlier jogs are still queued — the stick must not run ahead.
+     */
+    jogLine(line: string): boolean {
+        if (!this.grbl || this.grbl.jobActive || this.grbl.pending > 2) return false;
+        return this.grbl.send(line, true);
+    }
+
     jogStop() {
         void this.grbl?.realtime(REALTIME.jogCancel);
     }
