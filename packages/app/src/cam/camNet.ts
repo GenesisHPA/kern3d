@@ -82,6 +82,12 @@ export class GamepadJog {
         private readonly maxFeed: () => number,
         private readonly busy: () => boolean,
         private readonly onButton: (name: "stop" | "hold" | "start") => void,
+        /** Which buttons stop, hold and start (standard mapping: B, X, Y). */
+        private readonly buttons: { stop: number; hold: number; start: number } = {
+            stop: 1,
+            hold: 2,
+            start: 3,
+        },
     ) {}
 
     get active(): boolean {
@@ -95,10 +101,11 @@ export class GamepadJog {
             const pad = [...(navigator.getGamepads?.() ?? [])].find((p) => p);
             if (!pad) return;
             const pressed = pad.buttons.map((b) => b.pressed);
-            // B (1) stop, X (2) hold, Y (3) start — on press only
-            if (pressed[1] && !last[1]) this.onButton("stop");
-            if (pressed[2] && !last[2]) this.onButton("hold");
-            if (pressed[3] && !last[3]) this.onButton("start");
+            // stop / hold / start (by default B, X, Y) — on press only
+            const edge = (i: number) => pressed[i] && !last[i];
+            if (edge(this.buttons.stop)) this.onButton("stop");
+            if (edge(this.buttons.hold)) this.onButton("hold");
+            if (edge(this.buttons.start)) this.onButton("start");
             last = pressed;
             const z =
                 Math.abs(pad.axes[3] ?? 0) > GamepadJog.DEAD

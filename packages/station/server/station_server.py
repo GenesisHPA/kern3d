@@ -285,7 +285,7 @@ def gamepad_reader():
                 _pads[path] = {
                     "id": name,
                     "axes": [0.0] * len(AXES),
-                    "buttons": [0.0] * (BTN_COUNT + 4),
+                    "buttons": [0.0] * (BTN_COUNT + 8),
                     "ranges": {code: _abs_range(fd, code) for code in AXES},
                 }
                 _publish()
@@ -304,7 +304,13 @@ def gamepad_reader():
             for i in range(0, len(data) - 23, 24):
                 _, _, typ, code, val = struct.unpack("llHHi", data[i : i + 24])
                 if typ == EV_KEY and BTN_FIRST <= code < BTN_FIRST + BTN_COUNT:
-                    pad["buttons"][code - BTN_FIRST] = 1.0 if val else 0.0
+                    index = code - BTN_FIRST
+                    # 12…15 are the d-pad (from the hat): the 13th and 14th buttons (home,
+                    # capture on a Switch pad) move to 16, 17
+                    if index >= 12:
+                        index += 4
+                    if index < len(pad["buttons"]):
+                        pad["buttons"][index] = 1.0 if val else 0.0
                     changed = True
                 elif typ == EV_ABS and code in AXES:
                     lo, hi = pad["ranges"][code]

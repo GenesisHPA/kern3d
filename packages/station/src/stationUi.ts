@@ -55,6 +55,11 @@ export class StationUi {
     private readonly view: PathView;
     private readonly el: Record<string, HTMLElement> = {};
     private step = 1;
+
+    /** The jog step chosen on screen, mm (0 = continuous). */
+    get jogStep(): number {
+        return this.step;
+    }
     /** Program line index (0-based) of each line GRBL is sent, for drawing the path done. */
     private sentToSource: number[] = [];
     private shownJobId?: number;
