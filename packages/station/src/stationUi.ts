@@ -96,6 +96,8 @@ export class StationUi {
         );
         this.applyLayout();
         addEventListener("resize", () => this.applyLayout());
+        // ?open=settings: the settings sheet open at start (checks, screenshots)
+        if (new URLSearchParams(location.search).get("open") === "settings") this.settings.show();
         machine.onChange(() => this.render());
         this.render();
         const frame = () => {
@@ -263,7 +265,7 @@ export class StationUi {
     }
 
     private queueCard() {
-        const open = h("button", { class: "open" }, "+ Открыть G-code");
+        const open = h("button", { class: "openFile" }, "+ Открыть G-code");
         open.onclick = () => this.openFile();
         return h(
             "div",

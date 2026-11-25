@@ -72,6 +72,15 @@ body {
 .screen > .job { grid-area: job; }
 .screen > .mid { grid-area: mid; }
 .screen > .act { grid-area: act; }
+/* overlays span the whole grid: an absolute grid child with no area of its own would sit in an
+   extra implicit row below the last one */
+.screen > .sheet,
+.screen > .toast,
+.screen > .msg,
+.screen > .connect,
+.screen > .alarm {
+    grid-area: 1 / 1 / -1 / -1;
+}
 .screen[data-layout="landscape"] .mid {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
@@ -637,7 +646,7 @@ body {
     font-size: calc(var(--u) * 2.4);
     padding: 0 calc(var(--u) * 0.6);
 }
-.open {
+.openFile {
     margin-top: auto;
     height: calc(var(--u) * 6);
     border-radius: calc(var(--u) * 1.4);
@@ -646,7 +655,7 @@ body {
     color: var(--dim);
     font-size: calc(var(--u) * 2);
 }
-.open:active {
+.openFile:active {
     border-color: var(--acc);
     color: var(--acc2);
 }
