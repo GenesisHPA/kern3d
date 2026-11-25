@@ -281,6 +281,7 @@ export class SettingsSheet {
             status = r ?? status;
             pending = undefined;
             draw();
+            dispatchEvent(new Event("station-time")); // the clock in the top bar follows
         };
 
         const [ntpRow, setNtp] = choices<boolean>(

@@ -126,7 +126,20 @@ export class StationUi {
             requestAnimationFrame(frame);
         };
         requestAnimationFrame(frame);
-        setInterval(() => (this.el["clock"].textContent = new Date().toTimeString().slice(0, 5)), 1000);
+        // The clock shows the station's time: Chromium keeps the zone it started with, so a zone
+        // changed in ⚙ Время would not show. The offset is asked every 30 s and after every change.
+        let offset = 0;
+        const sync = async () => {
+            const t = await this.display.time().catch(() => undefined);
+            if (t) offset = new Date(t.now.replace(" ", "T")).getTime() - Date.now();
+        };
+        void sync();
+        setInterval(() => void sync(), 30000);
+        addEventListener("station-time", () => void sync());
+        setInterval(() => {
+            const now = new Date(Date.now() + offset);
+            this.el["clock"].textContent = now.toTimeString().slice(0, 5);
+        }, 1000);
     }
 
     private ref<T extends HTMLElement>(name: string, e: T): T {
@@ -158,7 +171,7 @@ export class StationUi {
             this.padChip(),
             h("div", { class: "sp" }),
             this.netChip(),
-            this.clockButton(),
+            this.ref("clock", h("div", { class: "clock" })),
             this.gearButton(),
         );
     }
@@ -168,10 +181,9 @@ export class StationUi {
         this.root.dataset["layout"] = resolveLayout(this.layout);
     }
 
-    /** The link in use and the station's address; tapping it opens Wi-Fi. Asked every 5 s. */
+    /** The link in use and the station's address, asked every 5 s (set up in ⚙ → Wi-Fi). */
     private netChip() {
-        const chip = this.ref("netChip", h("button", { class: "chip netChip", title: "Сеть" }));
-        chip.onclick = () => this.settings.showSection("wifi");
+        const chip = this.ref("netChip", h("div", { class: "chip netChip" }));
         const update = async () => {
             const n = await this.display.net().catch(() => undefined);
             chip.classList.toggle("down", !n || n.kind === "none");
@@ -186,13 +198,6 @@ export class StationUi {
         void update();
         setInterval(() => void update(), 5000);
         return chip;
-    }
-
-    /** The clock; tapping it opens the time settings. */
-    private clockButton() {
-        const clock = this.ref("clock", h("button", { class: "clock", title: "Время" }));
-        clock.onclick = () => this.settings.showSection("time");
-        return clock;
     }
 
     private padChip() {
