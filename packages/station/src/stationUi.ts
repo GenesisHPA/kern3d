@@ -3,6 +3,7 @@
 
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
 import type { BtApi } from "./btPanel";
+import { grblErrorText } from "./grblText";
 import { type DisplayApi, type Layout, resolveLayout, SettingsSheet, savedLayout } from "./settings";
 import type { StationMachine, StationSnapshot } from "./stationMachine";
 import { PathView } from "./view3d";
@@ -411,7 +412,7 @@ export class StationUi {
               : "▶ Старт";
         this.renderJob(s);
         this.renderQueue(s);
-        if (s.lastError && s.lastError !== this.shownError) this.toast(`Ошибка контроллера: ${s.lastError}`);
+        if (s.lastError && s.lastError !== this.shownError) this.toast(`⚠ ${grblErrorText(s.lastError)}`);
         this.shownError = s.lastError;
     }
 

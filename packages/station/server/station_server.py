@@ -23,6 +23,10 @@ user (a polkit rule lets that user change the network).
     GET  /api/net             the link in use (wifi / ethernet / none), its name, address, signal
     GET  /api/time            time zone, automatic time (NTP) on/off and synchronised, zones
     POST /api/time            {"timezone": "...", "ntp": bool, "set": "YYYY-MM-DD HH:MM:SS"}
+    GET  /api/jobs            the queue kept on disk: [{"id", "name", "source"}], oldest first
+    GET  /api/jobs/<id>       the program text
+    POST /api/jobs            {"name", "text", "source"} → {"id"}
+    DELETE /api/jobs/<id>
     GET  /api/display         {"rotate": 0|90|180|270}
     POST /api/display         {"rotate": ...}: saved, the kiosk restarts turned
 """
@@ -37,6 +41,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROTATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rotate")
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
+JOBS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jobs")
 PORT = int(os.environ.get("KERN3D_STATION_PORT", "8080"))
 BIND = os.environ.get("KERN3D_STATION_BIND", "127.0.0.1")
 
@@ -404,6 +409,65 @@ def set_time(req):
     return errors
 
 
+# ---- the job queue on disk ---------------------------------------------------------------------
+# One job = <id>.nc (the program) + <id>.json (name, source). The id is a time stamp, so the
+# queue comes back in the order the jobs arrived.
+
+
+def _job_id_ok(job_id):
+    return job_id.isdigit() and len(job_id) < 24
+
+
+def jobs_list():
+    os.makedirs(JOBS, exist_ok=True)
+    out = []
+    for name in sorted(os.listdir(JOBS)):
+        if not name.endswith(".json"):
+            continue
+        job_id = name[:-5]
+        if not _job_id_ok(job_id) or not os.path.exists(os.path.join(JOBS, job_id + ".nc")):
+            continue
+        try:
+            meta = json.load(open(os.path.join(JOBS, name), encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        out.append({"id": job_id, "name": meta.get("name", job_id), "source": meta.get("source", "file")})
+    out.sort(key=lambda j: int(j["id"]))
+    return out
+
+
+def job_add(req):
+    import time
+
+    os.makedirs(JOBS, exist_ok=True)
+    job_id = str(time.time_ns())
+    with open(os.path.join(JOBS, job_id + ".nc"), "w", encoding="utf-8") as f:
+        f.write(str(req.get("text", "")))
+    with open(os.path.join(JOBS, job_id + ".json"), "w", encoding="utf-8") as f:
+        json.dump({"name": str(req.get("name", "G-code"))[:200], "source": req.get("source", "file")}, f,
+                  ensure_ascii=False)
+    return job_id
+
+
+def job_text(job_id):
+    if not _job_id_ok(job_id):
+        return None
+    try:
+        return open(os.path.join(JOBS, job_id + ".nc"), encoding="utf-8").read()
+    except OSError:
+        return None
+
+
+def job_remove(job_id):
+    if not _job_id_ok(job_id):
+        return
+    for ext in (".nc", ".json"):
+        try:
+            os.remove(os.path.join(JOBS, job_id + ext))
+        except OSError:
+            pass
+
+
 def rotation():
     try:
         value = int(open(ROTATE_FILE, encoding="ascii").read().strip() or 0)
@@ -525,15 +589,36 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(200, net_status())
         if self.path.startswith("/api/time"):
             return self.reply(200, time_status(with_zones="zones" in self.path))
+        if self.path == "/api/jobs":
+            return self.reply(200, jobs_list())
+        if self.path.startswith("/api/jobs/"):
+            text = job_text(self.path.rsplit("/", 1)[1])
+            if text is None:
+                return self.reply(404, {"error": "no such job"})
+            data = text.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return None
         if self.path.startswith("/api/"):
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
+
+    def do_DELETE(self):
+        if self.path.startswith("/api/jobs/"):
+            job_remove(self.path.rsplit("/", 1)[1])
+            return self.reply(200, {"ok": True})
+        return self.reply(404, {"error": "unknown"})
 
     def do_POST(self):
         try:
             req = self.body()
         except ValueError:
             return self.reply(400, {"error": "bad json"})
+        if self.path == "/api/jobs":
+            return self.reply(200, {"id": job_add(req)})
         if self.path == "/api/time":
             errors = set_time(req)
             return self.reply(200, {"ok": not errors, "error": "; ".join(errors), **time_status()})

@@ -5,6 +5,7 @@ import { GamepadJog } from "@chili3d/app/src/cam/camNet";
 import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
 import { demoBt, serverBt } from "./btPanel";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
+import { JobStore } from "./jobStore";
 import { padCapture, padMap } from "./padMap";
 import { useServerPads } from "./serverPads";
 import { demoDisplay, serverDisplay } from "./settings";
@@ -36,6 +37,7 @@ const connect: Connect = async (onData, onClose) => {
 if (!demo) useServerPads();
 
 const machine = new StationMachine(connect);
+const jobs = new JobStore(machine);
 
 function openFile() {
     const input = document.createElement("input");
@@ -44,7 +46,7 @@ function openFile() {
     input.multiple = true;
     input.onchange = async () => {
         for (const file of input.files ?? [])
-            machine.addJob(file.name.replace(/\.[^.]+$/, ""), await file.text(), "file");
+            jobs.add(file.name.replace(/\.[^.]+$/, ""), await file.text(), "file");
     };
     input.click();
 }
@@ -66,11 +68,12 @@ document.addEventListener("dragover", (e) => e.preventDefault());
 document.addEventListener("drop", async (e) => {
     e.preventDefault();
     for (const file of e.dataTransfer?.files ?? []) {
-        machine.addJob(file.name.replace(/\.[^.]+$/, ""), await file.text(), "file");
+        jobs.add(file.name.replace(/\.[^.]+$/, ""), await file.text(), "file");
         ui.toast(`📥 ${file.name}`);
     }
 });
 
+if (!demo) void jobs.restore().catch(() => {});
 if (demo) {
     machine.addJob("Демо: карман 80×50", demoProgram(), "file");
     setTimeout(() => {
