@@ -1200,7 +1200,7 @@ export default {
         "browser.joints": "Сочленения",
         "command.sketch.point": "Точка",
         "command.modify.paintBucket": "Внешний вид",
-        "ribbon.workspace.mill": "Фрезеровка",
+        "ribbon.workspace.mill": "Фрезеровка (тест)",
         "ribbon.tab.mill": "Фрезеровка",
         "ribbon.group.mill": "Задание",
         "command.mill.open": "Фрезеровка (ЧПУ)",
@@ -1209,6 +1209,9 @@ export default {
         "mill.create": "Новое задание фрезеровки",
         "mill.edit": "Правка фрезеровки",
         "mill.toModel": "← К модели",
+        "mill.beta": "Тестовый режим",
+        "mill.beta.hint":
+            "Фрезеровка работает в тестовом режиме и ещё не проверена на настоящих станках. Проверяйте каждую программу в симуляции, первый запуск делайте по воздуху над заготовкой с выключенным шпинделем и держите руку на кнопке «Стоп».",
         "mill.importSvg": "Импорт SVG",
         "mill.saveGcode": "Сохранить G-code",
         "mill.play": "▶ Симуляция",

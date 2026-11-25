@@ -1509,6 +1509,8 @@ export const I18N_KEYS = [
     "mill.create",
     "mill.edit",
     "mill.toModel",
+    "mill.beta",
+    "mill.beta.hint",
     "mill.importSvg",
     "mill.saveGcode",
     "mill.play",

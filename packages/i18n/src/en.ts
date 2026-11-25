@@ -1362,7 +1362,7 @@ export default {
         "prompt.joint.drive": "Drive the joint; confirm keeps the value",
         "browser.components": "Components",
         "browser.joints": "Joints",
-        "ribbon.workspace.mill": "Milling",
+        "ribbon.workspace.mill": "Milling (beta)",
         "ribbon.tab.mill": "Milling",
         "ribbon.group.mill": "Job",
         "command.mill.open": "Milling (CNC)",
@@ -1371,6 +1371,9 @@ export default {
         "mill.create": "New milling job",
         "mill.edit": "Milling edit",
         "mill.toModel": "← Model",
+        "mill.beta": "Test mode",
+        "mill.beta.hint":
+            "Milling is in test mode and has not been tried on real machines yet. Check every program in the simulation, run it first in the air above the stock with the spindle off, and keep a hand on the stop button.",
         "mill.importSvg": "Import SVG",
         "mill.saveGcode": "Save G-code",
         "mill.play": "▶ Simulate",

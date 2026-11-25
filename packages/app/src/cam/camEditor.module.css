@@ -635,3 +635,42 @@
         min-height: 0;
     }
 }
+
+/* "test mode" chip in the top bar: milling has not been tried on real machines yet */
+.betaBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: #b54700;
+    background-color: color-mix(in srgb, #ffb020 22%, transparent);
+    border: 1px solid color-mix(in srgb, #ff8a00 55%, transparent);
+    cursor: help;
+
+    &::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background-color: #ff8a00;
+        animation: betaPulse 1.6s ease-in-out infinite;
+    }
+}
+
+:root[theme="dark"] .betaBadge {
+    color: #ffc066;
+}
+
+@keyframes betaPulse {
+    50% {
+        opacity: 0.3;
+        transform: scale(0.7);
+    }
+}

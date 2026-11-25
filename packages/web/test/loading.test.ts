@@ -5,10 +5,10 @@ import { Loading } from "../src/loading";
 
 describe("Loading custom element", () => {
     afterEach(() => {
-        // Every Loading instance injects a <style> with the spin keyframes into
+        // Every Loading instance injects a <style> with its keyframes into
         // document.head — remove them so tests don't leak into each other.
         document.head.querySelectorAll("style").forEach((styleEl) => {
-            if (styleEl.textContent?.includes("@keyframes spin")) {
+            if (styleEl.textContent?.includes("@keyframes kernSpin")) {
                 styleEl.remove();
             }
         });
@@ -42,10 +42,11 @@ describe("Loading custom element", () => {
         expect(firstChild.style.borderRadius).toBe("50%");
     });
 
-    test("should contain a label with 'Loading...' text", () => {
+    test("should show the name and a 'Loading…' line", () => {
         const el = new Loading();
-        const labels = Array.from(el.querySelectorAll("div")).filter((d) => d.textContent === "Loading...");
-        expect(labels.length).toBeGreaterThanOrEqual(1);
+        const texts = Array.from(el.querySelectorAll("div")).map((d) => d.textContent);
+        expect(texts).toContain("Kern3D");
+        expect(texts).toContain("Loading…");
     });
 
     test("should inject keyframes animation into document head", () => {
@@ -60,12 +61,14 @@ describe("Loading custom element", () => {
     test("should have spinner with animation style", () => {
         const el = new Loading();
         const spinner = el.children[0] as HTMLElement;
-        expect(spinner.style.animation).toContain("spin");
+        expect(spinner.style.animation).toContain("kernSpin");
     });
 
-    test("should have semi-transparent dark background", () => {
+    test("should have a dark background with an orange glow", () => {
         const el = new Loading();
-        expect(el.style.backgroundColor).toBe("rgba(0, 0, 0, 0.5)");
+        const background = el.getAttribute("style") ?? "";
+        expect(background).toContain("#111215");
+        expect(background).toContain("rgba(255, 122, 26");
     });
 
     test("second instance should also work", () => {

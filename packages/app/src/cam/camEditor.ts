@@ -247,6 +247,13 @@ export class MillEditor {
                 iconButton("←", "mill.toModel", () => workspaceTabs.activate(undefined)),
             ),
             el("span", { className: style.group }, this.modeButtons),
+            // not tried on real machines yet: say so where every milling session starts
+            el("span", {
+                className: style.betaBadge,
+                textContent: t("mill.beta"),
+                title: t("mill.beta.hint"),
+                onclick: () => PubSub.default.pub("showToast", "mill.beta.hint" as never),
+            }),
             el(
                 "span",
                 { className: style.group },
