@@ -9,6 +9,7 @@ import { DemoGrbl, demoProgram } from "./demoGrbl";
 import { dragScroll } from "./dragScroll";
 import { JobStore } from "./jobStore";
 import { padCapture, padEnabled, padMap } from "./padMap";
+import { rotary } from "./rotary";
 import { useServerPads } from "./serverPads";
 import { demoDisplay, serverDisplay } from "./settings";
 import { type Connect, StationMachine } from "./stationMachine";
@@ -198,6 +199,11 @@ setInterval(() => {
     if (edge(map.stepDown)) ui.shiftStep(-1);
     if (edge(map.zeroXY)) machine.zero(["X", "Y"]);
     if (edge(map.zeroZ)) machine.zero(["Z"]);
+    if (rotary().installed) {
+        const feed = Math.min(rotary().maxRate, 1800);
+        if (edge(map.aPlus)) machine.jogA(1, step, feed);
+        if (edge(map.aMinus)) machine.jogA(-1, step, feed);
+    }
     if (edge(map.toolChange))
         setTimeout(() => {
             if (!firstPad()?.buttons[padMap().toolChange]?.pressed) return;

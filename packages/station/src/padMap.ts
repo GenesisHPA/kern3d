@@ -17,6 +17,8 @@ export type PadAction =
     | "stepDown"
     | "zeroXY"
     | "zeroZ"
+    | "aPlus"
+    | "aMinus"
     | "toolChange";
 
 /** The actions in the order the settings list them, with their names. */
@@ -35,6 +37,8 @@ export const PAD_ACTIONS: readonly [PadAction, string][] = [
     ["stepDown", "Шаг меньше"],
     ["zeroXY", "Обнулить X и Y"],
     ["zeroZ", "Обнулить Z"],
+    ["aPlus", "A+ на шаг (4-я ось)"],
+    ["aMinus", "A− на шаг (4-я ось)"],
     ["toolChange", "Экстренная замена фрезы (держать 1 с)"],
 ];
 
@@ -57,6 +61,8 @@ export const DEFAULT_PAD_MAP: PadMap = {
     stepDown: -1,
     zeroXY: -1,
     zeroZ: -1,
+    aPlus: -1,
+    aMinus: -1,
     toolChange: -1,
 };
 

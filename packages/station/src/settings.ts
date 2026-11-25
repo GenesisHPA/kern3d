@@ -4,6 +4,7 @@
 import { type BtApi, BtPanel } from "./btPanel";
 import { padHelp } from "./padHelp";
 import { PadPanel } from "./padPanel";
+import { RotaryPanel } from "./rotaryPanel";
 import { scrollArrows, scrollerIn } from "./scrollArrows";
 import type { StationMachine } from "./stationMachine";
 import { ToolPanel } from "./toolPanel";
@@ -223,6 +224,15 @@ export class SettingsSheet {
             toolEl,
             () => toolPanel.show(),
             () => toolPanel.hide(),
+        );
+        const rotEl = h("div", "section");
+        const rotPanel = new RotaryPanel(rotEl, machine, toast);
+        this.add(
+            "rotary",
+            "4-я ось",
+            rotEl,
+            () => rotPanel.show(),
+            () => rotPanel.hide(),
         );
         const helpEl = h("div", "section");
         this.add("help", "Справка", helpEl, () => helpEl.replaceChildren(padHelp()));

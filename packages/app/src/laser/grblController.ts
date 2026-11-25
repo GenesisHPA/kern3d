@@ -32,6 +32,8 @@ export interface GrblStatus {
     pins?: string;
     /** Accessories on (`A:`): S / C spindle, F flood, M mist. */
     accessories?: string;
+    /** A 4th axis (A), when the controller reports one: machine and work position, degrees. */
+    a?: { m: number; w: number };
 }
 
 export type JobState = "none" | "running" | "paused" | "stopping" | "done" | "stopped" | "error";
@@ -57,14 +59,21 @@ export const REALTIME = {
 } as const;
 
 /** A `<…>` status report; the work coordinate offset (`WCO`) carried from earlier reports fills the other position. */
-export function parseStatus(line: string, lastWco?: [number, number, number]): GrblStatus | undefined {
+export function parseStatus(line: string, lastWco?: readonly number[]): GrblStatus | undefined {
     const m = /^<([^>]*)>$/.exec(line.trim());
     if (m === null) return undefined;
     const [head, ...fields] = m[1].split("|");
     const [state, sub] = head.split(":");
     const status: GrblStatus = { state };
     if (sub !== undefined && sub !== "") status.sub = Number(sub);
-    let wco = lastWco;
+    let wco = lastWco as [number, number, number] | undefined;
+    let wcoA = lastWco?.[3];
+    let mA: number | undefined;
+    let wA: number | undefined;
+    const fourth = (text: string) => {
+        const v = text.split(",");
+        return v.length >= 4 ? Number(v[3]) : undefined;
+    };
     const triple = (text: string) => {
         const v = text.split(",").map(Number);
         return [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0] as [number, number, number];
@@ -74,10 +83,16 @@ export function parseStatus(line: string, lastWco?: [number, number, number]): G
         if (colon < 0) continue;
         const key = field.slice(0, colon);
         const value = field.slice(colon + 1);
-        if (key === "MPos") status.mpos = triple(value);
-        else if (key === "WPos") status.wpos = triple(value);
-        else if (key === "WCO") wco = triple(value);
-        else if (key === "FS" || key === "F") {
+        if (key === "MPos") {
+            status.mpos = triple(value);
+            mA = fourth(value);
+        } else if (key === "WPos") {
+            status.wpos = triple(value);
+            wA = fourth(value);
+        } else if (key === "WCO") {
+            wco = triple(value);
+            wcoA = fourth(value);
+        } else if (key === "FS" || key === "F") {
             const [feed, spindle] = value.split(",").map(Number);
             status.feed = feed;
             if (spindle !== undefined) status.spindle = spindle;
@@ -97,6 +112,11 @@ export function parseStatus(line: string, lastWco?: [number, number, number]): G
             status.wpos = status.mpos.map((v, i) => v - wco![i]) as [number, number, number];
         if (status.wpos !== undefined && status.mpos === undefined)
             status.mpos = status.wpos.map((v, i) => v + wco![i]) as [number, number, number];
+    }
+    if (mA !== undefined || wA !== undefined) {
+        const off = wcoA ?? 0;
+        const m = mA ?? (wA as number) + off;
+        status.a = { m, w: wA ?? m - off };
     }
     return status;
 }
@@ -135,7 +155,7 @@ export class GrblController {
     private used = 0;
     private incoming = "";
     private writes: Promise<void> = Promise.resolve();
-    private wco: [number, number, number] | undefined;
+    private wco: number[] | undefined;
     private resetPending = false;
     private total = 0;
     private acked = 0;
@@ -325,7 +345,7 @@ export class GrblController {
         const status = parseStatus(line, this.wco);
         if (status === undefined) return;
         const wco = /WCO:([^|>]*)/.exec(line);
-        if (wco !== null) this.wco = wco[1].split(",").map(Number) as [number, number, number];
+        if (wco !== null) this.wco = wco[1].split(",").map(Number);
         this.status = status;
         this.emit({ type: "status", status });
         // the hold has settled: safe to reset without losing position

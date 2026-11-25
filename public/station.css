@@ -1283,3 +1283,61 @@ body {
     opacity: 0.25;
 }
 
+/* --- the 4th axis (shown while the rotary is on the table) --- */
+.axA,
+.aRow {
+    display: none;
+}
+.screen.rotary .axA {
+    display: grid;
+}
+.screen.rotary .aRow {
+    display: flex;
+}
+.screen.rotary .dro .ax {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+.screen.rotary .dro .v span {
+    font-size: 88%;
+}
+.aRow {
+    align-items: center;
+    gap: var(--u);
+}
+.aRow .k {
+    flex: 1;
+}
+.aHint {
+    flex: 1.2;
+    text-align: center;
+    font-size: calc(var(--u) * 1.7);
+    color: var(--dim);
+}
+.rotaryCalc {
+    padding: calc(var(--u) * 1.4) calc(var(--u) * 1.8);
+    border-radius: calc(var(--u) * 1.4);
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    font-size: calc(var(--u) * 2.1);
+    line-height: 1.5;
+}
+.rotaryCalc b {
+    color: var(--acc2);
+}
+
+/* --- settings tabs: a grid of up to two rows, never a word broken --- */
+.choices.tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(calc(var(--u) * 17), 1fr));
+    gap: var(--u);
+    flex-shrink: 0;
+}
+.choices.tabs .choice {
+    white-space: nowrap;
+    padding-left: calc(var(--u) * 1);
+    padding-right: calc(var(--u) * 1);
+    min-height: calc(var(--u) * 6);
+    height: auto;
+}
+

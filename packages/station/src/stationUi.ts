@@ -5,6 +5,7 @@ import type { Axis } from "@chili3d/app/src/cam/machineControl";
 import type { BtApi } from "./btPanel";
 import { grblErrorText } from "./grblText";
 import { padEnabled, setPadEnabled } from "./padMap";
+import { rotary } from "./rotary";
 import { scrollArrows } from "./scrollArrows";
 import { type DisplayApi, type Layout, resolveLayout, SettingsSheet, savedLayout } from "./settings";
 import type { StationMachine, StationSnapshot } from "./stationMachine";
@@ -124,6 +125,10 @@ export class StationUi {
         );
         this.applyLayout();
         addEventListener("resize", () => this.applyLayout());
+        // the rotary on the table or not: its row in the DRO and its jog keys
+        const showRotary = () => this.root.classList.toggle("rotary", rotary().installed);
+        showRotary();
+        addEventListener("station-rotary", showRotary);
         // ?open=settings: the settings sheet open at start (checks, screenshots)
         const open = new URLSearchParams(location.search).get("open");
         if (open === "settings") this.settings.show();
@@ -292,6 +297,20 @@ export class StationUi {
                 ),
             );
         }
+        const zeroA = h("button", { class: "zero" }, "A = 0");
+        zeroA.onclick = () => this.machine.zeroA();
+        axes.append(
+            this.ref(
+                "axA",
+                h(
+                    "div",
+                    { class: "ax axA" },
+                    h("div", { class: "n" }, "A"),
+                    h("div", { class: "v" }, this.ref("wA", h("span", {}, "—")), this.ref("mA", h("small"))),
+                    zeroA,
+                ),
+            ),
+        );
         return h("div", { class: "dro card" }, h("div", { class: "label" }, "Координаты детали · G54"), axes);
     }
 
@@ -376,11 +395,33 @@ export class StationUi {
             this.el[`${kind}Bar`] = bar;
             return box;
         };
+        const aKey = (label: string, dir: 1 | -1) => {
+            const b = h("button", { class: "k" }, label);
+            b.onpointerdown = (e) => {
+                b.setPointerCapture(e.pointerId);
+                this.machine.jogA(dir, this.step, Math.min(rotary().maxRate, 1800));
+            };
+            b.onpointerup = () => {
+                if (this.step === 0) this.machine.jogStop();
+            };
+            return b;
+        };
+        const aRow = this.ref(
+            "aRow",
+            h(
+                "div",
+                { class: "aRow" },
+                aKey("A−", -1),
+                h("span", { class: "aHint" }, "шаг в градусах"),
+                aKey("A+", 1),
+            ),
+        );
         return h(
             "div",
             { class: "jog card" },
             steps,
             pad,
+            aRow,
             h("div", { class: "ovr" }, ovr("feed", "Подача"), ovr("spindle", "Шпиндель")),
         );
     }
@@ -629,6 +670,9 @@ export class StationUi {
             this.el[`w${a}`].textContent = w ? fmt(this.shown[i]) : "—";
             this.el[`m${a}`].textContent = m ? `маш. ${fmt(m[i])}` : "";
         });
+        const a = s.status.a;
+        this.el["wA"].textContent = a ? `${a.w.toFixed(2)}°` : "—";
+        this.el["mA"].textContent = a ? `маш. ${a.m.toFixed(2)}°` : "";
         const rpm = s.status.spindle ?? 0;
         this.el["rpm"].textContent = Math.round(rpm).toLocaleString("ru");
         (this.root.querySelector(".ga") as SVGElement).style.strokeDashoffset = String(

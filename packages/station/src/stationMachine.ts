@@ -70,6 +70,8 @@ export interface StationSnapshot {
     jobTools: ToolRef[];
     /** The tool in the spindle, as far as the station knows (from the programs it ran). */
     tool?: ToolRef;
+    /** The controller's welcome line («Grbl 1.1h …», «Grbl 3.7 [FluidNC …]»). */
+    firmware?: string;
     change?: ToolChange;
     /** The tool length offset applied now (G43.1), mm; the reference tool's machine Z on the sensor. */
     offset: number;
@@ -179,6 +181,7 @@ export class StationMachine {
     offset = 0;
     /** The tool in the spindle: the program's first at its start, each change's after it. */
     tool?: ToolRef;
+    private firmware?: string;
 
     constructor(
         private readonly connectWith: Connect,
@@ -220,6 +223,7 @@ export class StationMachine {
             doneLine: run && doneCode >= 0 ? run.src[doneCode] : -1,
             ...this.jobTools(),
             tool: this.tool,
+            firmware: this.firmware,
             change: this.change,
             offset: this.offset,
             reference: this.reference,
@@ -262,6 +266,7 @@ export class StationMachine {
         else if (e.type === "error") this.lastError = `error:${e.code} ${e.line}`;
         else if (e.type === "welcome") {
             this.alarm = undefined;
+            this.firmware = e.version;
             // a reset drops the tool length offset; the tool in the spindle still needs it
             if (this.offset !== 0) this.grbl?.send(applyOffsetLines(this.offset)[0], true);
         } else if (e.type === "status") {
@@ -598,6 +603,27 @@ export class StationMachine {
             this.changed();
         }
         return this.grbl.send(`G10 L20 P1 ${axes.map((a) => `${a}0`).join(" ")}`);
+    }
+
+    /** The rotary axis by `step` degrees (0 = until `jogStop`), at `feed` degrees a minute. */
+    jogA(direction: 1 | -1, step: number, feed: number): boolean {
+        if (!this.grbl || this.grbl.jobActive || this.busy) return false;
+        const distance = step > 0 ? step : 3600;
+        return this.grbl.send(`$J=G91 A${direction * distance} F${Math.round(feed)}`);
+    }
+
+    /** Work zero of the rotary axis where it stands. */
+    zeroA(): boolean {
+        if (!this.grbl || this.grbl.jobActive || this.busy) return false;
+        return this.grbl.send("G10 L20 P1 A0");
+    }
+
+    /** Sends setting lines one by one, each waiting for its ok (rejects on an error). */
+    async sendLines(lines: string[]): Promise<void> {
+        const grbl = this.grbl;
+        if (!grbl) throw new Error("Контроллер не подключён");
+        if (grbl.jobActive || this.busy) throw new Error("Станок занят");
+        await new StationProbeIO(grbl).send(lines);
     }
 
     home(): boolean {
