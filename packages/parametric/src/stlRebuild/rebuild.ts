@@ -16,7 +16,7 @@ import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan"
 import { meshDifference } from "./raycast";
 import { safeMeshReady, safeTriangles } from "./safeMesh";
 import { sliceFrames } from "./slices";
-import { deviation, solidVolume, surfaceFit, trianglesOf } from "./verify";
+import { deviation, setVerifyDebug, solidVolume, surfaceFit, trianglesOf } from "./verify";
 
 export interface RebuildReport {
     readonly model?: BuiltModel;
@@ -93,6 +93,7 @@ export function kernelHeapMb(): number {
 export let REBUILD_DEBUG: ((line: string) => void) | undefined;
 export function setRebuildDebug(hook: ((line: string) => void) | undefined) {
     debugHook = hook;
+    setVerifyDebug(hook === undefined ? undefined : (line) => hook(`  ${line}`));
     REBUILD_DEBUG =
         hook === undefined
             ? undefined
@@ -374,6 +375,13 @@ export async function rebuildPart(
             if (expected === undefined) break;
             const diff = deviation(reference, current, true, expected);
             REBUILD_DEBUG?.(`correction pass ${pass}: deviation ${Date.now() - td} ms`);
+            if (!diff.trusted) {
+                // the kernel could not compare the bodies: no piece from it would mean anything
+                REBUILD_DEBUG?.(`correction pass ${pass}: comparison failed, corrections stopped`);
+                diff.missingShape?.dispose();
+                diff.extraShape?.dispose();
+                break;
+            }
             const pieces: { shape: IShape; operation: "fuse" | "cut" }[] = [];
             for (const [whole, operation] of [
                 [diff.missingShape, "fuse"],

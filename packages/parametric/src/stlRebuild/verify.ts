@@ -19,6 +19,12 @@ export interface Deviation {
     /** The difference pieces, when asked for (the caller owns them). */
     readonly missingShape?: IShape;
     readonly extraShape?: IShape;
+    /**
+     * Whether the kernel managed both cuts (a valid shape that took something away). When the first
+     * fails even nudged, the second is not tried (its volume counts as the whole rebuilt part): on a
+     * faceted reference each try is a heavy boolean, and no correction can come of a failed comparison.
+     */
+    readonly trusted: boolean;
 }
 
 /**
@@ -34,22 +40,31 @@ export function deviation(
 ): Deviation {
     const ref = solidVolume(reference);
     const built = solidVolume(rebuilt);
-    const missingCut = robustCut(reference, rebuilt, expected?.missing);
-    const extraCut = robustCut(rebuilt, reference, expected?.extra);
+    const missingTry = checkedCut(reference, rebuilt, expected?.missing);
+    const missingCut = missingTry.cut;
+    const extraTry = missingTry.broken ? undefined : checkedCut(rebuilt, reference, expected?.extra);
+    const extraCut = extraTry?.cut;
     const missing = missingCut.isOk ? solidVolume(missingCut.value) : ref;
-    const extra = extraCut.isOk ? solidVolume(extraCut.value) : built;
+    const extra = extraCut?.isOk ? solidVolume(extraCut.value) : built;
     const result: Deviation = {
         missing,
         extra,
         ratio: ref > 0 ? (missing + extra) / ref : 1,
+        trusted: !missingTry.broken && extraTry?.broken === false,
         ...(keepShapes && missingCut.isOk ? { missingShape: missingCut.value } : {}),
-        ...(keepShapes && extraCut.isOk ? { extraShape: extraCut.value } : {}),
+        ...(keepShapes && extraCut?.isOk ? { extraShape: extraCut.value } : {}),
     };
     if (!keepShapes) {
         if (missingCut.isOk) missingCut.value.dispose();
-        if (extraCut.isOk) extraCut.value.dispose();
+        if (extraCut?.isOk) extraCut.value.dispose();
     }
     return result;
+}
+
+/** Timing of the comparison's booleans, for the corpus diagnostics (unset in the app). */
+export let VERIFY_DEBUG: ((line: string) => void) | undefined;
+export function setVerifyDebug(hook: ((line: string) => void) | undefined) {
+    VERIFY_DEBUG = hook;
 }
 
 /** Skewed nudges, mm: off every face of both parts, far below any feature. */
@@ -69,30 +84,58 @@ export function robustCut(
     b: IShape,
     expected?: number,
 ): ReturnType<typeof shapeFactory.booleanCut> {
+    return checkedCut(a, b, expected).cut;
+}
+
+/** `robustCut` with whether the cut it hands back passed its checks. */
+function checkedCut(
+    a: IShape,
+    b: IShape,
+    expected?: number,
+): { cut: ReturnType<typeof shapeFactory.booleanCut>; sound: boolean; broken: boolean } {
     const volumeA = solidVolume(a);
     const overlap = boxesOverlap(a, b);
     // a cut of two overlapping parts that took nothing away is a cut the kernel gave up on, and
     // so is one far from the volume measured independently (`meshDifference`)
-    const sound = (cut: IShape) => {
-        if (!cut.checkShape()) return false;
+    // broken: not a valid shape, nothing taken away, or most of the part left where the ray
+    // measure finds only a little difference — the kernel gave up on the cut
+    const broken = (cut: IShape) => {
+        if (!cut.checkShape()) return true;
         const v = solidVolume(cut);
-        if (overlap && Math.abs(v - volumeA) <= volumeA * 1e-9) return false;
+        if (overlap && Math.abs(v - volumeA) <= volumeA * 1e-9) return true;
+        return expected !== undefined && expected < volumeA * 0.1 && v > volumeA * 0.5;
+    };
+    const sound = (cut: IShape) => {
+        if (broken(cut)) return false;
+        const v = solidVolume(cut);
         return expected === undefined || Math.abs(v - expected) <= expected * 0.5 + volumeA * 0.003;
     };
+    let t = Date.now();
     const first = shapeFactory.booleanCut([a], [b]);
-    if (first.isOk && sound(first.value)) return first;
-    if (first.isOk) first.value.dispose();
+    const firstSound = first.isOk && sound(first.value);
+    VERIFY_DEBUG?.(
+        `cut ${Date.now() - t} ms ok=${first.isOk} sound=${firstSound}` +
+            (first.isOk ? ` v=${solidVolume(first.value).toFixed(1)} expected=${expected?.toFixed(1)}` : ""),
+    );
+    if (firstSound) return { cut: first, sound: true, broken: false };
     for (const [x, y, z] of NUDGES) {
         const moved = b.transformed(Matrix4.fromTranslation(x, y, z));
         try {
+            t = Date.now();
             const cut = shapeFactory.booleanCut([a], [moved]);
-            if (cut.isOk && sound(cut.value)) return cut;
+            const cutSound = cut.isOk && sound(cut.value);
+            VERIFY_DEBUG?.(`nudged cut ${Date.now() - t} ms ok=${cut.isOk} sound=${cutSound}`);
+            if (cutSound) {
+                if (first.isOk) first.value.dispose();
+                return { cut, sound: true, broken: false };
+            }
             if (cut.isOk) cut.value.dispose();
         } finally {
             moved.dispose();
         }
     }
-    return first.isOk ? shapeFactory.booleanCut([a], [b]) : first;
+    // the first answer, kept rather than computed a second time (a boolean of seconds on a faceted part)
+    return { cut: first, sound: false, broken: !first.isOk || broken(first.value) };
 }
 
 /** Whether the two parts' bounding boxes overlap by more than a sliver. */
