@@ -1,0 +1,34 @@
+{
+    "//": "The app on a phone (run with SCENARIO_MOBILE=390,844,3): the home screen with the browser it found, a model with the browser/properties drawer slid in over the view, the laser start page and the milling editor with the panel above the 3D stage.",
+    "steps": [
+        { "kind": "wait", "ms": 1200 },
+        {
+            "kind": "eval",
+            "expression": "(() => [document.documentElement.dataset.browser, document.documentElement.dataset.os, document.documentElement.dataset.device].join(' '))()",
+            "log": true
+        },
+        { "kind": "screenshot", "name": "01-home" },
+        { "kind": "runCommand", "name": "doc.new" },
+        { "kind": "waitFor", "selector": "canvas" },
+        { "kind": "wait", "ms": 600 },
+        { "kind": "screenshot", "name": "02-model" },
+        {
+            "kind": "eval",
+            "expression": "(() => { const t = [...document.querySelectorAll('div')].find((x) => x.textContent === '☰'); if (!t) throw new Error('no drawer button'); t.click(); return true; })()"
+        },
+        { "kind": "wait", "ms": 500 },
+        { "kind": "screenshot", "name": "03-drawer" },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.laser'); return true; })()"
+        },
+        { "kind": "wait", "ms": 800 },
+        { "kind": "screenshot", "name": "04-laser" },
+        {
+            "kind": "eval",
+            "expression": "(() => { document.querySelector('chili-main-toolbar').switchWorkspace('ribbon.workspace.mill'); return true; })()"
+        },
+        { "kind": "wait", "ms": 1200 },
+        { "kind": "screenshot", "name": "05-mill" }
+    ]
+}

@@ -154,3 +154,60 @@
         display: none;
     }
 }
+
+/* the phone's button that slides the browser and properties in over the view */
+.sidebarToggle {
+    display: none;
+}
+
+@media (max-width: 680px) {
+    .sidebarToggle {
+        position: absolute;
+        left: 12px;
+        bottom: 14px;
+        /* above the view's own overlays (the view cube, the command bar at 99999) */
+        z-index: 100002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        font-size: 20px;
+        color: var(--accent-text-color);
+        background: var(--accent-gradient);
+        box-shadow: var(--accent-glow);
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform var(--dur) var(--ease-spring);
+
+        &:active {
+            transform: scale(0.92);
+        }
+    }
+
+    .content.sidebarOpen .sidebar {
+        display: flex;
+        position: absolute;
+        inset: 0 auto 0 0;
+        z-index: 100001;
+        width: min(86vw, 360px) !important;
+        max-width: none;
+        padding-bottom: 72px;
+        box-sizing: border-box;
+        border-right: 1px solid var(--chrome-border-color);
+        box-shadow: var(--panel-shadow);
+        animation: sidebarSlide var(--dur) var(--ease-out) backwards;
+
+        & .sidebarResizer {
+            display: none;
+        }
+    }
+}
+
+@keyframes sidebarSlide {
+    from {
+        transform: translateX(-100%);
+    }
+}

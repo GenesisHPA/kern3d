@@ -703,3 +703,71 @@
 .menuReset .menuText {
     color: var(--foreground-secondary-color);
 }
+
+/* --- phones: the name goes, the switcher is its icon, tabs and groups scroll sideways --- */
+
+@media (max-width: 680px) {
+    .appName {
+        display: none;
+    }
+
+    .quickCommands {
+        margin: 0 2px;
+        padding: 0 2px;
+    }
+
+    .docTab {
+        min-width: 64px;
+        max-width: 130px;
+    }
+
+    .workspace {
+        width: 58px;
+        padding: 4px 2px;
+    }
+
+    .workspaceText {
+        display: none;
+    }
+
+    .tabStrip {
+        overflow-x: auto;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+
+    .tab {
+        flex: none;
+        white-space: nowrap;
+        padding: 0 10px;
+    }
+
+    .groupArea {
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .menu {
+        max-width: calc(100vw - 16px);
+    }
+}
+
+/* a finger needs more room than a pointer */
+@media (pointer: coarse) {
+    .icons > *,
+    .icons > .iconSlot > * {
+        padding: 7px;
+    }
+
+    .menuRow {
+        padding: 10px 12px;
+    }
+
+    .quickCommands svg,
+    .appButton {
+        padding: 7px;
+    }
+}

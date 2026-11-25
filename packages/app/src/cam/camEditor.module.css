@@ -614,3 +614,24 @@
         transition: none !important;
     }
 }
+
+/* phones: the operations panel takes the top part and scrolls, the 3D stage keeps the rest */
+@media (max-width: 760px) {
+    .dialog {
+        height: calc(100dvh - 30px);
+        max-height: calc(100dvh - 30px);
+    }
+
+    .panel {
+        height: auto;
+        max-height: 46%;
+        flex: none;
+        border-bottom: 1px solid var(--m-line);
+    }
+
+    .stage {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+    }
+}

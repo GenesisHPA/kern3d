@@ -2,12 +2,22 @@
 // See LICENSE file in the project root for full license information.
 
 import { AppBuilder } from "@chili3d/builder";
-import { type IApplication, Logger, PubSub, pendingWork, quietFrames } from "@chili3d/core";
+import {
+    detectBrowser,
+    type IApplication,
+    Logger,
+    markDocument,
+    PubSub,
+    pendingWork,
+    quietFrames,
+} from "@chili3d/core";
 import { installApplicationErrorCapture } from "./errorCapture";
 import { Loading } from "./loading";
 import { parseStartupParams } from "./startupParams";
 
 installApplicationErrorCapture();
+// before anything is drawn, so styles per device (phone, touch) apply from the first frame
+markDocument(detectBrowser());
 
 const loading = new Loading();
 document.body.appendChild(loading);

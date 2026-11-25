@@ -4,6 +4,8 @@
 import {
     CAMERA_FLY_DURATION,
     Constants,
+    describeBrowser,
+    detectBrowser,
     I18n,
     type I18nKeys,
     type IApplication,
@@ -158,6 +160,7 @@ export class Home extends HTMLElement {
                     { className: style.header },
                     div({ className: style.welcome, textContent: new Localize("home.welcome") }),
                     div({ className: style.subtitle, textContent: new Localize("home.welcome.subtitle") }),
+                    browserNotice(),
                 ),
                 div(
                     { className: style.contentRow },
@@ -308,3 +311,42 @@ export class Home extends HTMLElement {
 }
 
 customElements.define("chili-home", Home);
+
+const BROWSER_NOTICE_SEEN = "kern3d.home.browserNotice";
+
+/**
+ * What the app found it runs in — browser, system — and, when it matters, what that means:
+ * a phone is for looking, a browser without Web Serial cannot drive a machine. The advice can
+ * be put away (remembered); the browser line stays.
+ */
+function browserNotice(): HTMLElement {
+    const info = detectBrowser();
+    const usb = info.desktopApp || info.webSerial;
+    const adviceKey: I18nKeys | undefined =
+        info.phone || info.tablet ? "home.browser.phone" : usb ? undefined : "home.browser.noUsb";
+    const chip = span({ className: style.browserChip, textContent: describeBrowser(info) });
+    const status =
+        usb && !info.phone
+            ? [span({ className: style.browserOk, textContent: new Localize("home.browser.usb") })]
+            : [];
+    const root = div(
+        { className: style.browserNotice },
+        div({ className: style.browserLine }, chip, ...status),
+    );
+    if (adviceKey && localStorage.getItem(BROWSER_NOTICE_SEEN) !== adviceKey) {
+        const advice = div(
+            { className: style.browserAdvice },
+            span({ textContent: new Localize(adviceKey) }),
+            button({
+                className: style.browserDismiss,
+                textContent: new Localize("home.browser.dismiss"),
+                onclick: () => {
+                    localStorage.setItem(BROWSER_NOTICE_SEEN, adviceKey);
+                    advice.remove();
+                },
+            }),
+        );
+        root.append(advice);
+    }
+    return root;
+}

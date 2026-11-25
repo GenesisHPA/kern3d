@@ -358,6 +358,7 @@ async function runScenario(browser, name) {
         // Front-most: an unfocused tab gets no animation frames, and the settle handshake
         // waits on one.
         await page.cdp.send("Page.bringToFront");
+        await emulateMobile(page);
         // What the page said, kept for the failure message: a boot that dies on an
         // exception otherwise looks exactly like a boot that is slow.
         page.cdp.on("Runtime.consoleAPICalled", (params) => {
@@ -396,6 +397,35 @@ async function runScenario(browser, name) {
  * matter: a command is asynchronous, and the canvas only exists once the document's view
  * has been laid out.
  */
+/**
+ * SCENARIO_MOBILE=width,height[,scale[,android]] runs the page as a phone: its screen size and
+ * pixel ratio, touch, and a phone's user agent (iPhone Safari, or Android Chrome with
+ * `android`), then reloads so the app starts as it would there.
+ */
+async function emulateMobile(page) {
+    const spec = process.env.SCENARIO_MOBILE;
+    if (!spec) return;
+    const [width, height, scale = "3", kind = "iphone"] = spec.split(",");
+    const userAgent =
+        kind === "android"
+            ? "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
+            : "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
+    await page.cdp.send("Emulation.setDeviceMetricsOverride", {
+        width: Number(width),
+        height: Number(height),
+        deviceScaleFactor: Number(scale),
+        mobile: true,
+    });
+    await page.cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    await page.cdp.send("Emulation.setUserAgentOverride", {
+        userAgent,
+        platform: kind === "android" ? "Linux armv8l" : "iPhone",
+    });
+    await page.cdp.send("Page.reload", { ignoreCache: true });
+    // the reload is answered before the old page is gone: do not mistake it for the new one
+    await new Promise((resolve) => setTimeout(resolve, 800));
+}
+
 async function startDocument(page) {
     await page.evaluate(`globalThis.__chiliTest.dispatch("doc.new")`);
     await page.settled();

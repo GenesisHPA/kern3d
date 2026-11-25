@@ -800,6 +800,12 @@ export default {
         "home.credits":
             "Kern3D by Genesis Tactical · based on Chili3D by xiangechen (仙阁) · AGPL-3.0 license",
         "home.welcome": "Welcome to Kern3D",
+        "home.browser.usb": "USB machines: available",
+        "home.browser.noUsb":
+            "Machines over USB do not work in this browser. Open Kern3D in Chrome or Edge, or use the Kern3D program.",
+        "home.browser.phone":
+            "On a phone you can view models and projects; connect machines from a computer (Chrome, Edge or the Kern3D program).",
+        "home.browser.dismiss": "Got it",
         "home.welcome.subtitle": "Sketch, model, assemble and draw in 3D.",
         "items.header": "Items",
         "items.tool.delete": "Delete",

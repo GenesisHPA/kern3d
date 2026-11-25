@@ -9,6 +9,7 @@ import {
     type IFeatureListNode,
     type INode,
     isFeatureListNode,
+    Localize,
     type Material,
     PubSub,
     type Ribbon,
@@ -81,7 +82,12 @@ export class Editor extends HTMLElement {
             }),
         );
         this.applySidebarSplit();
-        this._contentEl = div({ className: style.content }, this._sidebarEl, this._viewportContainer);
+        this._contentEl = div(
+            { className: style.content },
+            this._sidebarEl,
+            this._viewportContainer,
+            this.sidebarToggle(),
+        );
         this.append(
             div(
                 { className: style.root },
@@ -92,6 +98,23 @@ export class Editor extends HTMLElement {
             ),
         );
         this.app.mainWindow?.appendChild(this);
+    }
+
+    /**
+     * On a phone the browser and properties do not fit beside the view: they are hidden and this
+     * round button slides them in over the view (and back). Hidden on wider screens by the CSS.
+     */
+    private sidebarToggle() {
+        const toggle = div({
+            className: style.sidebarToggle,
+            title: new Localize("browser.header"),
+            onclick: () => {
+                const open = this._contentEl?.classList.toggle(style.sidebarOpen) ?? false;
+                toggle.textContent = open ? "✕" : "☰";
+            },
+        });
+        toggle.textContent = "☰";
+        return toggle;
     }
 
     private ensureChatPanel(): ChatPanel {

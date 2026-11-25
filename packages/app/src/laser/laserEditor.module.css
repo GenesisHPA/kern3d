@@ -541,6 +541,11 @@
     margin-bottom: 20px;
 }
 
+.homeTop > :last-child {
+    flex: none;
+    white-space: nowrap;
+}
+
 .homeHeading {
     font-size: 20px;
     font-weight: 700;

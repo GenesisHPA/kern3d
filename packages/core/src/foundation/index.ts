@@ -3,6 +3,7 @@
 
 export * from "./asyncController";
 export * from "./binding";
+export * from "./browserInfo";
 export * from "./collection";
 export * from "./comparers";
 export * from "./converter";

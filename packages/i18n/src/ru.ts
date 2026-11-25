@@ -714,6 +714,12 @@ export default {
         "home.credits":
             "Kern3D от Genesis Tactical · на основе Chili3D, автор xiangechen (仙阁) · лицензия AGPL-3.0",
         "home.welcome": "Добро пожаловать в Kern3D",
+        "home.browser.usb": "Станки по USB: доступны",
+        "home.browser.noUsb":
+            "В этом браузере станки по USB не подключаются. Откройте Kern3D в Chrome или Edge или в программе Kern3D.",
+        "home.browser.phone":
+            "На телефоне можно смотреть модели и проекты. Станки подключайте с компьютера: Chrome, Edge или программа Kern3D.",
+        "home.browser.dismiss": "Понятно",
         "home.welcome.subtitle": "Эскизы, 3D-модели, сборки и чертежи.",
         "items.header": "Компоненты",
         "items.tool.delete": "Удалить",
