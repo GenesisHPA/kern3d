@@ -968,3 +968,46 @@ body {
     line-height: 1.4;
 }
 
+/* --- network chip, clock, time settings --- */
+.netChip {
+    cursor: pointer;
+    color: var(--fg);
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.netChip.down {
+    color: #ff6b5a;
+    border-color: #ff6b5a;
+}
+button.clock {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: calc(var(--u) * 0.6) calc(var(--u) * 1);
+    font-family: inherit;
+}
+.timeBig {
+    font-size: calc(var(--u) * 6);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    white-space: pre;
+}
+.timeManual {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--u);
+}
+.timeManual[hidden] {
+    display: none;
+}
+.choices.zones {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+}
+.choices.zones .choice {
+    font-size: calc(var(--u) * 2);
+    white-space: nowrap;
+}
+

@@ -20,6 +20,9 @@ user (a polkit rule lets that user change the network).
     POST /api/bt/remove       {"mac": "..."}
     GET  /api/gamepad/events  server-sent events: the joysticks Linux sees (axes −1…1, buttons),
                               for gamepads the browser does not show (vendor 0000, some clones)
+    GET  /api/net             the link in use (wifi / ethernet / none), its name, address, signal
+    GET  /api/time            time zone, automatic time (NTP) on/off and synchronised, zones
+    POST /api/time            {"timezone": "...", "ntp": bool, "set": "YYYY-MM-DD HH:MM:SS"}
     GET  /api/display         {"rotate": 0|90|180|270}
     POST /api/display         {"rotate": ...}: saved, the kiosk restarts turned
 """
@@ -331,6 +334,74 @@ def pads_snapshot():
     return [{"id": p["id"], "axes": p["axes"], "buttons": p["buttons"]} for p in _pads.values()]
 
 
+# ---- network status and time ----------------------------------------------------------------
+
+
+def net_status():
+    _, out, _ = nmcli("-f", "DEVICE,TYPE,STATE,CONNECTION", "device")
+    links = []
+    for line in out.splitlines():
+        dev, typ, state, conn = (split_terse(line) + ["", "", "", ""])[:4]
+        if typ in ("wifi", "ethernet") and state == "connected":
+            links.append((dev, typ, conn))
+    # a cable first: it is what the machine should be on when both are
+    links.sort(key=lambda l: l[1] != "ethernet")
+    if not links:
+        return {"kind": "none", "name": "", "ip": "", "signal": 0, "host": os.uname().nodename}
+    dev, typ, conn = links[0]
+    ip = ""
+    _, out, _ = nmcli("-f", "IP4.ADDRESS", "device", "show", dev)
+    for line in out.splitlines():
+        if line.startswith("IP4.ADDRESS"):
+            ip = line.split(":", 1)[1].split("/")[0]
+            break
+    signal = 0
+    if typ == "wifi":
+        _, out, _ = nmcli("-f", "IN-USE,SIGNAL", "device", "wifi", "list", "--rescan", "no")
+        for line in out.splitlines():
+            in_use, sig = (split_terse(line) + ["", ""])[:2]
+            if in_use == "*":
+                signal = int(sig or 0)
+    return {"kind": typ, "name": conn, "ip": ip, "signal": signal, "host": os.uname().nodename}
+
+
+def time_status(with_zones=False):
+    import datetime
+
+    p = subprocess.run(["timedatectl", "show", "-p", "Timezone", "-p", "NTP", "-p", "NTPSynchronized"],
+                       capture_output=True, text=True, timeout=10)
+    props = dict(line.split("=", 1) for line in p.stdout.splitlines() if "=" in line)
+    out = {
+        "now": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "timezone": props.get("Timezone", ""),
+        "ntp": props.get("NTP") == "yes",
+        "synced": props.get("NTPSynchronized") == "yes",
+    }
+    if with_zones:
+        z = subprocess.run(["timedatectl", "list-timezones"], capture_output=True, text=True, timeout=10)
+        out["zones"] = z.stdout.split()
+    return out
+
+
+def set_time(req):
+    """Time zone, automatic time, or a time set by hand (which turns automatic time off)."""
+    errors = []
+
+    def run(*args):
+        p = subprocess.run(["timedatectl", *args], capture_output=True, text=True, timeout=15)
+        if p.returncode != 0:
+            errors.append(p.stderr.strip() or p.stdout.strip())
+
+    if req.get("timezone"):
+        run("set-timezone", str(req["timezone"]))
+    if "ntp" in req:
+        run("set-ntp", "true" if req["ntp"] else "false")
+    if req.get("set"):
+        run("set-ntp", "false")
+        run("set-time", str(req["set"]))
+    return errors
+
+
 def rotation():
     try:
         value = int(open(ROTATE_FILE, encoding="ascii").read().strip() or 0)
@@ -448,6 +519,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(200, {"rotate": rotation()})
         if self.path == "/api/bt":
             return self.reply(200, bt_status())
+        if self.path == "/api/net":
+            return self.reply(200, net_status())
+        if self.path.startswith("/api/time"):
+            return self.reply(200, time_status(with_zones="zones" in self.path))
         if self.path.startswith("/api/"):
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
@@ -457,6 +532,9 @@ class Handler(SimpleHTTPRequestHandler):
             req = self.body()
         except ValueError:
             return self.reply(400, {"error": "bad json"})
+        if self.path == "/api/time":
+            errors = set_time(req)
+            return self.reply(200, {"ok": not errors, "error": "; ".join(errors), **time_status()})
         if self.path == "/api/bt/scan":
             bt_scan()
             return self.reply(200, bt_status())

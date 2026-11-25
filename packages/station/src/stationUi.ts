@@ -84,7 +84,7 @@ export class StationUi {
         private readonly openFile: () => void,
         private readonly askConnect: () => void,
         wifi: WifiApi,
-        display: DisplayApi,
+        private readonly display: DisplayApi,
         bt: BtApi,
     ) {
         const canvas = h("canvas");
@@ -144,7 +144,7 @@ export class StationUi {
     // ---- building -------------------------------------------------------------------------------
 
     private topBar() {
-        const logo = h("div", { class: "logo" }, "Kern3D ", h("b", {}, "Станок"));
+        const logo = h("div", { class: "logo" }, "Kern3D ", h("b", {}, "CNC"));
         const link = this.ref(
             "link",
             h("div", { class: "chip" }, h("span", { class: "dot" }), this.ref("linkText", h("span"))),
@@ -157,7 +157,8 @@ export class StationUi {
             this.ref("state", h("div", { class: "chip" })),
             this.padChip(),
             h("div", { class: "sp" }),
-            this.ref("clock", h("div", { class: "clock" })),
+            this.netChip(),
+            this.clockButton(),
             this.gearButton(),
         );
     }
@@ -165,6 +166,33 @@ export class StationUi {
     /** Portrait (the Tesla screen standing up) or landscape (a monitor): the grid changes, nothing else. */
     private applyLayout() {
         this.root.dataset["layout"] = resolveLayout(this.layout);
+    }
+
+    /** The link in use and the station's address; tapping it opens Wi-Fi. Asked every 5 s. */
+    private netChip() {
+        const chip = this.ref("netChip", h("button", { class: "chip netChip", title: "Сеть" }));
+        chip.onclick = () => this.settings.showSection("wifi");
+        const update = async () => {
+            const n = await this.display.net().catch(() => undefined);
+            chip.classList.toggle("down", !n || n.kind === "none");
+            if (!n) chip.textContent = "⚠ нет связи со станцией";
+            else if (n.kind === "none") chip.textContent = "⚠ Нет сети";
+            else {
+                const icon = n.kind === "ethernet" ? "🔌" : "📶";
+                const level = n.kind === "wifi" && n.signal ? ` ${n.signal}%` : "";
+                chip.textContent = `${icon} ${n.name}${level} · ${n.ip}`;
+            }
+        };
+        void update();
+        setInterval(() => void update(), 5000);
+        return chip;
+    }
+
+    /** The clock; tapping it opens the time settings. */
+    private clockButton() {
+        const clock = this.ref("clock", h("button", { class: "clock", title: "Время" }));
+        clock.onclick = () => this.settings.showSection("time");
+        return clock;
     }
 
     private padChip() {
