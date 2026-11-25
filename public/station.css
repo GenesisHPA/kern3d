@@ -789,6 +789,17 @@ body {
     display: flex;
     flex-direction: column;
     gap: calc(var(--u) * 1.6);
+    /* every section scrolls when it does not fit (dragScroll.ts makes a drag scroll it too) */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+}
+.section > * {
+    flex-shrink: 0;
+}
+.section > .wifiList,
+.section > .helpBox {
+    flex-shrink: 1;
 }
 .section[hidden] {
     display: none;
@@ -1169,5 +1180,43 @@ body {
 }
 .toolChip.unknown {
     color: var(--dim);
+}
+
+/* a station screen: no text selection by a finger that a touch board reports as a mouse */
+.screen {
+    user-select: none;
+    -webkit-user-select: none;
+}
+.screen input {
+    user-select: text;
+}
+
+/* --- the top bar never wraps: chips keep one line, the long ones give way with «…» --- */
+.top {
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+.top > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.top .logo {
+    white-space: nowrap;
+}
+.top > .toolChip,
+.top > .netChip {
+    flex-shrink: 1;
+    min-width: calc(var(--u) * 10);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    line-height: calc(var(--u) * 3.4);
+}
+.top > .sp {
+    flex-shrink: 1;
+    min-width: 0;
+}
+.padToggle {
+    flex-direction: row;
 }
 

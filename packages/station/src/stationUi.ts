@@ -177,7 +177,6 @@ export class StationUi {
             link,
             this.ref("state", h("div", { class: "chip" })),
             this.ref("toolChip", h("div", { class: "chip toolChip" })),
-            this.padChip(),
             this.padToggle(),
             h("div", { class: "sp" }),
             this.netChip(),
@@ -264,15 +263,6 @@ export class StationUi {
             if (why) this.toast(`⚠ ${why}`);
         };
         return b;
-    }
-
-    private padChip() {
-        const chip = this.ref(
-            "padChip",
-            h("button", { class: "chip padChip", title: "Джойстик: что какая кнопка делает" }, "🎮"),
-        );
-        chip.onclick = () => this.settings.showSection("help");
-        return chip;
     }
 
     private gearButton() {
@@ -634,10 +624,6 @@ export class StationUi {
     /** Every frame: the numbers glide to where the machine is, the gauge, the 3D view. */
     private animate() {
         const s = this.machine.snapshot();
-        this.el["padChip"].classList.toggle(
-            "show",
-            [...(navigator.getGamepads?.() ?? [])].some((p) => p),
-        );
         const w = s.status.wpos;
         const m = s.status.mpos;
         (["X", "Y", "Z"] as Axis[]).forEach((a, i) => {

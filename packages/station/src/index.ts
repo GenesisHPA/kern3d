@@ -6,6 +6,7 @@ import { loadProbeSettings } from "@chili3d/app/src/cam/camProbe";
 import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
 import { demoBt, serverBt } from "./btPanel";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
+import { dragScroll } from "./dragScroll";
 import { JobStore } from "./jobStore";
 import { padCapture, padEnabled, padMap } from "./padMap";
 import { useServerPads } from "./serverPads";
@@ -84,6 +85,8 @@ const ui = new StationUi(
     demo ? demoDisplay() : serverDisplay(),
     demo ? demoBt() : serverBt(),
 );
+
+dragScroll();
 
 // a file dropped on the screen joins the queue
 document.addEventListener("dragover", (e) => e.preventDefault());
