@@ -3,10 +3,40 @@
 
 import type { Point3, ProgramPath } from "./gcodePath";
 
+/** Colours of the depths, shallowest first — none of them orange, which is the path done. */
+const DEPTH_COLOURS = [
+    "#4fd1ff",
+    "#7cff6b",
+    "#c38bff",
+    "#ff6bd6",
+    "#5b8cff",
+    "#3dffc5",
+    "#fff38a",
+    "#ff5a5a",
+];
+
+/** The depths the cuts are made at, deepest last (to 0.01 mm), and a colour for each. */
+export function depthLevels(path: ProgramPath): { z: number; colour: string }[] {
+    const zs = new Set<number>();
+    for (const s of path.segments) {
+        if (s.rapid || Math.abs(s.from[2] - s.to[2]) > 0.005) continue; // plunges take the level they reach
+        zs.add(Math.round(s.to[2] * 100) / 100);
+    }
+    const sorted = [...zs].sort((a, b) => b - a);
+    return sorted.map((z, i) => ({
+        z,
+        colour:
+            sorted.length <= DEPTH_COLOURS.length
+                ? DEPTH_COLOURS[i]
+                : `hsl(${190 + (110 * i) / Math.max(1, sorted.length - 1)} 90% 65%)`,
+    }));
+}
+
 /**
  * The job drawn in a fixed isometric view on a 2D canvas: the stock's box round the cuts, the
- * path still to go faint, the path done bright orange, the tool where the controller says it
- * is. Light enough for any station PC; no WebGL.
+ * path still to go coloured by its depth (a legend in the corner), rapids faint and dashed, the
+ * path done bright orange, the tool where the controller says it is. Light enough for any
+ * station PC; no WebGL.
  */
 export class PathView {
     private readonly ctx: CanvasRenderingContext2D;
@@ -16,6 +46,7 @@ export class PathView {
     private tool: Point3 = [0, 0, 0];
     private scale = 1;
     private centre: Point3 = [0, 0, 0];
+    private levels: { z: number; colour: string }[] = [];
 
     constructor(private readonly canvas: HTMLCanvasElement) {
         this.ctx = canvas.getContext("2d")!;
@@ -24,6 +55,7 @@ export class PathView {
 
     setPath(path: ProgramPath | undefined) {
         this.path = path;
+        this.levels = path ? depthLevels(path) : [];
         this.doneLine = -1;
         this.fit();
     }
@@ -67,19 +99,53 @@ export class PathView {
             ctx.lineCap = "round";
             for (const s of p.segments) {
                 const done = s.line <= this.doneLine;
-                ctx.strokeStyle = done
-                    ? "rgba(255,150,50,.95)"
-                    : s.rapid
-                      ? "rgba(255,255,255,.07)"
-                      : "rgba(255,255,255,.22)";
-                ctx.lineWidth = (done ? 2.2 : 1) * dpr;
+                if (s.rapid) {
+                    ctx.strokeStyle = done ? "rgba(255,150,50,.45)" : "rgba(255,255,255,.18)";
+                    ctx.lineWidth = dpr;
+                    ctx.setLineDash([4 * dpr, 4 * dpr]);
+                } else {
+                    ctx.strokeStyle = done ? "rgba(255,150,50,.95)" : this.colourAt(s.to[2]);
+                    ctx.lineWidth = (done ? 2.4 : 1.4) * dpr;
+                    ctx.setLineDash([]);
+                }
+                ctx.globalAlpha = done || s.rapid ? 1 : 0.8;
                 ctx.beginPath();
                 ctx.moveTo(...this.iso(s.from));
                 ctx.lineTo(...this.iso(s.to));
                 ctx.stroke();
             }
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
         }
         this.drawTool(dpr);
+        this.drawLegend(dpr);
+    }
+
+    /** The colour of the depth nearest to z. */
+    private colourAt(z: number): string {
+        let best = this.levels[0];
+        for (const l of this.levels) if (Math.abs(l.z - z) < Math.abs(best.z - z)) best = l;
+        return best?.colour ?? "rgba(255,255,255,.4)";
+    }
+
+    /** Depth → colour, top left; with many depths only every few are named. */
+    private drawLegend(dpr: number) {
+        const levels = this.levels;
+        if (levels.length < 2) return;
+        const { ctx } = this;
+        const step = Math.ceil(levels.length / 8);
+        const shown = levels.filter((_, i) => i % step === 0 || i === levels.length - 1);
+        const size = Math.max(14 * dpr, this.canvas.height * 0.034);
+        ctx.font = `600 ${size}px system-ui, sans-serif`;
+        ctx.textBaseline = "middle";
+        let y = size * 1.3;
+        for (const l of shown) {
+            ctx.fillStyle = l.colour;
+            ctx.fillRect(size, y - size * 0.15, size * 1.6, size * 0.3);
+            ctx.fillStyle = "rgba(255,255,255,.75)";
+            ctx.fillText(`Z ${l.z > 0 ? "+" : ""}${l.z.toFixed(2).replace(/\.?0+$/, "")}`, size * 3, y);
+            y += size * 1.45;
+        }
     }
 
     private drawStock(p: ProgramPath) {
