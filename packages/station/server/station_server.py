@@ -113,6 +113,7 @@ def bt_status():
         "present": "Controller" in show,
         "scanning": time.time() < _scan_until,
         "devices": devices,
+        "pairing": dict(_pairing) if _pairing else None,
     }
 
 
@@ -125,16 +126,83 @@ def bt_scan(seconds=20):
     threading.Thread(target=btctl, args=("--timeout", str(seconds), "scan", "on"), kwargs={"timeout": seconds + 5}, daemon=True).start()
 
 
+_pairing = {}
+
+
+def _strip(line):
+    # colour codes and readline markers bluetoothctl puts round its prompt
+    return re.sub(r"\x1b\[[0-9;]*[a-zA-Z]|[\x01\x02]", "", line)
+
+
+def bt_pair_session(mac):
+    """
+    Pairs in one interactive bluetoothctl session (agent, scan, pair, trust, connect), as the
+    command line would: separate non-interactive calls lose the freshly found device and hang until
+    their timeouts. Progress goes to `_pairing` for the page to poll.
+    """
+    import queue
+    import time
+
+    st = _pairing
+    st.update(mac=mac, stage="запуск", done=False, ok=False, error="")
+    p = subprocess.Popen(["bluetoothctl"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, bufsize=1)
+    lines = queue.Queue()
+    threading.Thread(target=lambda: [lines.put(_strip(l)) for l in p.stdout], daemon=True).start()
+
+    def send(cmd):
+        p.stdin.write(cmd + "\n")
+        p.stdin.flush()
+
+    def expect(good, bad, seconds):
+        end = time.time() + seconds
+        while time.time() < end:
+            try:
+                line = lines.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if any(g in line for g in good):
+                return True, line
+            if any(b in line for b in bad):
+                return False, line.strip()
+        return False, "нет ответа от устройства"
+
+    try:
+        for cmd in ("power on", "agent NoInputNoOutput", "default-agent", "pairable on", "scan on"):
+            send(cmd)
+        st["stage"] = "поиск устройства"
+        if not bt_info(mac).get("name") or bt_info(mac)["name"] == mac:
+            expect([mac], [], 15)
+        time.sleep(1)
+        if not bt_info(mac)["paired"]:
+            st["stage"] = "сопряжение"
+            send(f"pair {mac}")
+            ok, line = expect(["Pairing successful", "AlreadyExists"], ["Failed to pair", "not available"], 30)
+            if not ok and not bt_info(mac)["paired"]:
+                st.update(error=line, done=True)
+                return
+        st["stage"] = "доверие"
+        send(f"trust {mac}")
+        expect(["trust succeeded", "Trusted: yes"], [], 5)
+        st["stage"] = "подключение"
+        send(f"connect {mac}")
+        ok, line = expect(["Connection successful", "Connected: yes"], ["Failed to connect"], 20)
+        connected = ok or bt_info(mac)["connected"]
+        st.update(ok=connected, done=True, error="" if connected else line)
+    finally:
+        try:
+            send("scan off")
+            send("quit")
+            p.wait(timeout=5)
+        except Exception:
+            p.kill()
+
+
 def bt_pair(mac):
-    btctl("power", "on", timeout=5)
-    btctl("pairable", "on", timeout=5)
-    code, out = btctl("--timeout", "25", "pair", mac, timeout=35, agent=True)
-    paired = bt_info(mac)["paired"]
-    if not paired:
-        return False, out.strip().splitlines()[-1] if out.strip() else "не удалось"
-    btctl("trust", mac, timeout=5)
-    btctl("--timeout", "15", "connect", mac, timeout=20)
-    return True, ""
+    if _pairing and not _pairing.get("done", True):
+        return False
+    threading.Thread(target=bt_pair_session, args=(mac,), daemon=True).start()
+    return True
 
 
 def rotation():
@@ -248,8 +316,9 @@ class Handler(SimpleHTTPRequestHandler):
             if not MAC.match(mac):
                 return self.reply(400, {"error": "mac"})
             if self.path == "/api/bt/pair":
-                ok, err = bt_pair(mac)
-                return self.reply(200, {"ok": ok, "error": err, **bt_status()})
+                # runs in the background: the page polls /api/bt for "pairing"
+                bt_pair(mac)
+                return self.reply(200, bt_status())
             if self.path == "/api/bt/connect":
                 code, out = btctl("--timeout", "15", "connect", mac, timeout=20)
                 ok = bt_info(mac)["connected"]

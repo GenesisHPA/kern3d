@@ -895,4 +895,12 @@ body {
     color: #fff;
     border-color: transparent;
 }
+.spinner {
+    width: calc(var(--u) * 4);
+    height: calc(var(--u) * 4);
+    border-radius: 50%;
+    border: calc(var(--u) * 0.6) solid var(--line);
+    border-top-color: var(--acc);
+    animation: spin 0.8s linear infinite;
+}
 

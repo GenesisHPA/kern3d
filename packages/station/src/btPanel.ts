@@ -17,6 +17,8 @@ export interface BtStatus {
     powered: boolean;
     scanning: boolean;
     devices: BtDevice[];
+    /** A pairing running in the background (or the last one): its stage and outcome. */
+    pairing?: { mac: string; stage: string; done: boolean; ok: boolean; error: string } | null;
     ok?: boolean;
     error?: string;
 }
@@ -69,11 +71,13 @@ export function demoBt(): BtApi {
         gamepad: true,
     };
     let scanning = false;
+    let pairing: BtStatus["pairing"] = null;
     const state = (): BtStatus => ({
         present: true,
         powered: true,
         scanning,
         devices: structuredClone(devices),
+        pairing: pairing ? { ...pairing } : null,
     });
     const wait = (s: BtStatus) => new Promise<BtStatus>((r) => setTimeout(() => r(s), 700));
     const find = (mac: string) => devices.find((d) => d.mac === mac);
@@ -88,9 +92,19 @@ export function demoBt(): BtApi {
             return wait(state());
         },
         pair: (mac) => {
-            const d = find(mac);
-            if (d) Object.assign(d, { paired: true, trusted: true, connected: true });
-            return wait({ ...state(), ok: true });
+            const stages = ["поиск устройства", "сопряжение", "доверие", "подключение"];
+            pairing = { mac, stage: stages[0], done: false, ok: false, error: "" };
+            stages.forEach((stage, i) =>
+                setTimeout(() => {
+                    if (pairing) pairing.stage = stage;
+                }, i * 900),
+            );
+            setTimeout(() => {
+                const d = find(mac);
+                if (d) Object.assign(d, { paired: true, trusted: true, connected: true });
+                if (pairing) Object.assign(pairing, { done: true, ok: true });
+            }, stages.length * 900);
+            return wait(state());
         },
         connect: (mac) => {
             const d = find(mac);
@@ -124,6 +138,8 @@ export class BtPanel {
     private busy = false;
     private poll?: ReturnType<typeof setInterval>;
     private frame = 0;
+    /** The pairing whose outcome was already told (so it is told once). */
+    private toldPairing = "";
 
     constructor(
         host: HTMLElement,
@@ -139,7 +155,7 @@ export class BtPanel {
             h(
                 "p",
                 "hint",
-                "Включите на джойстике режим сопряжения (обычно кнопка с логотипом + кнопка сопряжения), нажмите «Искать» и выберите его.",
+                "Включите на джойстике режим сопряжения (обычно кнопка с логотипом + кнопка сопряжения, огоньки часто мигают), нажмите «Искать», затем «Подключить» — пока идёт сопряжение, держите джойстик в этом режиме.",
             ),
             this.list,
             this.pad,
@@ -148,7 +164,7 @@ export class BtPanel {
 
     show() {
         void this.run(() => this.api.status(), "");
-        this.poll = setInterval(() => void this.refresh(), 3000);
+        this.poll = setInterval(() => void this.refresh(), 1000);
         const loop = () => {
             this.drawPad();
             this.frame = requestAnimationFrame(loop);
@@ -185,13 +201,22 @@ export class BtPanel {
     }
 
     private render(s: BtStatus) {
-        this.info.textContent = !s.present
-            ? "Bluetooth-адаптер не найден"
-            : !s.powered
-              ? "Bluetooth выключен"
-              : s.scanning
-                ? "Поиск… (20 с)"
-                : `Устройств: ${s.devices.length}`;
+        const pairing = s.pairing;
+        const pairingNow = pairing && !pairing.done ? pairing : undefined;
+        if (pairing?.done && this.toldPairing !== `${pairing.mac}:${pairing.ok}:${pairing.error}`) {
+            this.toldPairing = `${pairing.mac}:${pairing.ok}:${pairing.error}`;
+            const name = s.devices.find((d) => d.mac === pairing.mac)?.name ?? pairing.mac;
+            this.toast(pairing.ok ? `🎮 ${name} подключён` : `Bluetooth: ${pairing.error || "не удалось"}`);
+        }
+        this.info.textContent = pairingNow
+            ? `Сопряжение: ${pairingNow.stage}…`
+            : !s.present
+              ? "Bluetooth-адаптер не найден"
+              : !s.powered
+                ? "Bluetooth выключен"
+                : s.scanning
+                  ? "Поиск… (20 с)"
+                  : `Устройств: ${s.devices.length}`;
         this.list.replaceChildren(
             ...s.devices.map((d) => {
                 const row = h("div", `wifiRow${d.connected ? " on" : ""}`);
@@ -213,7 +238,12 @@ export class BtPanel {
                     };
                     row.append(b);
                 };
-                if (!d.paired) act("Подключить", () => this.api.pair(d.mac), `🎮 ${d.name} подключён`);
+                if (pairingNow?.mac === d.mac) {
+                    row.append(h("span", "spinner"));
+                    return row;
+                }
+                if (pairingNow) return row;
+                if (!d.paired) act("Подключить", () => this.api.pair(d.mac), "");
                 else if (!d.connected) act("Соединить", () => this.api.connect(d.mac), `🎮 ${d.name} в сети`);
                 if (d.paired) act("Удалить", () => this.api.remove(d.mac), "");
                 return row;
