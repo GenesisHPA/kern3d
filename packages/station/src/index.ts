@@ -5,6 +5,7 @@ import { GamepadJog } from "@chili3d/app/src/cam/camNet";
 import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
 import { demoBt, serverBt } from "./btPanel";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
+import { useServerPads } from "./serverPads";
 import { demoDisplay, serverDisplay } from "./settings";
 import { type Connect, StationMachine } from "./stationMachine";
 import { StationUi } from "./stationUi";
@@ -29,6 +30,9 @@ const connect: Connect = async (onData, onClose) => {
     if (!ask) return undefined;
     return WebSerialConnection.request(BAUD, onData, onClose).catch(() => undefined);
 };
+
+// joysticks the browser leaves out, read by the station server from Linux
+if (!demo) useServerPads();
 
 const machine = new StationMachine(connect);
 

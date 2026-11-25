@@ -18,12 +18,15 @@ user (a polkit rule lets that user change the network).
     POST /api/bt/pair         {"mac": "..."}: pair, trust, connect (a gamepad then reconnects by itself)
     POST /api/bt/connect      {"mac": "..."}
     POST /api/bt/remove       {"mac": "..."}
+    GET  /api/gamepad/events  server-sent events: the joysticks Linux sees (axes −1…1, buttons),
+                              for gamepads the browser does not show (vendor 0000, some clones)
     GET  /api/display         {"rotate": 0|90|180|270}
     POST /api/display         {"rotate": ...}: saved, the kiosk restarts turned
 """
 import json
 import os
 import re
+import struct
 import subprocess
 import sys
 import threading
@@ -205,6 +208,123 @@ def bt_pair(mac):
     return True
 
 
+# ---- gamepads read from Linux (evdev) -------------------------------------------------------
+
+EV_KEY, EV_ABS = 1, 3
+# buttons in raw order: BTN_SOUTH (304) … the 16th button; the hat (ABS 16/17) becomes the d-pad 12–15
+BTN_FIRST, BTN_COUNT = 304, 16
+AXES = (0, 1, 3, 4, 2, 5)  # X, Y, RX, RY, Z, RZ → axes 0…5
+
+_pads = {}  # event path → {"id", "axes", "buttons", "ranges"}
+_pads_version = 0
+_pads_cond = threading.Condition()
+
+
+def _joystick_nodes():
+    """Event nodes of the joysticks: /proc/bus/input/devices entries with a js handler."""
+    nodes = {}
+    block = {}
+    for line in open("/proc/bus/input/devices", encoding="utf-8", errors="replace").read().splitlines() + [""]:
+        if not line.strip():
+            handlers = block.get("H", "")
+            if " js" in f" {handlers}" or handlers.startswith("js"):
+                ev = next((h for h in handlers.split() if h.startswith("event")), None)
+                if ev:
+                    nodes["/dev/input/" + ev] = block.get("N", "Gamepad").strip('"')
+            block = {}
+            continue
+        key, _, value = line.partition(": ")
+        if key in ("N", "H"):
+            block[key] = value.partition("=")[2]
+    return nodes
+
+
+def _abs_range(fd, code):
+    import fcntl
+
+    buf = bytearray(24)
+    try:
+        fcntl.ioctl(fd, 0x80184540 + code, buf)  # EVIOCGABS(code): value, min, max, fuzz, flat, res
+    except OSError:
+        return (-32768, 32767)
+    _, lo, hi, *_ = struct.unpack("6i", bytes(buf))
+    return (lo, hi) if hi > lo else (-32768, 32767)
+
+
+def _publish():
+    global _pads_version
+    with _pads_cond:
+        _pads_version += 1
+        _pads_cond.notify_all()
+
+
+def gamepad_reader():
+    import select
+    import time
+
+    open_fds = {}  # fd → path
+    next_scan = 0.0
+    while True:
+        if time.time() >= next_scan:
+            next_scan = time.time() + 2
+            nodes = _joystick_nodes()
+            for fd, path in list(open_fds.items()):
+                if path not in nodes:
+                    os.close(fd)
+                    del open_fds[fd]
+                    _pads.pop(path, None)
+                    _publish()
+            for path, name in nodes.items():
+                if path in open_fds.values():
+                    continue
+                try:
+                    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+                except OSError:
+                    continue
+                open_fds[fd] = path
+                _pads[path] = {
+                    "id": name,
+                    "axes": [0.0] * len(AXES),
+                    "buttons": [0.0] * (BTN_COUNT + 4),
+                    "ranges": {code: _abs_range(fd, code) for code in AXES},
+                }
+                _publish()
+        if not open_fds:
+            time.sleep(1)
+            continue
+        ready, _, _ = select.select(list(open_fds), [], [], 0.5)
+        changed = False
+        for fd in ready:
+            path = open_fds[fd]
+            pad = _pads.get(path)
+            try:
+                data = os.read(fd, 24 * 64)
+            except OSError:
+                continue
+            for i in range(0, len(data) - 23, 24):
+                _, _, typ, code, val = struct.unpack("llHHi", data[i : i + 24])
+                if typ == EV_KEY and BTN_FIRST <= code < BTN_FIRST + BTN_COUNT:
+                    pad["buttons"][code - BTN_FIRST] = 1.0 if val else 0.0
+                    changed = True
+                elif typ == EV_ABS and code in AXES:
+                    lo, hi = pad["ranges"][code]
+                    pad["axes"][AXES.index(code)] = round((2 * (val - lo) / (hi - lo)) - 1, 3)
+                    changed = True
+                elif typ == EV_ABS and code in (16, 17):  # hat: d-pad up/down/left/right = 12…15
+                    b = pad["buttons"]
+                    if code == 17:
+                        b[12], b[13] = (1.0 if val < 0 else 0.0), (1.0 if val > 0 else 0.0)
+                    else:
+                        b[14], b[15] = (1.0 if val < 0 else 0.0), (1.0 if val > 0 else 0.0)
+                    changed = True
+        if changed:
+            _publish()
+
+
+def pads_snapshot():
+    return [{"id": p["id"], "axes": p["axes"], "buttons": p["buttons"]} for p in _pads.values()]
+
+
 def rotation():
     try:
         value = int(open(ROTATE_FILE, encoding="ascii").read().strip() or 0)
@@ -292,7 +412,30 @@ class Handler(SimpleHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
 
+    def gamepad_stream(self):
+        """Server-sent events: the pads now, then on every change (at most ~60 a second)."""
+        import time
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        seen = -1
+        try:
+            while True:
+                with _pads_cond:
+                    if _pads_version == seen:
+                        _pads_cond.wait(timeout=10)
+                    seen = _pads_version
+                self.wfile.write(f"data: {json.dumps(pads_snapshot())}\n\n".encode())
+                self.wfile.flush()
+                time.sleep(1 / 60)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+
     def do_GET(self):
+        if self.path == "/api/gamepad/events":
+            return self.gamepad_stream()
         if self.path == "/api/wifi":
             return self.reply(200, wifi_status())
         if self.path == "/api/display":
@@ -365,7 +508,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
+    threading.Thread(target=gamepad_reader, daemon=True).start()
     server = ThreadingHTTPServer((BIND, PORT), Handler)
+    server.daemon_threads = True
     print(f"Kern3D Станок: http://{BIND}:{PORT}/station.html, files from {ROOT}", file=sys.stderr)
     server.serve_forever()
 
