@@ -20,7 +20,7 @@ export type PadAction =
 
 /** The actions in the order the settings list them, with their names. */
 export const PAD_ACTIONS: readonly [PadAction, string][] = [
-    ["stop", "Стоп"],
+    ["stop", "Стоп (нажать — пауза, держать 1 с — стоп)"],
     ["hold", "Пауза"],
     ["start", "Старт (удерживать 1 с)"],
     ["home", "Домой"],

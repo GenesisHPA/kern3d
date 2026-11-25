@@ -91,6 +91,27 @@ setInterval(() => {
  * (held a second, like «Старт» on screen), home, a step on X/Y/Z, the step finer/coarser, zeroing.
  */
 const START_HOLD_MS = 1000;
+const STOP_HOLD_MS = 1000;
+
+/**
+ * The gamepad's «Стоп»: a press is a pause (feed hold — the job carries on with «Старт», a jog is
+ * cut short), so a knock on the button spoils nothing; held a second it is the full stop. The
+ * screen's «Стоп» stays instant; the real emergency stop is the mushroom button on the machine.
+ */
+function padStop() {
+    const s = machine.snapshot();
+    if (s.jobState === "running") machine.pause();
+    else machine.jogStop();
+    setTimeout(() => {
+        if (!firstPad()?.buttons[padMap().stop]?.pressed) {
+            if (s.jobState === "running")
+                ui.toast("⏸ Пауза — «Старт» продолжит, удержание «Стоп» 1 с — полный стоп");
+            return;
+        }
+        machine.stop();
+        ui.toast("■ Стоп");
+    }, STOP_HOLD_MS);
+}
 const firstPad = () => [...(navigator.getGamepads?.() ?? [])].find((p) => p);
 const gamepadJog = new GamepadJog(
     (line) => (padCapture.active ? false : machine.jogLine(line)),
@@ -99,7 +120,7 @@ const gamepadJog = new GamepadJog(
     () => padCapture.active,
     (button) => {
         if (padCapture.active) return;
-        if (button === "stop") machine.stop();
+        if (button === "stop") padStop();
         else if (button === "hold") machine.pause();
         else
             setTimeout(() => {
