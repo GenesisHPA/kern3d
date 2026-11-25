@@ -1010,3 +1010,164 @@ body {
     color: var(--fg);
 }
 
+/* --- gamepad on/off --- */
+.padToggle {
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 800;
+    color: var(--dim);
+    min-width: calc(var(--u) * 8);
+    justify-content: center;
+}
+.padToggle.on {
+    color: #fff;
+    background: var(--grad);
+    border-color: transparent;
+}
+
+/* --- tool change --- */
+.view {
+    position: relative;
+}
+.emergency {
+    position: absolute;
+    top: calc(var(--u) * 1.4);
+    right: calc(var(--u) * 1.4);
+    z-index: 3;
+    display: none;
+    height: calc(var(--u) * 5.6);
+    padding: 0 calc(var(--u) * 2.2);
+    border-radius: calc(var(--u) * 99);
+    border: 1px solid var(--line);
+    background: rgba(23, 24, 28, 0.88);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: calc(var(--u) * 2.1);
+    font-weight: 800;
+}
+.emergency.show {
+    display: block;
+}
+.emergency.armed {
+    background: var(--err);
+    border-color: var(--err);
+    animation: pulse 0.8s ease-in-out infinite;
+}
+.changeBox {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: none;
+    place-items: center;
+    padding: calc(var(--u) * 2);
+    background: rgba(12, 13, 16, 0.82);
+    backdrop-filter: blur(4px);
+    border-radius: inherit;
+}
+.changeBox.show {
+    display: grid;
+}
+.changeCard {
+    max-width: calc(var(--u) * 80);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--u) * 1.4);
+    animation: rise 0.4s var(--ease) both;
+}
+.changeIcon {
+    font-size: calc(var(--u) * 7);
+}
+.changeTitle {
+    font-size: calc(var(--u) * 4);
+    font-weight: 900;
+}
+.changeCard p {
+    font-size: calc(var(--u) * 2.3);
+    color: var(--dim);
+    line-height: 1.4;
+}
+.changeCard.failed .changeTitle {
+    color: var(--err);
+}
+.changeBtns {
+    display: flex;
+    gap: calc(var(--u) * 1.6);
+    align-items: center;
+    margin-top: calc(var(--u) * 1);
+}
+.changeBtns button {
+    height: calc(var(--u) * 7);
+    padding: 0 calc(var(--u) * 3.4);
+    border-radius: calc(var(--u) * 1.6);
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: calc(var(--u) * 2.4);
+    font-weight: 800;
+}
+.changeBtns button.primary {
+    background: var(--grad);
+    border-color: transparent;
+    color: #fff;
+}
+.spin {
+    width: calc(var(--u) * 5);
+    height: calc(var(--u) * 5);
+    border-radius: 50%;
+    border: calc(var(--u) * 0.6) solid rgba(255, 255, 255, 0.12);
+    border-top-color: var(--acc);
+    animation: spin 0.9s linear infinite;
+}
+
+/* --- settings: tool --- */
+.toolSection {
+    overflow-y: auto;
+}
+.toolPlace {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--u);
+}
+.toolPlace > .hint {
+    flex-basis: 100%;
+}
+.toolNums {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--u);
+}
+.toolNum {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 0.4);
+    font-size: calc(var(--u) * 1.8);
+    color: var(--dim);
+}
+.toolNum input {
+    width: calc(var(--u) * 16);
+    height: calc(var(--u) * 5.6);
+    padding: 0 calc(var(--u) * 1.4);
+    border-radius: calc(var(--u) * 1.2);
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: calc(var(--u) * 2.2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- the tool in the spindle --- */
+.toolChip {
+    white-space: nowrap;
+    max-width: calc(var(--u) * 34);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.toolChip.unknown {
+    color: var(--dim);
+}
+

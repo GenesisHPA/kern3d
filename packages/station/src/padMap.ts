@@ -16,7 +16,8 @@ export type PadAction =
     | "stepUp"
     | "stepDown"
     | "zeroXY"
-    | "zeroZ";
+    | "zeroZ"
+    | "toolChange";
 
 /** The actions in the order the settings list them, with their names. */
 export const PAD_ACTIONS: readonly [PadAction, string][] = [
@@ -34,6 +35,7 @@ export const PAD_ACTIONS: readonly [PadAction, string][] = [
     ["stepDown", "Шаг меньше"],
     ["zeroXY", "Обнулить X и Y"],
     ["zeroZ", "Обнулить Z"],
+    ["toolChange", "Экстренная замена фрезы (держать 1 с)"],
 ];
 
 /** A button number for each action; −1 = none. */
@@ -55,6 +57,7 @@ export const DEFAULT_PAD_MAP: PadMap = {
     stepDown: -1,
     zeroXY: -1,
     zeroZ: -1,
+    toolChange: -1,
 };
 
 const KEY = "kern3d.station.padmap";
@@ -97,6 +100,17 @@ function save(map: PadMap): PadMap {
     current = map;
     localStorage.setItem(KEY, JSON.stringify(map));
     return map;
+}
+
+const ON_KEY = "kern3d.station.padOn";
+
+/** The gamepad switched on in the top bar (off: the station ignores it, and drops it over Bluetooth). */
+export function padEnabled(): boolean {
+    return localStorage.getItem(ON_KEY) !== "0";
+}
+
+export function setPadEnabled(on: boolean) {
+    localStorage.setItem(ON_KEY, on ? "1" : "0");
 }
 
 /** While a button is being chosen in the settings, presses do nothing to the machine. */

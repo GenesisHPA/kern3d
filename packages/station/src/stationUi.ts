@@ -4,6 +4,7 @@
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
 import type { BtApi } from "./btPanel";
 import { grblErrorText } from "./grblText";
+import { padEnabled, setPadEnabled } from "./padMap";
 import { type DisplayApi, type Layout, resolveLayout, SettingsSheet, savedLayout } from "./settings";
 import type { StationMachine, StationSnapshot } from "./stationMachine";
 import { PathView } from "./view3d";
@@ -72,8 +73,6 @@ export class StationUi {
     get jogStep(): number {
         return this.step;
     }
-    /** Program line index (0-based) of each line GRBL is sent, for drawing the path done. */
-    private sentToSource: number[] = [];
     private shownJobId?: number;
     private shown: [number, number, number] = [0, 0, 0];
     private shownError?: string;
@@ -86,7 +85,7 @@ export class StationUi {
         private readonly askConnect: () => void,
         wifi: WifiApi,
         private readonly display: DisplayApi,
-        bt: BtApi,
+        private readonly bt: BtApi,
     ) {
         const canvas = h("canvas");
         this.view = new PathView(canvas);
@@ -96,7 +95,14 @@ export class StationUi {
             this.ref("msg", h("div", { class: "msg" })),
             this.topBar(),
             this.dro(),
-            h("div", { class: "view card" }, canvas, this.ref("gline", h("div", { class: "gline" }))),
+            h(
+                "div",
+                { class: "view card" },
+                canvas,
+                this.ref("gline", h("div", { class: "gline" })),
+                this.emergencyButton(),
+                this.ref("changeBox", h("div", { class: "changeBox" })),
+            ),
             this.jobCard(),
             h("div", { class: "mid card" }, this.jogCard(), this.queueCard()),
             this.actions(),
@@ -113,6 +119,7 @@ export class StationUi {
                 this.applyLayout();
             },
             (text) => this.toast(text),
+            machine,
         );
         this.applyLayout();
         addEventListener("resize", () => this.applyLayout());
@@ -169,7 +176,9 @@ export class StationUi {
             logo,
             link,
             this.ref("state", h("div", { class: "chip" })),
+            this.ref("toolChip", h("div", { class: "chip toolChip" })),
             this.padChip(),
+            this.padToggle(),
             h("div", { class: "sp" }),
             this.netChip(),
             this.ref("clock", h("div", { class: "clock" })),
@@ -199,6 +208,62 @@ export class StationUi {
         void update();
         setInterval(() => void update(), 5000);
         return chip;
+    }
+
+    /**
+     * The gamepad on or off. Off: the station ignores it and drops it over Bluetooth (its battery
+     * rests); on: the paired gamepads are called back.
+     */
+    private padToggle() {
+        const chip = this.ref("padToggle", h("button", { class: "chip padToggle" }));
+        const show = () => {
+            const on = padEnabled();
+            chip.classList.toggle("on", on);
+            chip.textContent = on ? "🎮 вкл" : "🎮 выкл";
+        };
+        show();
+        chip.onclick = async () => {
+            const on = !padEnabled();
+            setPadEnabled(on);
+            show();
+            const pads =
+                (await this.bt.status().catch(() => undefined))?.devices.filter((d) => d.gamepad) ?? [];
+            if (on) {
+                const paired = pads.filter((d) => d.paired && !d.connected);
+                this.toast(paired.length > 0 ? "🎮 Джойстик включён — подключаю…" : "🎮 Джойстик включён");
+                for (const d of paired) void this.bt.connect(d.mac).catch(() => {});
+            } else {
+                this.toast("🎮 Джойстик выключен");
+                for (const d of pads.filter((x) => x.connected))
+                    void this.bt.disconnect(d.mac).catch(() => {});
+            }
+        };
+        return chip;
+    }
+
+    /** 🔧 in the corner of the view while a job runs: two taps — the second within 3 s — begin it. */
+    private emergencyButton() {
+        const b = this.ref("emergency", h("button", { class: "emergency" }, "🔧 Замена фрезы"));
+        let armed: ReturnType<typeof setTimeout> | undefined;
+        b.onclick = () => {
+            if (armed === undefined) {
+                b.classList.add("armed");
+                b.textContent = "Ещё раз — остановить и заменить";
+                armed = setTimeout(() => {
+                    armed = undefined;
+                    b.classList.remove("armed");
+                    b.textContent = "🔧 Замена фрезы";
+                }, 3000);
+                return;
+            }
+            clearTimeout(armed);
+            armed = undefined;
+            b.classList.remove("armed");
+            b.textContent = "🔧 Замена фрезы";
+            const why = this.machine.emergencyChange();
+            if (why) this.toast(`⚠ ${why}`);
+        };
+        return b;
     }
 
     private padChip() {
@@ -410,8 +475,13 @@ export class StationUi {
             : s.jobState === "paused"
               ? "▶ Продолжить"
               : "▶ Старт";
+        this.el["toolChip"].textContent = s.tool
+            ? `🛠 T${s.tool.tool}${s.tool.name ? ` · ${s.tool.name}` : ""}`
+            : "🛠 фреза не указана";
+        this.el["toolChip"].classList.toggle("unknown", !s.tool);
         this.renderJob(s);
         this.renderQueue(s);
+        this.renderChange(s);
         if (s.lastError && s.lastError !== this.shownError) this.toast(`⚠ ${grblErrorText(s.lastError)}`);
         this.shownError = s.lastError;
     }
@@ -421,16 +491,6 @@ export class StationUi {
         if (job?.id !== this.shownJobId) {
             this.shownJobId = job?.id;
             this.view.setPath(job?.path);
-            this.sentToSource = [];
-            job?.lines.forEach((l, i) => {
-                if (
-                    l
-                        .replace(/\([^)]*\)/g, "")
-                        .replace(/;.*$/, "")
-                        .trim() !== ""
-                )
-                    this.sentToSource.push(i);
-            });
             this.el["gline"].innerHTML = "";
         }
         this.el["jobName"].textContent = job
@@ -442,14 +502,19 @@ export class StationUi {
         const left = job && p > 0 && s.elapsed > 0 ? (s.elapsed / p) * (1 - p) : job?.estimate;
         this.el["jobTimes"].innerHTML = job
             ? `Прошло <b>${clock(s.elapsed)}</b> · осталось <b>${left !== undefined ? clock(left) : "—"}</b><br>` +
-              `Подача <b>${Math.round(s.status.feed ?? 0)}</b> мм/мин · строка <b>${s.acked}</b> / ${s.total || job.lines.length}`
+              `Подача <b>${Math.round(s.status.feed ?? 0)}</b> мм/мин · строка <b>${s.acked}</b> / ${s.total || job.lines.length}` +
+              (s.jobTools.length > 1
+                  ? `<br>Инструменты: <b>${s.jobTools.map((t) => `T${t.tool}`).join(" → ")}</b>`
+                  : "") +
+              (s.offset !== 0
+                  ? ` · поправка длины <b>${s.offset > 0 ? "+" : ""}${s.offset.toFixed(3)}</b>`
+                  : "")
             : "";
-        const doneLine = s.acked > 0 ? (this.sentToSource[s.acked - 1] ?? -1) : -1;
-        this.view.setProgress(doneLine, s.status.wpos);
-        if (job && s.acked > 0) {
-            const from = Math.max(0, s.acked - 3);
+        this.view.setProgress(s.doneLine, s.status.wpos);
+        if (job && s.doneLine >= 0) {
             const rows = job.lines
-                .slice(this.sentToSource[from] ?? 0, (this.sentToSource[s.acked - 1] ?? 0) + 1)
+                .slice(Math.max(0, s.doneLine - 8), s.doneLine + 1)
+                .filter((l) => !l.startsWith("("))
                 .slice(-3);
             this.el["gline"].innerHTML = rows
                 .map(
@@ -463,6 +528,75 @@ export class StationUi {
         this.el["spindleOv"].textContent = `${ov[2]}%`;
         this.el["feedBar"].style.setProperty("--w", `${Math.min(100, ov[0] / 2)}%`);
         this.el["spindleBar"].style.setProperty("--w", `${Math.min(100, ov[2] / 2)}%`);
+    }
+
+    private shownChange = "";
+
+    /** The tool change, over the view: what to do now, and the buttons for it. */
+    private renderChange(s: StationSnapshot) {
+        const active = s.jobState === "running" || s.jobState === "paused";
+        this.el["emergency"].classList.toggle("show", active && !s.change);
+        const box = this.el["changeBox"];
+        const c = s.change;
+        const key = c ? `${c.kind}|${c.stage}|${c.tool}|${c.error}` : "";
+        box.classList.toggle("show", c !== undefined);
+        if (key === this.shownChange) return;
+        this.shownChange = key;
+        if (!c) {
+            box.replaceChildren();
+            return;
+        }
+        const emergency = c.kind === "emergency";
+        const tool = emergency ? "Новая фреза" : `T${c.tool ?? "?"}${c.name ? ` · ${c.name}` : ""}`;
+        const button = (text: string, action: () => void, cls = "") => {
+            const b = h("button", { class: cls }, text);
+            b.onclick = action;
+            return b;
+        };
+        const cancel = button("Отменить задание", () => this.machine.stop(), "ghost");
+        const done = (text: string) => button(text, () => this.machine.changeDone(), "primary");
+        const spin = h("div", { class: "spin" });
+        const parts: Record<string, [string, string, HTMLElement[]]> = {
+            reference: [
+                "Замер фрезы на датчике",
+                "Фреза, которой ставили ноль Z, — эталон: по нему выставятся следующие.",
+                [spin, cancel],
+            ],
+            moving: [
+                emergency ? "Экстренная замена фрезы" : "Смена инструмента",
+                emergency
+                    ? "Задание остановлено на месте. Шпиндель выключается, станок едет в точку смены…"
+                    : "Шпиндель выключается, станок едет в точку смены…",
+                [spin, cancel],
+            ],
+            waiting: [
+                emergency ? "Замените фрезу" : `Поставьте ${tool}`,
+                "Шпиндель выключен. Поставьте фрезу и нажмите «Готово» (или «Старт» на джойстике).",
+                [done("✓ Готово"), cancel],
+            ],
+            measuring: ["Замер новой фрезы", "Фреза касается датчика длины…", [spin, cancel]],
+            zero: [
+                "Обнулите Z новой фрезой",
+                "Датчика длины нет: подведите фрезу к верху детали (джойстик или кнопки), нажмите «Z = 0», потом «Продолжить».",
+                [done("▶ Продолжить"), cancel],
+            ],
+            failed: [
+                "Смена не удалась",
+                c.error ?? "",
+                [button("Закрыть", () => this.machine.stop(), "primary")],
+            ],
+        };
+        const [title, text, controls] = parts[c.stage];
+        box.replaceChildren(
+            h(
+                "div",
+                { class: `changeCard ${c.stage}` },
+                h("div", { class: "changeIcon" }, emergency ? "🔧" : "🛠"),
+                h("div", { class: "changeTitle" }, title),
+                h("p", {}, text),
+                h("div", { class: "changeBtns" }, ...controls),
+            ),
+        );
     }
 
     private renderQueue(s: StationSnapshot) {

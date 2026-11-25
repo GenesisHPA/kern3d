@@ -17,6 +17,7 @@ user (a polkit rule lets that user change the network).
     POST /api/bt/scan         search for 20 s
     POST /api/bt/pair         {"mac": "..."}: pair, trust, connect (a gamepad then reconnects by itself)
     POST /api/bt/connect      {"mac": "..."}
+    POST /api/bt/disconnect   {"mac": "..."}
     POST /api/bt/remove       {"mac": "..."}
     GET  /api/gamepad/events  server-sent events: the joysticks Linux sees (axes −1…1, buttons),
                               for gamepads the browser does not show (vendor 0000, some clones)
@@ -637,6 +638,9 @@ class Handler(SimpleHTTPRequestHandler):
                 code, out = btctl("--timeout", "15", "connect", mac, timeout=20)
                 ok = bt_info(mac)["connected"]
                 return self.reply(200, {"ok": ok, "error": "" if ok else out.strip()[-120:], **bt_status()})
+            if self.path == "/api/bt/disconnect":
+                btctl("disconnect", mac, timeout=10)
+                return self.reply(200, {"ok": True, **bt_status()})
             if self.path == "/api/bt/remove":
                 btctl("remove", mac, timeout=10)
                 return self.reply(200, {"ok": True, **bt_status()})

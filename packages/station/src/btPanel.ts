@@ -28,6 +28,7 @@ export interface BtApi {
     scan(): Promise<BtStatus>;
     pair(mac: string): Promise<BtStatus>;
     connect(mac: string): Promise<BtStatus>;
+    disconnect(mac: string): Promise<BtStatus>;
     remove(mac: string): Promise<BtStatus>;
 }
 
@@ -45,6 +46,7 @@ export function serverBt(base = ""): BtApi {
         scan: () => post("/scan"),
         pair: (mac) => post("/pair", { mac }),
         connect: (mac) => post("/connect", { mac }),
+        disconnect: (mac) => post("/disconnect", { mac }),
         remove: (mac) => post("/remove", { mac }),
     };
 }
@@ -109,6 +111,11 @@ export function demoBt(): BtApi {
         connect: (mac) => {
             const d = find(mac);
             if (d) d.connected = true;
+            return wait({ ...state(), ok: true });
+        },
+        disconnect: (mac) => {
+            const d = find(mac);
+            if (d) d.connected = false;
             return wait({ ...state(), ok: true });
         },
         remove: (mac) => {

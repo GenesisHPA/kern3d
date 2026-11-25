@@ -2,11 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 import { GamepadJog } from "@chili3d/app/src/cam/camNet";
+import { loadProbeSettings } from "@chili3d/app/src/cam/camProbe";
 import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
 import { demoBt, serverBt } from "./btPanel";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
 import { JobStore } from "./jobStore";
-import { padCapture, padMap } from "./padMap";
+import { padCapture, padEnabled, padMap } from "./padMap";
 import { useServerPads } from "./serverPads";
 import { demoDisplay, serverDisplay } from "./settings";
 import { type Connect, StationMachine } from "./stationMachine";
@@ -38,6 +39,27 @@ if (!demo) useServerPads();
 
 const machine = new StationMachine(connect);
 const jobs = new JobStore(machine);
+
+// the length sensor settings, and the reference tool and offset, kept in this browser
+machine.probe = loadProbeSettings();
+const TOOL_KEY = "kern3d.station.toolref";
+try {
+    const kept = JSON.parse(localStorage.getItem(TOOL_KEY) ?? "null") as {
+        reference?: number;
+        offset?: number;
+        tool?: { tool: number; name?: string };
+    } | null;
+    if (typeof kept?.reference === "number") machine.reference = kept.reference;
+    if (typeof kept?.offset === "number") machine.offset = kept.offset;
+    if (typeof kept?.tool?.tool === "number") machine.tool = kept.tool;
+} catch {}
+let keptTool = "";
+machine.onChange(() => {
+    const now = JSON.stringify({ reference: machine.reference, offset: machine.offset, tool: machine.tool });
+    if (now === keptTool) return;
+    keptTool = now;
+    localStorage.setItem(TOOL_KEY, now);
+});
 
 function openFile() {
     const input = document.createElement("input");
@@ -117,12 +139,19 @@ function padStop() {
 }
 const firstPad = () => [...(navigator.getGamepads?.() ?? [])].find((p) => p);
 const gamepadJog = new GamepadJog(
-    (line) => (padCapture.active ? false : machine.jogLine(line)),
+    (line) => (padCapture.active || !padEnabled() ? false : machine.jogLine(line)),
     () => machine.jogStop(),
     () => 3000,
-    () => padCapture.active,
+    () => padCapture.active || !padEnabled(),
     (button) => {
-        if (padCapture.active) return;
+        if (padCapture.active || !padEnabled()) return;
+        const change = machine.snapshot().change;
+        if (change && (change.stage === "waiting" || change.stage === "zero")) {
+            // in a tool change «Старт» is «Готово» / «Продолжить»; the rest wait
+            if (button === "start") machine.changeDone();
+            else if (button === "stop") padStop();
+            return;
+        }
         if (button === "stop") padStop();
         else if (button === "hold") machine.pause();
         else
@@ -153,7 +182,7 @@ setInterval(() => {
     const map = padMap();
     const edge = (i: number) => i >= 0 && pressed[i] && !lastPressed[i];
     lastPressed = pressed;
-    if (padCapture.active) return;
+    if (padCapture.active || !padEnabled()) return;
     const step = ui.jogStep || 1; // continuous (0) is the sticks' job: a press steps 1 mm
     if (edge(map.yPlus)) machine.jog("Y", 1, step);
     if (edge(map.yMinus)) machine.jog("Y", -1, step);
@@ -166,6 +195,12 @@ setInterval(() => {
     if (edge(map.stepDown)) ui.shiftStep(-1);
     if (edge(map.zeroXY)) machine.zero(["X", "Y"]);
     if (edge(map.zeroZ)) machine.zero(["Z"]);
+    if (edge(map.toolChange))
+        setTimeout(() => {
+            if (!firstPad()?.buttons[padMap().toolChange]?.pressed) return;
+            const why = machine.emergencyChange();
+            ui.toast(why ? `⚠ ${why}` : "🔧 Экстренная замена фрезы");
+        }, 1000);
 }, 50);
 
 addEventListener("gamepadconnected", (e) => {

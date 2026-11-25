@@ -4,6 +4,8 @@
 import { type BtApi, BtPanel } from "./btPanel";
 import { padHelp } from "./padHelp";
 import { PadPanel } from "./padPanel";
+import type { StationMachine } from "./stationMachine";
+import { ToolPanel } from "./toolPanel";
 import { type WifiApi, WifiPanel } from "./wifiPanel";
 
 export type Layout = "auto" | "portrait" | "landscape";
@@ -171,6 +173,7 @@ export class SettingsSheet {
         private readonly display: DisplayApi,
         private readonly onLayout: (layout: Layout) => void,
         toast: (text: string) => void,
+        machine: StationMachine,
     ) {
         const close = h("button", "sheetClose", "✕");
         close.onclick = () => this.hide();
@@ -205,6 +208,15 @@ export class SettingsSheet {
             padEl,
             () => padPanel.show(),
             () => padPanel.hide(),
+        );
+        const toolEl = h("div", "section toolSection");
+        const toolPanel = new ToolPanel(toolEl, machine, toast);
+        this.add(
+            "tool",
+            "Инструмент",
+            toolEl,
+            () => toolPanel.show(),
+            () => toolPanel.hide(),
         );
         const helpEl = h("div", "section");
         this.add("help", "Справка", helpEl, () => helpEl.replaceChildren(padHelp()));
