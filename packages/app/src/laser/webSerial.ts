@@ -14,6 +14,7 @@ interface SerialPortLike {
 
 interface SerialLike {
     requestPort(options?: object): Promise<SerialPortLike>;
+    getPorts?(): Promise<SerialPortLike[]>;
 }
 
 function serialApi(): SerialLike | undefined {
@@ -55,7 +56,30 @@ export class WebSerialConnection implements GrblTransport {
     ): Promise<WebSerialConnection> {
         const api = serialApi();
         if (api === undefined) throw new Error("Web Serial is not available");
-        const port = await api.requestPort();
+        return WebSerialConnection.open(await api.requestPort(), baud, onData, onClose);
+    }
+
+    /**
+     * Opens a port this page was already allowed to use (granted earlier, or by the desktop app),
+     * with no chooser: the machine station connects by itself when it starts or the cable comes
+     * back. Undefined when there is none.
+     */
+    static async reopen(
+        baud: number,
+        onData: (text: string) => void,
+        onClose: () => void,
+    ): Promise<WebSerialConnection | undefined> {
+        const ports = (await serialApi()?.getPorts?.()) ?? [];
+        if (ports.length === 0) return undefined;
+        return WebSerialConnection.open(ports[0], baud, onData, onClose);
+    }
+
+    private static async open(
+        port: SerialPortLike,
+        baud: number,
+        onData: (text: string) => void,
+        onClose: () => void,
+    ): Promise<WebSerialConnection> {
         await port.open({ baudRate: baud, bufferSize: 4096 });
         const connection = new WebSerialConnection(port, onData, onClose);
         connection.writer = port.writable?.getWriter();

@@ -12,6 +12,8 @@ export default defineConfig({
     devtool: isProduction ? false : "source-map",
     entry: {
         main: "./packages/web/src/index.ts",
+        // «Kern3D Станок»: the machine station's page, without the modeller
+        station: "./packages/station/src/index.ts",
     },
     experiments: {
         css: true,
@@ -71,7 +73,7 @@ export default defineConfig({
                 {
                     from: resolve(configDir, "public"),
                     globOptions: {
-                        ignore: ["**/**/index.html"],
+                        ignore: ["**/**/index.html", "**/**/station.html"],
                     },
                 },
             ],
@@ -85,6 +87,13 @@ export default defineConfig({
         new rspack.HtmlRspackPlugin({
             template: resolve(configDir, "public/index.html"),
             inject: "body",
+            chunks: ["main"],
+        }),
+        new rspack.HtmlRspackPlugin({
+            template: resolve(configDir, "public/station.html"),
+            filename: "station.html",
+            inject: "body",
+            chunks: ["station"],
         }),
     ],
     optimization: {

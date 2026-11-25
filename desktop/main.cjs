@@ -270,15 +270,22 @@ function enableSystemFonts() {
     });
 }
 
+/**
+ * `--station`: the machine station by the mill — the «Kern3D Станок» page full screen (kiosk),
+ * no modeller. Started like this from the station PC's autostart.
+ */
+const STATION = process.argv.includes("--station");
+
 function createWindow() {
     const win = new BrowserWindow({
-        width: 1440,
-        height: 900,
-        minWidth: 960,
-        minHeight: 600,
-        title: "Kern3D",
+        width: STATION ? 1200 : 1440,
+        height: STATION ? 1920 : 900,
+        minWidth: STATION ? 400 : 960,
+        minHeight: STATION ? 600 : 600,
+        kiosk: STATION,
+        title: STATION ? "Kern3D Станок" : "Kern3D",
         icon: path.join(__dirname, "icon.png"),
-        backgroundColor: "#1F2429",
+        backgroundColor: STATION ? "#0f1013" : "#1F2429",
         autoHideMenuBar: true,
         show: false,
         webPreferences: {
@@ -299,9 +306,9 @@ function createWindow() {
         event.preventDefault();
         openExternally(url);
     });
-    confirmCloseWithOpenDocument(win);
+    if (!STATION) confirmCloseWithOpenDocument(win);
     enableWebSerial(win);
-    win.loadURL(`${ORIGIN}/index.html`);
+    win.loadURL(`${ORIGIN}/${STATION ? "station.html" : "index.html"}`);
     return win;
 }
 
