@@ -292,26 +292,15 @@ export class StationUi {
     }
 
     private connectOverlay() {
-        const button = h("button", {}, "Подключить станок");
+        const button = h("button", {}, "Подключить");
         button.onclick = () => this.askConnect();
-        return this.ref(
-            "connect",
-            h(
-                "div",
-                { class: "connect" },
-                h(
-                    "div",
-                    {},
-                    h("div", { class: "logo" }, "Kern3D ", h("b", {}, "Станок")),
-                    h(
-                        "p",
-                        {},
-                        "Контроллер не найден. Подключите его по USB и нажмите кнопку — выберите порт один раз, дальше станция найдёт его сама.",
-                    ),
-                    button,
-                ),
-            ),
+        const text = h(
+            "p",
+            {},
+            h("b", {}, "Контроллер не найден. "),
+            "Подключите его по USB и нажмите «Подключить» — порт выбирается один раз.",
         );
+        return this.ref("connect", h("div", { class: "connect" }, text, button));
     }
 
     // ---- live ----------------------------------------------------------------------------------

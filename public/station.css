@@ -649,37 +649,42 @@ body {
 }
 .connect {
     position: absolute;
-    inset: 0;
-    z-index: 8;
+    left: 2cqw;
+    right: 2cqw;
+    top: 8.4cqw;
+    z-index: 7;
     display: none;
-    place-items: center;
-    background: rgba(10, 10, 12, 0.82);
-    backdrop-filter: blur(6px);
+    align-items: center;
+    gap: 2cqw;
+    padding: 1.4cqw 2cqw;
+    border-radius: 1.8cqw;
+    background: rgba(23, 24, 28, 0.94);
+    border: 1px solid var(--err);
+    box-shadow: 0 2cqw 5cqw -2cqw rgba(0, 0, 0, 0.8);
+    animation: rise 0.5s var(--ease) both;
 }
 .connect.show {
-    display: grid;
-}
-.connect div {
-    text-align: center;
-    display: grid;
-    gap: 2.4cqw;
-    justify-items: center;
+    display: flex;
 }
 .connect p {
-    font-size: 2.6cqw;
+    flex: 1;
+    font-size: 2.1cqw;
     color: var(--dim);
-    max-width: 70cqw;
+    line-height: 1.35;
+}
+.connect p b {
+    color: var(--fg);
 }
 .connect button {
-    height: 9cqw;
-    padding: 0 6cqw;
-    border-radius: 2cqw;
+    flex: none;
+    height: 6.4cqw;
+    padding: 0 3cqw;
+    border-radius: 1.4cqw;
     border: none;
     background: var(--grad);
     color: #fff;
-    font-size: 3.2cqw;
+    font-size: 2.3cqw;
     font-weight: 800;
-    box-shadow: 0 2cqw 5cqw -2cqw rgba(255, 122, 26, 0.9);
 }
 
 /* --- settings sheet: Wi-Fi with an on-screen keyboard --- */
