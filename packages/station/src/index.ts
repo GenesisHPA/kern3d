@@ -5,6 +5,7 @@ import { GamepadJog } from "@chili3d/app/src/cam/camNet";
 import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
 import { demoBt, serverBt } from "./btPanel";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
+import { padCapture, padMap } from "./padMap";
 import { useServerPads } from "./serverPads";
 import { demoDisplay, serverDisplay } from "./settings";
 import { type Connect, StationMachine } from "./stationMachine";
@@ -86,46 +87,61 @@ setInterval(() => {
 
 /**
  * Jogging with a gamepad (Bluetooth or USB): left stick X/Y, right stick (or ZL/ZR) Z, the
- * deflection sets the speed; the d-pad moves X/Y and L/R move Z by the step chosen on screen.
- * The buttons as on this station's Switch-style pad: B stop, Y hold, + start (held for a second,
- * like «Старт» on screen), − home.
+ * deflection sets the speed. The buttons are set in ⚙ → Джойстик (padMap.ts): stop, hold, start
+ * (held a second, like «Старт» on screen), home, a step on X/Y/Z, the step finer/coarser, zeroing.
  */
-const PAD = { stop: 0, hold: 2, start: 9, home: 8, up: 12, down: 13, left: 14, right: 15, zUp: 5, zDown: 4 };
 const START_HOLD_MS = 1000;
 const firstPad = () => [...(navigator.getGamepads?.() ?? [])].find((p) => p);
 const gamepadJog = new GamepadJog(
-    (line) => machine.jogLine(line),
+    (line) => (padCapture.active ? false : machine.jogLine(line)),
     () => machine.jogStop(),
     () => 3000,
-    () => false,
+    () => padCapture.active,
     (button) => {
+        if (padCapture.active) return;
         if (button === "stop") machine.stop();
         else if (button === "hold") machine.pause();
         else
             setTimeout(() => {
-                if (firstPad()?.buttons[PAD.start]?.pressed && !machine.start())
+                if (firstPad()?.buttons[padMap().start]?.pressed && !machine.start())
                     ui.toast("Нечего запускать или станок занят");
             }, START_HOLD_MS);
     },
-    { stop: PAD.stop, hold: PAD.hold, start: PAD.start },
+    {
+        get stop() {
+            return padMap().stop;
+        },
+        get hold() {
+            return padMap().hold;
+        },
+        get start() {
+            return padMap().start;
+        },
+    },
 );
 
-/** The d-pad and the shoulder buttons: one step per press, the step chosen on the screen. */
+/** The other buttons: one step per press, the step chosen on the screen. */
 let lastPressed: boolean[] = [];
 setInterval(() => {
     const pad = firstPad();
     if (!pad) return;
     const pressed = pad.buttons.map((b) => b.pressed);
-    const edge = (i: number) => pressed[i] && !lastPressed[i];
-    const step = ui.jogStep || 1; // continuous (0) is the sticks' job: a press steps 1 mm
-    if (edge(PAD.up)) machine.jog("Y", 1, step);
-    if (edge(PAD.down)) machine.jog("Y", -1, step);
-    if (edge(PAD.left)) machine.jog("X", -1, step);
-    if (edge(PAD.right)) machine.jog("X", 1, step);
-    if (edge(PAD.zUp)) machine.jog("Z", 1, step);
-    if (edge(PAD.zDown)) machine.jog("Z", -1, step);
-    if (edge(PAD.home)) machine.home();
+    const map = padMap();
+    const edge = (i: number) => i >= 0 && pressed[i] && !lastPressed[i];
     lastPressed = pressed;
+    if (padCapture.active) return;
+    const step = ui.jogStep || 1; // continuous (0) is the sticks' job: a press steps 1 mm
+    if (edge(map.yPlus)) machine.jog("Y", 1, step);
+    if (edge(map.yMinus)) machine.jog("Y", -1, step);
+    if (edge(map.xMinus)) machine.jog("X", -1, step);
+    if (edge(map.xPlus)) machine.jog("X", 1, step);
+    if (edge(map.zPlus)) machine.jog("Z", 1, step);
+    if (edge(map.zMinus)) machine.jog("Z", -1, step);
+    if (edge(map.home)) machine.home();
+    if (edge(map.stepUp)) ui.shiftStep(1);
+    if (edge(map.stepDown)) ui.shiftStep(-1);
+    if (edge(map.zeroXY)) machine.zero(["X", "Y"]);
+    if (edge(map.zeroZ)) machine.zero(["Z"]);
 }, 50);
 
 addEventListener("gamepadconnected", (e) => {

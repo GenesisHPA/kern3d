@@ -904,3 +904,67 @@ body {
     animation: spin 0.8s linear infinite;
 }
 
+/* --- gamepad buttons and help --- */
+.padMapRow {
+    padding-top: calc(var(--u) * 1.4);
+    padding-bottom: calc(var(--u) * 1.4);
+}
+.padMapRow .wifiName {
+    font-size: calc(var(--u) * 2.4);
+}
+.padBadge {
+    min-width: calc(var(--u) * 14);
+    text-align: center;
+    padding: calc(var(--u) * 0.8) calc(var(--u) * 1.6);
+    border-radius: 99px;
+    background: rgba(255, 122, 26, 0.15);
+    color: var(--acc2);
+    font-size: calc(var(--u) * 2.1);
+    font-weight: 800;
+}
+.padBadge.none {
+    background: none;
+    color: var(--dim);
+}
+.padMapRow.waiting {
+    border-color: var(--acc);
+    box-shadow: 0 0 calc(var(--u) * 3) calc(var(--u) * -1) var(--acc);
+}
+.padMapRow.waiting .padBadge {
+    animation: pulse 1s ease-in-out infinite;
+}
+.padChip {
+    cursor: pointer;
+    color: var(--fg);
+    font-size: calc(var(--u) * 2.2);
+}
+.helpBox {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 1.2);
+}
+.helpTable {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: calc(var(--u) * 0.8) calc(var(--u) * 2);
+    align-items: baseline;
+    margin-bottom: calc(var(--u) * 1);
+}
+.helpKey {
+    padding: calc(var(--u) * 0.6) calc(var(--u) * 1.4);
+    border-radius: calc(var(--u) * 1);
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    color: var(--acc2);
+    font-size: calc(var(--u) * 2.1);
+    font-weight: 800;
+    white-space: nowrap;
+}
+.helpWhat {
+    font-size: calc(var(--u) * 2.1);
+    line-height: 1.4;
+}
+

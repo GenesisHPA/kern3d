@@ -2,6 +2,8 @@
 // See LICENSE file in the project root for full license information.
 
 import { type BtApi, BtPanel } from "./btPanel";
+import { padHelp } from "./padHelp";
+import { PadPanel } from "./padPanel";
 import { type WifiApi, WifiPanel } from "./wifiPanel";
 
 export type Layout = "auto" | "portrait" | "landscape";
@@ -127,6 +129,17 @@ export class SettingsSheet {
             () => btPanel.show(),
             () => btPanel.hide(),
         );
+        const padEl = h("div", "section");
+        const padPanel = new PadPanel(padEl, toast);
+        this.add(
+            "pad",
+            "Джойстик",
+            padEl,
+            () => padPanel.show(),
+            () => padPanel.hide(),
+        );
+        const helpEl = h("div", "section");
+        this.add("help", "Справка", helpEl, () => helpEl.replaceChildren(padHelp()));
         this.add("screen", "Экран", this.screenSection(), () => {});
         this.open("wifi");
     }
@@ -139,6 +152,12 @@ export class SettingsSheet {
         el.hidden = true;
         this.body.append(el);
         this.sections.set(id, { el, show, hide });
+    }
+
+    /** Opens the sheet on one section (the 🎮 chip opens the gamepad help). */
+    showSection(id: string) {
+        this.sheet.classList.add("open");
+        this.open(id);
     }
 
     private open(id: string) {

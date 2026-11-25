@@ -56,6 +56,17 @@ export class StationUi {
     private readonly el: Record<string, HTMLElement> = {};
     private step = 1;
 
+    /** One step finer (−1) or coarser (+1) among the steps on screen, as if its chip was tapped. */
+    shiftStep(delta: 1 | -1) {
+        const steps = STEPS.filter((x) => x > 0);
+        const i = steps.indexOf(this.step as (typeof steps)[number]);
+        const next = steps[Math.min(steps.length - 1, Math.max(0, (i < 0 ? 2 : i) + delta))];
+        this.step = next;
+        for (const chip of this.root.querySelectorAll(".steps button"))
+            chip.classList.toggle("on", chip.textContent === String(next));
+        this.toast(`Шаг ${next} мм`);
+    }
+
     /** The jog step chosen on screen, mm (0 = continuous). */
     get jogStep(): number {
         return this.step;
@@ -105,7 +116,9 @@ export class StationUi {
         this.applyLayout();
         addEventListener("resize", () => this.applyLayout());
         // ?open=settings: the settings sheet open at start (checks, screenshots)
-        if (new URLSearchParams(location.search).get("open") === "settings") this.settings.show();
+        const open = new URLSearchParams(location.search).get("open");
+        if (open === "settings") this.settings.show();
+        else if (open) this.settings.showSection(open);
         machine.onChange(() => this.render());
         this.render();
         const frame = () => {
@@ -142,7 +155,7 @@ export class StationUi {
             logo,
             link,
             this.ref("state", h("div", { class: "chip" })),
-            this.ref("padChip", h("div", { class: "chip padChip" }, "🎮")),
+            this.padChip(),
             h("div", { class: "sp" }),
             this.ref("clock", h("div", { class: "clock" })),
             this.gearButton(),
@@ -152,6 +165,15 @@ export class StationUi {
     /** Portrait (the Tesla screen standing up) or landscape (a monitor): the grid changes, nothing else. */
     private applyLayout() {
         this.root.dataset["layout"] = resolveLayout(this.layout);
+    }
+
+    private padChip() {
+        const chip = this.ref(
+            "padChip",
+            h("button", { class: "chip padChip", title: "Джойстик: что какая кнопка делает" }, "🎮"),
+        );
+        chip.onclick = () => this.settings.showSection("help");
+        return chip;
     }
 
     private gearButton() {
