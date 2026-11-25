@@ -13,6 +13,8 @@ user (a polkit rule lets that user change the network).
     POST /api/wifi/connect    {"ssid": "...", "password": "..."}
     POST /api/wifi/forget     {"ssid": "..."}
     POST /api/wifi/radio      {"on": true|false}
+    GET  /api/display         {"rotate": 0|90|180|270}
+    POST /api/display         {"rotate": ...}: saved, the kiosk restarts turned
 """
 import json
 import os
@@ -20,6 +22,7 @@ import subprocess
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+ROTATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rotate")
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 PORT = int(os.environ.get("KERN3D_STATION_PORT", "8080"))
 BIND = os.environ.get("KERN3D_STATION_BIND", "127.0.0.1")
@@ -47,6 +50,21 @@ def split_terse(line):
             cur += ch
     out.append(cur)
     return out
+
+
+def rotation():
+    try:
+        value = int(open(ROTATE_FILE, encoding="ascii").read().strip() or 0)
+    except (OSError, ValueError):
+        value = 0
+    return value if value in (0, 90, 180, 270) else 0
+
+
+def set_rotation(value):
+    """Saves the turn and restarts cage (the login loop starts it again with the new -r count)."""
+    with open(ROTATE_FILE, "w", encoding="ascii") as f:
+        f.write(str(value))
+    subprocess.run(["pkill", "-x", "cage"], check=False)
 
 
 def wifi_device():
@@ -124,6 +142,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/wifi":
             return self.reply(200, wifi_status())
+        if self.path == "/api/display":
+            return self.reply(200, {"rotate": rotation()})
         if self.path.startswith("/api/"):
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
@@ -133,6 +153,13 @@ class Handler(SimpleHTTPRequestHandler):
             req = self.body()
         except ValueError:
             return self.reply(400, {"error": "bad json"})
+        if self.path == "/api/display":
+            value = int(req.get("rotate", 0))
+            if value not in (0, 90, 180, 270):
+                return self.reply(400, {"error": "rotate"})
+            self.reply(200, {"rotate": value})
+            set_rotation(value)  # after the reply: the page goes away with the kiosk
+            return None
         dev, _ = wifi_device()
         if self.path == "/api/wifi/rescan":
             nmcli("device", "wifi", "rescan", timeout=20)

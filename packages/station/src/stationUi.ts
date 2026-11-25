@@ -2,9 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
+import { type DisplayApi, type Layout, resolveLayout, SettingsSheet, savedLayout } from "./settings";
 import type { StationMachine, StationSnapshot } from "./stationMachine";
 import { PathView } from "./view3d";
-import { type WifiApi, WifiPanel } from "./wifiPanel";
+import type { WifiApi } from "./wifiPanel";
 
 const STATE_TEXT: Record<string, string> = {
     Idle: "Готов",
@@ -58,13 +59,15 @@ export class StationUi {
     private shownJobId?: number;
     private shown: [number, number, number] = [0, 0, 0];
     private shownError?: string;
-    private wifi!: WifiPanel;
+    private settings!: SettingsSheet;
+    private layout: Layout = savedLayout();
 
     constructor(
         private readonly machine: StationMachine,
         private readonly openFile: () => void,
         private readonly askConnect: () => void,
         wifi: WifiApi,
+        display: DisplayApi,
     ) {
         const canvas = h("canvas");
         this.view = new PathView(canvas);
@@ -81,7 +84,18 @@ export class StationUi {
             this.connectOverlay(),
         );
         document.body.append(this.root);
-        this.wifi = new WifiPanel(this.root, wifi, (text) => this.toast(text));
+        this.settings = new SettingsSheet(
+            this.root,
+            wifi,
+            display,
+            (layout) => {
+                this.layout = layout;
+                this.applyLayout();
+            },
+            (text) => this.toast(text),
+        );
+        this.applyLayout();
+        addEventListener("resize", () => this.applyLayout());
         machine.onChange(() => this.render());
         this.render();
         const frame = () => {
@@ -124,9 +138,14 @@ export class StationUi {
         );
     }
 
+    /** Portrait (the Tesla screen standing up) or landscape (a monitor): the grid changes, nothing else. */
+    private applyLayout() {
+        this.root.dataset["layout"] = resolveLayout(this.layout);
+    }
+
     private gearButton() {
         const gear = h("button", { class: "gear", title: "Настройки: Wi-Fi" }, "⚙");
-        gear.onclick = () => this.wifi.show();
+        gear.onclick = () => this.settings.show();
         return gear;
     }
 

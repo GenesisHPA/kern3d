@@ -91,12 +91,10 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""): 
 }
 
 /**
- * Settings → Wi-Fi as a sheet over the station screen: the networks in range with their signal,
- * tap to join (an on-screen keyboard for the password — there is no keyboard at the machine),
- * forget a saved one, rescan.
+ * Settings → Wi-Fi: the networks in range with their signal, tap to join (an on-screen keyboard
+ * for the password — there is no keyboard at the machine), forget a saved one, rescan.
  */
 export class WifiPanel {
-    private readonly sheet = h("div", "sheet");
     private readonly list = h("div", "wifiList");
     private readonly info = h("div", "wifiInfo");
     private readonly keyboard = h("div", "kbd");
@@ -111,24 +109,20 @@ export class WifiPanel {
         private readonly api: WifiApi,
         private readonly toast: (text: string) => void,
     ) {
-        const close = h("button", "sheetClose", "✕");
-        close.onclick = () => this.hide();
         const rescan = h("button", "sheetBtn", "↻ Обновить");
         rescan.onclick = () => this.run(() => this.api.rescan());
-        const head = h("div", "sheetHead");
-        head.append(h("div", "sheetTitle", "Wi-Fi"), rescan, close);
-        this.sheet.append(head, this.info, this.list, this.keyboard);
-        host.append(this.sheet);
+        const bar = h("div", "sectionBar");
+        bar.append(this.info, rescan);
+        host.append(bar, this.list, this.keyboard);
     }
 
     show() {
-        this.sheet.classList.add("open");
         this.keyboard.classList.remove("open");
         void this.run(() => this.api.status());
     }
 
     hide() {
-        this.sheet.classList.remove("open");
+        this.keyboard.classList.remove("open");
         this.password = "";
     }
 

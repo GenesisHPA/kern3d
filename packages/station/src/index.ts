@@ -3,6 +3,7 @@
 
 import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
+import { demoDisplay, serverDisplay } from "./settings";
 import { type Connect, StationMachine } from "./stationMachine";
 import { StationUi } from "./stationUi";
 import { demoWifi, serverWifi } from "./wifiPanel";
@@ -49,6 +50,7 @@ const ui = new StationUi(
         void machine.connect().finally(() => (ask = false));
     },
     demo ? demoWifi() : serverWifi(),
+    demo ? demoDisplay() : serverDisplay(),
 );
 
 // a file dropped on the screen joins the queue
