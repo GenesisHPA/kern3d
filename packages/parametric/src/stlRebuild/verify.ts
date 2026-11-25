@@ -3,6 +3,7 @@
 
 import { type IShape, Matrix4, ShapeTypes } from "@chili3d/core";
 import { type TriMesh, type Vec3, vertex } from "./mesh";
+import { MeshInside } from "./meshInside";
 
 export function solidVolume(shape: IShape): number {
     return shape.findSubShapes(ShapeTypes.solid).reduce((v, s) => v + Math.abs(s.volume()), 0);
@@ -182,7 +183,21 @@ export interface SurfaceFit {
  * a probe `eps` out along the vertex normal outside the solid, one `eps` in inside it. Unlike a
  * volume difference this reads zero for a rebuild with true arcs where the STL had facets.
  */
-export function surfaceFit(mesh: TriMesh, shape: IShape, eps: number, samples = 3000): SurfaceFit {
+export function surfaceFit(
+    mesh: TriMesh,
+    shape: IShape,
+    eps: number,
+    samples = 3000,
+    /** The body's own triangles, when they are at hand: the probes are classified against them. */
+    bodyTriangles?: ArrayLike<number>,
+): SurfaceFit {
+    // the body's display mesh lies within ~0.01 mm of its faces, far inside `eps` (≥ 0.05 mm):
+    // classifying the probes against it answers as the kernel would, thousands of times faster;
+    // only a probe whose rays disagree (an edge grazed) goes to the kernel
+    let inside: MeshInside | undefined;
+    if (bodyTriangles !== undefined && bodyTriangles.length >= 36) inside = new MeshInside(bodyTriangles);
+    const contains = (q: { x: number; y: number; z: number }) =>
+        inside?.contains(q.x, q.y, q.z) ?? shape.containsPoint(q, false);
     // triangle centres, by area: a centre lies on a flat face of the part exactly, and on a
     // curved one within the facet's sagitta — far less than `eps` for any sensible STL
     const total = mesh.areas.reduce((a, b) => a + b, 0);
@@ -204,7 +219,7 @@ export function surfaceFit(mesh: TriMesh, shape: IShape, eps: number, samples = 
         sampled++;
         const out = { x: p[0] + n[0] * eps, y: p[1] + n[1] * eps, z: p[2] + n[2] * eps };
         const inn = { x: p[0] - n[0] * eps, y: p[1] - n[1] * eps, z: p[2] - n[2] * eps };
-        if (shape.containsPoint(out, false) || !shape.containsPoint(inn, false)) {
+        if (contains(out) || !contains(inn)) {
             off++;
             if (misses.length < 20) misses.push(p);
         }

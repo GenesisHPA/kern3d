@@ -224,6 +224,8 @@ export async function rebuildPart(
     const referenceFaces = reference.findSubShapes(ShapeTypes.face).length;
     /** Created nodes not kept yet: discarded if the user stops (the transaction would too). */
     const live = new Set<BuiltModel>();
+    /** The frames already built without pieces. */
+    const tried = new Set<(typeof frames)[number]>();
     /** One axis tried whole: planned, built, its edges rounded, measured. */
     const attempt = async (frame: (typeof frames)[number], meshPieces: boolean, step: IProgress) => {
         const ta = Date.now();
@@ -235,6 +237,12 @@ export async function rebuildPart(
             `axis ${axisName}${meshPieces ? " +pieces" : ""}: ${plans.length} plans (${plans.filter((p) => p.fromMesh).length} pieces), ${treatments.length} treatments, plan ${Date.now() - ta} ms`,
         );
         if (plans.length === 0) return undefined;
+        // with no mesh piece in it the plan is the one this axis already built: nothing new to try
+        if (meshPieces && tried.has(frame) && !plans.some((p) => p.fromMesh)) {
+            REBUILD_DEBUG?.(`axis ${axisName} +pieces: same plan as before, skipped`);
+            return undefined;
+        }
+        if (!meshPieces) tried.add(frame);
         // a tree this long, or this much of the part as pieces, is no rebuild worth having — and
         // every piece is re-read on each rebuild of the chain, which is what runs the heap out
         if (plans.length > MAX_FEATURES || plans.filter((p) => p.fromMesh).length > MAX_PIECES)
@@ -465,7 +473,11 @@ export async function rebuildPart(
         const fitEps = Math.max(tol * 4, 0.05);
         const surfaceOf = (m: BuiltModel) => {
             const shape = bodyShape(m);
-            return shape === undefined ? 1 : surfaceFit(mesh, shape, fitEps).off;
+            if (shape === undefined) return 1;
+            // the triangles the volume measure already made (the mesh is cached on the shape)
+            // (an unsound body in a kernel of its own, as the volume measure does it)
+            const tri = soundBody(shape, partSolids) ? inPlaceTriangles(shape) : safeTriangles(shape);
+            return surfaceFit(mesh, shape, fitEps, 3000, tri).off;
         };
         progress.throwIfCancelled();
         await progress.report(0.75, "stl.stage.surface");
