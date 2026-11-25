@@ -4,6 +4,9 @@
     "description": "Parametric feature-list bodies (extrude/revolve from sketches, then fillet/chamfer etc.)",
     "main": "src/index.ts",
     "type": "module",
+    "dependencies": {
+        "clipper-lib": "6.4.2"
+    },
     "devDependencies": {
         "@chili3d/core": "*"
     }

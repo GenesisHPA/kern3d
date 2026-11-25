@@ -11,11 +11,12 @@ import {
 } from "@chili3d/core";
 import { appendExtrude, appendTreatment, type BuiltModel, buildModel } from "./build";
 import { profileArea } from "./fit2d";
-import { meshVolume, soupMesh, type TriMesh, weldTriangles } from "./mesh";
+import { dot, meshVolume, soupMesh, type TriMesh, type Vec3, weldTriangles } from "./mesh";
 import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan";
 import { meshDifference } from "./raycast";
 import { safeMeshReady, safeTriangles } from "./safeMesh";
-import { sliceFrames } from "./slices";
+import { silhouetteHull, silhouetteTrim } from "./silhouette";
+import { frameFor, type SliceFrame, sliceFrames } from "./slices";
 import { deviation, setVerifyDebug, solidVolume, surfaceFit, trianglesOf } from "./verify";
 
 export interface RebuildReport {
@@ -319,6 +320,21 @@ export async function rebuildPart(
             );
         return { model, ratio, rounded, plans, frame, sound, error: undefined as string | undefined };
     };
+    /** The other views to cut to: the world axes and the best-scoring frames, not along `main`. */
+    const viewFrames = (main: SliceFrame): SliceFrame[] => {
+        const out: SliceFrame[] = [];
+        const world: Vec3[] = [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+        ];
+        for (const f of [...world.map((a) => frameFor(mesh, a)), ...frames.slice(0, 4)]) {
+            if (Math.abs(dot(f.axis, main.axis)) > 0.99) continue;
+            if (out.some((o) => Math.abs(dot(o.axis, f.axis)) > 0.99)) continue;
+            out.push(f);
+        }
+        return out.slice(0, 3);
+    };
     const discard = (model: BuiltModel) => {
         live.delete(model);
         for (const n of [model.body, ...model.sketches]) n.parent?.remove(n);
@@ -376,8 +392,63 @@ export async function rebuildPart(
         }
         const firstRatio = best.ratio;
         const t3 = Date.now();
+        // ---- the part as what its views have in common -----------------------------------------
+        // a clip (an arch one way, a plate with holes the other) is the common part of two or three
+        // extruded views; slabs along one axis only approximate it. Cut away what lies outside each
+        // other view (kept only when it brings the part closer), then try the views' hull itself.
+        const views = viewFrames(best.frame);
+        let viewRatio = best.ratio;
+        if (best.sound && viewRatio > goal) {
+            for (const frame of views) {
+                if (!inTime() || viewRatio <= goal) break;
+                progress.throwIfCancelled();
+                const trim = silhouetteTrim(mesh, frame, tol);
+                if (trim === undefined) continue;
+                const before = model.body.features;
+                const sketchesBefore = model.sketches.length;
+                appendExtrude(model, document, trim, tol);
+                const after = bodyShape(model);
+                const next =
+                    failedFeature(model) !== undefined || !soundBody(after, partSolids)
+                        ? 1
+                        : measure(referenceMesh, after);
+                const kept = viewRatio - next >= MIN_GAIN;
+                REBUILD_DEBUG?.(
+                    `view trim ${frame.axis.map((x) => x.toFixed(2))}: ${(next * 100).toFixed(3)}% ${kept ? "kept" : "dropped"}`,
+                );
+                if (kept) viewRatio = next;
+                else {
+                    model.body.setFeaturesEmitShapeChanged(before);
+                    for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
+                }
+            }
+        }
+        if (viewRatio > goal && inTime() && views.length > 0) {
+            // the hull of the views, with the holes the best axis found cut into it
+            const hull = silhouetteHull(mesh, [best.frame, ...views], tol);
+            const holes = best.plans.filter((p) => p.operation === "cut" && p.role === "hole" && !p.fromMesh);
+            if (hull.length >= 2) {
+                const th = Date.now();
+                const alt = await buildModel(document, [...hull, ...holes], name, tol, reference);
+                live.add(alt);
+                const altShape = bodyShape(alt);
+                const altRatio =
+                    failedFeature(alt) !== undefined || !soundBody(altShape, partSolids)
+                        ? 1
+                        : measure(referenceMesh, altShape);
+                REBUILD_DEBUG?.(
+                    `view hull ${hull.length} views + ${holes.length} holes: ${(altRatio * 100).toFixed(3)}%, ${Date.now() - th} ms`,
+                );
+                if (altRatio < viewRatio - MIN_GAIN) {
+                    discard(model);
+                    model = alt;
+                    rounded = 0;
+                    viewRatio = altRatio;
+                } else discard(alt);
+            }
+        }
         const deadline = Math.min(t3 + (options.budgetMs ?? 60_000), finishBy);
-        let ratio = firstRatio;
+        let ratio = viewRatio;
         let corrections = 0;
         const refVolume = solidVolume(reference);
         const corrective = referenceFaces <= MAX_DIFFERENCE_FACES && best.sound;
@@ -501,7 +572,9 @@ export async function rebuildPart(
                     alt !== undefined &&
                     alt.error === undefined &&
                     altSurface < surface - 0.01 &&
-                    alt.ratio <= ratio * 1.2 + 0.001
+                    // against the volume before the view trims: they lower the volume measure of a
+                    // body the pieces would have beaten on the surface, and must not keep it
+                    alt.ratio <= Math.max(ratio, firstRatio) * 1.2 + 0.001
                 ) {
                     discard(model);
                     model = alt.model;
