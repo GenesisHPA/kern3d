@@ -5,6 +5,7 @@ import type { Axis } from "@chili3d/app/src/cam/machineControl";
 import type { BtApi } from "./btPanel";
 import { grblErrorText } from "./grblText";
 import { padEnabled, setPadEnabled } from "./padMap";
+import { scrollArrows } from "./scrollArrows";
 import { type DisplayApi, type Layout, resolveLayout, SettingsSheet, savedLayout } from "./settings";
 import type { StationMachine, StationSnapshot } from "./stationMachine";
 import { PathView } from "./view3d";
@@ -387,13 +388,10 @@ export class StationUi {
     private queueCard() {
         const open = h("button", { class: "openFile" }, "+ Открыть G-code");
         open.onclick = () => this.openFile();
-        return h(
-            "div",
-            { class: "queue card" },
-            h("div", { class: "label" }, "Очередь"),
-            this.ref("queue", h("div")),
-            open,
-        );
+        const list = this.ref("queue", h("div", { class: "qlist" }));
+        const box = h("div", { class: "qbox" }, list);
+        scrollArrows(box, () => (list.scrollHeight > list.clientHeight + 2 ? list : undefined));
+        return h("div", { class: "queue card" }, h("div", { class: "label" }, "Очередь"), box, open);
     }
 
     private actions() {

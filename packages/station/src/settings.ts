@@ -4,6 +4,7 @@
 import { type BtApi, BtPanel } from "./btPanel";
 import { padHelp } from "./padHelp";
 import { PadPanel } from "./padPanel";
+import { scrollArrows, scrollerIn } from "./scrollArrows";
 import type { StationMachine } from "./stationMachine";
 import { ToolPanel } from "./toolPanel";
 import { type WifiApi, WifiPanel } from "./wifiPanel";
@@ -180,6 +181,11 @@ export class SettingsSheet {
         const head = h("div", "sheetHead");
         head.append(h("div", "sheetTitle", "Настройки"), close);
         this.sheet.append(head, this.tabs, this.body);
+        // ▲ ▼ for the open section when it does not fit
+        scrollArrows(this.body, () => {
+            const open = this.sections.get(this.current)?.el;
+            return open && this.sheet.classList.contains("open") ? scrollerIn(open) : undefined;
+        });
         host.append(this.sheet);
 
         const wifiEl = h("div", "section");
