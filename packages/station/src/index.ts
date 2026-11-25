@@ -5,6 +5,7 @@ import { WebSerialConnection } from "@chili3d/app/src/laser/webSerial";
 import { DemoGrbl, demoProgram } from "./demoGrbl";
 import { type Connect, StationMachine } from "./stationMachine";
 import { StationUi } from "./stationUi";
+import { demoWifi, serverWifi } from "./wifiPanel";
 
 /**
  * «Kern3D Станок»: the machine station's page (station.html). Only the machine — no modeller,
@@ -40,10 +41,15 @@ function openFile() {
     input.click();
 }
 
-const ui = new StationUi(machine, openFile, () => {
-    ask = true;
-    void machine.connect().finally(() => (ask = false));
-});
+const ui = new StationUi(
+    machine,
+    openFile,
+    () => {
+        ask = true;
+        void machine.connect().finally(() => (ask = false));
+    },
+    demo ? demoWifi() : serverWifi(),
+);
 
 // a file dropped on the screen joins the queue
 document.addEventListener("dragover", (e) => e.preventDefault());

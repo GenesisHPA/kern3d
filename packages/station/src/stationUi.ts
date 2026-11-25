@@ -4,6 +4,7 @@
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
 import type { StationMachine, StationSnapshot } from "./stationMachine";
 import { PathView } from "./view3d";
+import { type WifiApi, WifiPanel } from "./wifiPanel";
 
 const STATE_TEXT: Record<string, string> = {
     Idle: "Готов",
@@ -57,11 +58,13 @@ export class StationUi {
     private shownJobId?: number;
     private shown: [number, number, number] = [0, 0, 0];
     private shownError?: string;
+    private wifi!: WifiPanel;
 
     constructor(
         private readonly machine: StationMachine,
         private readonly openFile: () => void,
         private readonly askConnect: () => void,
+        wifi: WifiApi,
     ) {
         const canvas = h("canvas");
         this.view = new PathView(canvas);
@@ -78,6 +81,7 @@ export class StationUi {
             this.connectOverlay(),
         );
         document.body.append(this.root);
+        this.wifi = new WifiPanel(this.root, wifi, (text) => this.toast(text));
         machine.onChange(() => this.render());
         this.render();
         const frame = () => {
@@ -116,7 +120,14 @@ export class StationUi {
             this.ref("state", h("div", { class: "chip" })),
             h("div", { class: "sp" }),
             this.ref("clock", h("div", { class: "clock" })),
+            this.gearButton(),
         );
+    }
+
+    private gearButton() {
+        const gear = h("button", { class: "gear", title: "Настройки: Wi-Fi" }, "⚙");
+        gear.onclick = () => this.wifi.show();
+        return gear;
     }
 
     private dro() {
