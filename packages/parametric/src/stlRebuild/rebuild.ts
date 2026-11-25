@@ -151,13 +151,29 @@ function difference(
     shape: IShape,
     sound = true,
 ): { ratio: number; missing: number; extra: number } | undefined {
-    const tri = sound ? trianglesOf(shape) : safeTriangles(shape);
+    const tri = sound ? inPlaceTriangles(shape) : safeTriangles(shape);
     if (tri === undefined) {
         REBUILD_DEBUG?.("body could not be meshed: judged off");
         return undefined;
     }
     const d = meshDifference(reference, soupMesh(tri));
     return { ratio: d.aVolume > 0 ? (d.aOnly + d.bOnly) / d.aVolume : 1, missing: d.aOnly, extra: d.bOnly };
+}
+
+/**
+ * A sound body's triangles, meshed in the shared kernel (fast). A valid B-rep can still make
+ * OCCT's mesher raise (Voron idler_front, 2026-11-25): that «Aborted()» the kernel survives, so
+ * the body is meshed again in a kernel of its own; a damaged heap stops the rebuild.
+ */
+function inPlaceTriangles(shape: IShape): Float64Array | undefined {
+    try {
+        return trianglesOf(shape);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (KERNEL_CORRUPTED.test(message)) throw new KernelCorrupted(message);
+        REBUILD_DEBUG?.(`mesher raised (${message.slice(0, 60)}): meshed in a kernel of its own`);
+        return safeTriangles(shape);
+    }
 }
 
 function failedFeature(model: BuiltModel): string | undefined {
