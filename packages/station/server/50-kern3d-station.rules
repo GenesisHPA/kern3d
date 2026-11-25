@@ -1,0 +1,9 @@
+// Kern3D CNC: the station user (who runs the station server) may, from the station screen,
+// set up the network (Wi-Fi) and the clock (time zone, automatic time, time by hand).
+// Installed to /etc/polkit-1/rules.d/ (needs polkitd).
+polkit.addRule(function (action, subject) {
+    if (subject.user !== "station") return polkit.Result.NOT_HANDLED;
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) return polkit.Result.YES;
+    if (action.id.indexOf("org.freedesktop.timedate1.") === 0) return polkit.Result.YES;
+    return polkit.Result.NOT_HANDLED;
+});

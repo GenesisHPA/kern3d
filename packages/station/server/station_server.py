@@ -367,7 +367,9 @@ def net_status():
 
 def time_status(with_zones=False):
     import datetime
+    import time
 
+    time.tzset()  # the zone may have just changed: read /etc/localtime again
     p = subprocess.run(["timedatectl", "show", "-p", "Timezone", "-p", "NTP", "-p", "NTPSynchronized"],
                        capture_output=True, text=True, timeout=10)
     props = dict(line.split("=", 1) for line in p.stdout.splitlines() if "=" in line)

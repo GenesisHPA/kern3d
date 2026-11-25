@@ -136,6 +136,23 @@ function choices<T extends string | number | boolean>(
     return [row, set];
 }
 
+/** Russia's time zones for the list (any other zone the station has is added to it as is). */
+const ZONES: readonly [string, string][] = [
+    ["Europe/Kaliningrad", "Калининград (UTC+2)"],
+    ["Europe/Moscow", "Москва (UTC+3)"],
+    ["Europe/Samara", "Самара (UTC+4)"],
+    ["Asia/Yekaterinburg", "Екатеринбург (UTC+5)"],
+    ["Asia/Omsk", "Омск (UTC+6)"],
+    ["Asia/Novosibirsk", "Новосибирск (UTC+7)"],
+    ["Asia/Krasnoyarsk", "Красноярск (UTC+7)"],
+    ["Asia/Irkutsk", "Иркутск (UTC+8)"],
+    ["Asia/Yakutsk", "Якутск (UTC+9)"],
+    ["Asia/Vladivostok", "Владивосток (UTC+10)"],
+    ["Asia/Magadan", "Магадан (UTC+11)"],
+    ["Asia/Kamchatka", "Камчатка (UTC+12)"],
+    ["UTC", "UTC"],
+];
+
 /**
  * ⚙ Settings: a sheet sliding up over the station screen, with sections — Wi-Fi, Bluetooth (the
  * gamepad), Экран (layout and rotation).
@@ -273,24 +290,21 @@ export class SettingsSheet {
             ],
             (ntp) => void apply({ ntp }),
         );
-        const [zoneRow, setZone] = choices<string>(
-            [
-                ["Europe/Kaliningrad", "Калининград +2"],
-                ["Europe/Moscow", "Москва +3"],
-                ["Europe/Samara", "Самара +4"],
-                ["Asia/Yekaterinburg", "Екатеринбург +5"],
-                ["Asia/Omsk", "Омск +6"],
-                ["Asia/Novosibirsk", "Новосибирск +7"],
-                ["Asia/Krasnoyarsk", "Красноярск +7"],
-                ["Asia/Irkutsk", "Иркутск +8"],
-                ["Asia/Yakutsk", "Якутск +9"],
-                ["Asia/Vladivostok", "Владивосток +10"],
-                ["Asia/Magadan", "Магадан +11"],
-                ["Asia/Kamchatka", "Камчатка +12"],
-            ],
-            (timezone) => void apply({ timezone }),
-        );
-        zoneRow.classList.add("zones");
+        const zoneRow = h("select", "zoneSelect");
+        for (const [zone, label] of ZONES) {
+            const o = h("option", "", label);
+            o.value = zone;
+            zoneRow.append(o);
+        }
+        zoneRow.onchange = () => void apply({ timezone: zoneRow.value });
+        const setZone = (zone: string) => {
+            if (!ZONES.some(([z]) => z === zone)) {
+                const o = h("option", "", zone);
+                o.value = zone;
+                zoneRow.append(o);
+            }
+            if (document.activeElement !== zoneRow) zoneRow.value = zone;
+        };
 
         const shift = (label: string, ms: number) => {
             const b = h("button", "sheetBtn", label);

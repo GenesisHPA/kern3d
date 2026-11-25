@@ -988,7 +988,7 @@ button.clock {
     font-family: inherit;
 }
 .timeBig {
-    font-size: calc(var(--u) * 6);
+    font-size: calc(var(--u) * 4.2);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
@@ -1002,12 +1002,20 @@ button.clock {
 .timeManual[hidden] {
     display: none;
 }
-.choices.zones {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+.zoneSelect {
+    align-self: flex-start;
+    min-width: calc(var(--u) * 40);
+    height: calc(var(--u) * 6.4);
+    padding: 0 calc(var(--u) * 2);
+    border-radius: calc(var(--u) * 1.4);
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: calc(var(--u) * 2.4);
 }
-.choices.zones .choice {
-    font-size: calc(var(--u) * 2);
-    white-space: nowrap;
+.zoneSelect option {
+    background: var(--panel2);
+    color: var(--fg);
 }
 
