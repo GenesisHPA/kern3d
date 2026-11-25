@@ -70,8 +70,12 @@ export class WebSerialConnection implements GrblTransport {
         onClose: () => void,
     ): Promise<WebSerialConnection | undefined> {
         const ports = (await serialApi()?.getPorts?.()) ?? [];
-        if (ports.length === 0) return undefined;
-        return WebSerialConnection.open(ports[0], baud, onData, onClose);
+        // a USB adapter first: with all ports allowed (the station's policy) the board's own COM
+        // ports (ttyS0…) come first in the list, and a controller is never on those
+        const usb = ports.filter((p) => p.getInfo?.().usbVendorId !== undefined);
+        const port = usb[0] ?? (ports.length === 1 ? ports[0] : undefined);
+        if (!port) return undefined;
+        return WebSerialConnection.open(port, baud, onData, onClose);
     }
 
     private static async open(
