@@ -96,6 +96,25 @@ export function primitiveDistance(prim: Primitive, p: Vec3): number {
     }
 }
 
+/** The surface's smaller radius of curvature near `p` (the tube's for a torus). */
+function curvatureRadius(prim: Primitive, p: Vec3): number {
+    switch (prim.kind) {
+        case "cylinder":
+        case "sphere":
+            return prim.radius;
+        case "torus":
+            return Math.abs(prim.minor);
+        case "cone": {
+            const d = sub(p, prim.apex);
+            const h = dot(d, prim.axis);
+            const rho = Math.hypot(d[0] - h * prim.axis[0], d[1] - h * prim.axis[1], d[2] - h * prim.axis[2]);
+            return rho / Math.max(Math.cos(prim.angle), 1e-6);
+        }
+        default:
+            return Number.POSITIVE_INFINITY;
+    }
+}
+
 /** Two unit vectors square to `a` and to each other. */
 function basis(a: Vec3): [Vec3, Vec3] {
     const e1 = normalize(Math.abs(a[0]) < 0.9 ? cross(a, [1, 0, 0]) : cross(a, [0, 1, 0]));
@@ -567,6 +586,10 @@ export function segmentMesh(mesh: TriMesh, tol: number): Segment[] {
                 worst = Math.max(worst, Math.acos(Math.min(1, Math.abs(dot(n, mean)))));
             }
             if (2 * worst > MAX_SWEEP) return false;
+            // and the facet's middle is a chord's sag off the surface, no more: four corners of a
+            // flat face lie on some circle, and a thin torus through them is no face of the part
+            const sag = 0.07 * curvatureRadius(prim, clusters[c].centroid) + fitTol;
+            if (Math.abs(primitiveDistance(prim, clusters[c].centroid)) > sag) return false;
         }
         return true;
     };
@@ -600,7 +623,11 @@ export function segmentMesh(mesh: TriMesh, tol: number): Segment[] {
         const points = pointsOf(members);
         const error = maxDistance(prim, points);
         if (error > fitTol || !narrow(prim, members)) return undefined;
-        return { prim, clusters: members, area: members.reduce((s, c) => s + clusters[c].area, 0), error };
+        const area = members.reduce((s, c) => s + clusters[c].area, 0);
+        // a curved face is tessellated in strips of a kind: one flat cluster holding most of it is
+        // a face of its own with a facet or two beside it (any big cylinder fits those)
+        if (Math.max(...members.map((c) => clusters[c].area)) > area * 0.5) return undefined;
+        return { prim, clusters: members, area, error };
     };
     /** Hypotheses from a gently bent pair (and the pair's next gentle neighbour). */
     const hypotheses = (i: number, j: number): Primitive[] => {
@@ -679,11 +706,21 @@ export function segmentMesh(mesh: TriMesh, tol: number): Segment[] {
     const facetLike = (c: number) => {
         let gentle = 0;
         let all = 0;
+        let biggest = 0;
         for (const [o, e] of clusters[c].next) {
             all += e.length;
-            if (smooth(c, o) && bend(c, o) > (1 * Math.PI) / 180) gentle += e.length;
+            if (smooth(c, o) && bend(c, o) > (1 * Math.PI) / 180) {
+                gentle += e.length;
+                biggest = Math.max(biggest, clusters[o].area);
+            }
         }
-        return all > 0 && gentle >= all * 0.5 && clusters[c].triangles.length <= 2;
+        // (a flat face far bigger than the facets beside it is a face, whatever bends next to it)
+        return (
+            all > 0 &&
+            gentle >= all * 0.5 &&
+            clusters[c].triangles.length <= 2 &&
+            clusters[c].area <= biggest * 4
+        );
     };
     for (let c = 0; c < clusters.length; c++) {
         if (segmentOf[c] >= 0 || !facetLike(c)) continue;

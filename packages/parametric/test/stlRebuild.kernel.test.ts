@@ -63,11 +63,13 @@ function document() {
     return doc;
 }
 
-/** The part through STL and back, rebuilt; the report. */
+/** The part through STL and back, rebuilt; the report (KERN3D_STL_TRACE=1: the steps printed). */
 function rebuild(part: IShape) {
+    if (process.env["KERN3D_STL_TRACE"]) setRebuildDebug((line) => console.log(line));
     const stl = fromStl(stlBytes(part));
     const reference = meshToSolid(stl).value;
-    return rebuildPart(document(), trianglesOf(stl), reference, "part");
+    const off = process.env["KERN3D_STL_OFF"] === "holes" ? (["holes"] as const) : [];
+    return rebuildPart(document(), trianglesOf(stl), reference, "part", { off });
 }
 
 describe("STL rebuilt as features (real kernel)", () => {
@@ -95,7 +97,7 @@ describe("STL rebuilt as features (real kernel)", () => {
         expect(report.ratio).toBeLessThan(0.005);
     });
 
-    test("rounded top edges come back as one fillet feature, not as slabs", async () => {
+    test("rounded top edges come back round, not as slabs", async () => {
         const block = box(0, 0, 0, 40, 30, 12);
         const edges = block.findSubShapes(ShapeTypes.edge) as IEdge[];
         const top = edges.flatMap((e, i) => {
@@ -107,9 +109,23 @@ describe("STL rebuilt as features (real kernel)", () => {
             writeFileSync(process.env["KERN3D_STL_DUMP_ROUNDED"], stlBytes(rounded));
         const report = await rebuild(rounded);
         expect(report.error).toBeUndefined();
-        expect(report.rounded).toBeGreaterThanOrEqual(1);
-        expect(report.model!.body.features.some((f) => f.type === "fillet")).toBe(true);
+        // as a fillet on the slabs, or as the common part of the block's views (which are rounded)
         expect(report.ratio).toBeLessThan(0.01);
+        expect(report.surfaceOff ?? 1).toBeLessThan(0.05);
+    });
+
+    test("a block with chamfered top edges: one chamfer of their distance", async () => {
+        const block = box(0, 0, 0, 40, 30, 12);
+        const edges = block.findSubShapes(ShapeTypes.edge) as IEdge[];
+        const top = edges.flatMap((e, i) => {
+            const [a, b] = e.ends();
+            return Math.abs(a.z - 12) < 1e-6 && Math.abs(b.z - 12) < 1e-6 ? [i] : [];
+        });
+        const chamfered = shapeFactory.chamfer(block, top, 2).value;
+        const report = await rebuild(chamfered);
+        expect(report.error).toBeUndefined();
+        expect(report.ratio).toBeLessThan(0.005);
+        expect(report.surfaceOff ?? 1).toBeLessThan(0.05);
     });
 
     test("a leaning arm on a plate is one oblique extrude along a direction line", async () => {
@@ -131,7 +147,7 @@ describe("STL rebuilt as features (real kernel)", () => {
         expect(report.ratio).toBeLessThan(0.005);
     });
 
-    test("a hole square to the main axis is cut by the correction pass along its own axis", async () => {
+    test("a hole square to the main axis is cut along its own axis", async () => {
         // the vertical holes make z the main axis; the side hole runs along x
         const part = cut(
             box(0, 0, 0, 40, 30, 20),
@@ -143,8 +159,9 @@ describe("STL rebuilt as features (real kernel)", () => {
         );
         const report = await rebuild(part);
         expect(report.error).toBeUndefined();
+        // (by the holes read off the faces, the view cuts or the corrections — whichever comes first)
         expect(report.ratio).toBeLessThan(0.01);
-        expect(report.corrections).toBeGreaterThan(0);
+        expect(report.surfaceOff ?? 1).toBeLessThan(0.05);
     });
 });
 
@@ -194,7 +211,15 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
             return;
         }
         setRebuildDebug((line) => log(`  ${path.basename(file)}: ${line}`));
-        const report = await rebuildPart(document(), trianglesOf(stl), reference.value, path.basename(file));
+        // KERN3D_STL_OFF=holes (or =stage24): the holes off the faces off, for a comparison;
+        // KERN3D_STL_SHARP=1: the sharp plan tried too
+        const offEnv = process.env["KERN3D_STL_OFF"] ?? "";
+        const off = offEnv.split(",").includes("holes") || offEnv === "stage24" ? (["holes"] as const) : [];
+        const sharpRounds = process.env["KERN3D_STL_SHARP"] === "1";
+        const report = await rebuildPart(document(), trianglesOf(stl), reference.value, path.basename(file), {
+            off,
+            sharpRounds,
+        });
         setRebuildDebug(undefined);
         if (process.env["KERN3D_STL_SEGMENTS"] && report.model?.body.shape.isOk) {
             // where the rebuilt surface misses, by the STL's faces (primitive segmentation)

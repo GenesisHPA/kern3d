@@ -196,7 +196,10 @@ export function sectionLoops(mesh: TriMesh, frame: SliceFrame, h: number): Loop2
     const n = mesh.positions.length / 3;
     const heights = new Float64Array(n);
     for (let i = 0; i < n; i++) heights[i] = dot(vertex(mesh, i), axis) - h;
-    const next = new Map<string, { to: string; point: [number, number]; exact: boolean }>();
+    const next = new Map<
+        string,
+        { to: string; point: [number, number]; toPoint: [number, number]; exact: boolean }
+    >();
     /** An edge along the axis crosses the plane at a true surface point, not on a facet's chord. */
     const alongAxis = (a: number, b: number) => {
         const d = sub(vertex(mesh, b), vertex(mesh, a));
@@ -218,31 +221,64 @@ export function sectionLoops(mesh: TriMesh, frame: SliceFrame, h: number): Loop2
     };
     const edgeKey = (a: number, b: number) => (a < b ? `${a}_${b}` : `${b}_${a}`);
     for (let k = 0; k < mesh.areas.length; k++) {
+        // a facet flattened onto a line (a sharpened round's) bounds nothing: the walk steps over
+        // it by position below
+        if (!(mesh.areas[k] > 0)) continue;
         const v = [t[3 * k], t[3 * k + 1], t[3 * k + 2]];
-        const crossings: { key: string; point: [number, number]; exact: boolean }[] = [];
+        const crossings: { key: string; point: [number, number]; exact: boolean; down: boolean }[] = [];
         for (let e = 0; e < 3; e++) {
             const a = v[e];
             const b = v[(e + 1) % 3];
             if (heights[a] < 0 !== heights[b] < 0) {
-                crossings.push({ key: edgeKey(a, b), point: pointOn(a, b), exact: alongAxis(a, b) });
+                crossings.push({
+                    key: edgeKey(a, b),
+                    point: pointOn(a, b),
+                    exact: alongAxis(a, b),
+                    down: heights[b] < 0,
+                });
             }
         }
         if (crossings.length !== 2) continue;
-        // material on the left: the segment runs along axis × normal
-        const dir = cross(axis, normalOf(mesh, k));
+        // material on the left (the segment along axis × normal): from the edge the winding takes
+        // down through the plane to the one it takes up — the winding's say, so a facet flattened
+        // onto a line (no normal: a round collapsed onto its sharp edge) still chains
         const [p, q] = crossings;
-        const along = (q.point[0] - p.point[0]) * dot(dir, xvec) + (q.point[1] - p.point[1]) * dot(dir, yvec);
-        const [from, to] = along >= 0 ? [p, q] : [q, p];
-        next.set(from.key, { to: to.key, point: from.point, exact: from.exact });
+        const [from, to] = p.down ? [p, q] : [q, p];
+        next.set(from.key, { to: to.key, point: from.point, toPoint: to.point, exact: from.exact });
     }
     const loops: Loop2D[] = [];
     const used = new Set<string>();
+    // where the edges do not chain (a mesh whose facets meet edge to edge only in position: a
+    // sharpened round's line), a segment goes on from the one that starts where it ended
+    const joinTol = Math.max(mesh.size * 1e-8, 1e-12);
+    const cell = (p: readonly [number, number]) =>
+        `${Math.round(p[0] / (joinTol * 4))},${Math.round(p[1] / (joinTol * 4))}`;
+    let starts: Map<string, string[]> | undefined;
+    const startingAt = (p: readonly [number, number]): string | undefined => {
+        if (starts === undefined) {
+            starts = new Map();
+            for (const [k, v] of next) {
+                const c = cell(v.point);
+                starts.set(c, [...(starts.get(c) ?? []), k]);
+            }
+        }
+        const cx = Math.round(p[0] / (joinTol * 4));
+        const cy = Math.round(p[1] / (joinTol * 4));
+        for (let dx = -1; dx <= 1; dx++)
+            for (let dy = -1; dy <= 1; dy++)
+                for (const k of starts.get(`${cx + dx},${cy + dy}`) ?? []) {
+                    const q = next.get(k)!.point;
+                    if (Math.hypot(q[0] - p[0], q[1] - p[1]) <= joinTol && !used.has(k)) return k;
+                }
+        return undefined;
+    };
     for (const start of next.keys()) {
         if (used.has(start)) continue;
         const loop: Loop2D = [];
         const exact: boolean[] = [];
         let key = start;
         let closed = false;
+        const startPoint = next.get(start)!.point;
         while (!used.has(key)) {
             const step = next.get(key);
             if (step === undefined) break;
@@ -253,6 +289,15 @@ export function sectionLoops(mesh: TriMesh, frame: SliceFrame, h: number): Loop2
             if (key === start) {
                 closed = true;
                 break;
+            }
+            if (!next.has(key) || used.has(key)) {
+                if (Math.hypot(step.toPoint[0] - startPoint[0], step.toPoint[1] - startPoint[1]) <= joinTol) {
+                    closed = true;
+                    break;
+                }
+                const jump = startingAt(step.toPoint);
+                if (jump === undefined) break;
+                key = jump;
             }
         }
         if (!closed || loop.length < 3) continue;

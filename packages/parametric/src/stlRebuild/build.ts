@@ -101,6 +101,8 @@ function addCurve(
 export interface BuiltModel {
     readonly body: ParametricBodyNode;
     readonly sketches: SketchNode[];
+    /** The build was stopped before its last feature (`buildModel`'s `stop`). */
+    stopped?: boolean;
 }
 
 const ROLE_NAMES: Record<PlannedExtrude["role"], string> = {
@@ -123,6 +125,8 @@ export async function buildModel(
     judge?: BodyJudge,
     /** Called before each feature (done, total): progress and «Отмена» between the features. */
     onStep?: (done: number, total: number) => Promise<void>,
+    /** Asked before each feature: true stops the build there (`BuiltModel.stopped`). */
+    stop?: () => boolean,
 ): Promise<BuiltModel> {
     const body = new ParametricBodyNode({ document, features: [] });
     body.name = name;
@@ -132,6 +136,10 @@ export async function buildModel(
     // does not take the whole body down
     for (const [index, plan] of plans.entries()) {
         await onStep?.(index, plans.length);
+        if (stop?.()) {
+            model.stopped = true;
+            break;
+        }
         if (
             plan.fromMesh &&
             reference !== undefined &&
@@ -266,6 +274,51 @@ export function appendTreatment(model: BuiltModel, treatment: EdgeTreatment, tol
     if (model.body.shape.isOk && model.body.featureItems().at(-1)?.error === undefined) return true;
     model.body.setFeaturesEmitShapeChanged(before);
     return false;
+}
+
+/**
+ * Rounds or chamfers the body's edges at `indexes` (into its current shape) as one feature of
+ * `size`. False — and nothing added — when the kernel refuses it.
+ */
+export function appendRound(
+    model: BuiltModel,
+    kind: "fillet" | "chamfer",
+    size: number,
+    indexes: readonly number[],
+): boolean {
+    if (indexes.length === 0 || !model.body.shape.isOk) return false;
+    const edges = model.body.shape.value.findSubShapes(ShapeTypes.edge) as IEdge[];
+    const refs = indexes.map((i) => {
+        const id = model.body.edgeIdAt(i);
+        return captureEdgeRef(edges[i], id, model.body.edgeIdIsShared(id));
+    });
+    const before = model.body.features;
+    const id = `rebuild-edge-${before.length + 1}`;
+    const feature: FeatureData =
+        kind === "fillet"
+            ? { id, type: "fillet", radius: size, edges: refs }
+            : { id, type: "chamfer", distance: size, edges: refs };
+    model.body.setFeaturesEmitShapeChanged([...before, feature]);
+    if (model.body.shape.isOk && model.body.featureItems().at(-1)?.error === undefined) return true;
+    model.body.setFeaturesEmitShapeChanged(before);
+    return false;
+}
+
+/** Points along each edge of the body (its ends, quarters and middle), by index; none for an edge without a curve. */
+export function edgeSamples(model: BuiltModel): (Vec3[] | undefined)[] {
+    if (!model.body.shape.isOk) return [];
+    return (model.body.shape.value.findSubShapes(ShapeTypes.edge) as IEdge[]).map((edge) => {
+        try {
+            const a = edge.firstParameter();
+            const b = edge.lastParameter();
+            return [0, 0.25, 0.5, 0.75, 1].map((f) => {
+                const p = edge.pointAt(a + (b - a) * f);
+                return [p.x, p.y, p.z] as Vec3;
+            });
+        } catch {
+            return undefined;
+        }
+    });
 }
 
 /** A revolve plan as a sketch (its half-section) and a full-turn revolve fused into the body. */

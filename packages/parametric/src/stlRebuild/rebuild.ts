@@ -9,12 +9,22 @@ import {
     ShapeTypes,
     subProgress,
 } from "@chili3d/core";
-import { appendExtrude, appendTreatment, type BuiltModel, buildModel } from "./build";
+import {
+    appendExtrude,
+    appendRound,
+    appendTreatment,
+    type BuiltModel,
+    buildModel,
+    edgeSamples,
+} from "./build";
 import { profileArea } from "./fit2d";
+import { primitiveHoles } from "./holes";
 import { dot, meshVolume, soupMesh, type TriMesh, type Vec3, weldTriangles } from "./mesh";
 import { type EdgeTreatment, type PlannedExtrude, planExtrusions } from "./plan";
 import { meshDifference } from "./raycast";
 import { safeMeshReady, safeTriangles } from "./safeMesh";
+import { type Segment, segmentMesh } from "./segment";
+import { bandOfEdge, type Sharpened, sharpenMesh } from "./sharpen";
 import { silhouetteHull, silhouetteTrim } from "./silhouette";
 import { frameFor, type SliceFrame, sliceFrames } from "./slices";
 import { deviation, setVerifyDebug, solidVolume, surfaceFit, trianglesOf } from "./verify";
@@ -50,6 +60,14 @@ export interface RebuildOptions {
      * already built (other axes, corrections, pieces, rounds) are not started past it.
      */
     readonly totalBudgetMs?: number;
+    /** Steps off for a comparison (the corpus runs): the holes read off the faces. */
+    readonly off?: readonly "holes"[];
+    /**
+     * Also try the part planned with sharp edges, its rounds and chamfers put back as features
+     * (`sharpen.ts`). Off by default: on the corpus (2026-11-26) it was never the closer body
+     * once it had to beat the plain plan by 5 % — it only cost a build.
+     */
+    readonly sharpRounds?: boolean;
     /** Progress window and «Отмена» (the command's); none in the tests. */
     readonly progress?: IProgress;
 }
@@ -124,6 +142,9 @@ const MAX_DIFFERENCE_FACES = 1000;
 
 /** Most faces the reference may have for the surface pass's mesh pieces (see above). */
 const MAX_PIECES_FACES = 6000;
+
+/** Most holes read off the faces that are tried (each is a cut and a measure). */
+const MAX_HOLES = 24;
 
 /** Tolerance for a part of this size: 0.005 mm, more for a big part (5e-5 of its size). */
 export function defaultTolerance(mesh: TriMesh): number {
@@ -228,28 +249,46 @@ export async function rebuildPart(
     const referenceFaces = reference.findSubShapes(ShapeTypes.face).length;
     /** Created nodes not kept yet: discarded if the user stops (the transaction would too). */
     const live = new Set<BuiltModel>();
+    // the mesh's faces fitted as planes, cylinders, cones…: the holes and the rounds are read off them
+    const segments: Segment[] | undefined =
+        options.sharpRounds !== true && options.off?.includes("holes") ? undefined : segmentMesh(mesh, tol);
     /** The frames already built without pieces. */
     const tried = new Set<(typeof frames)[number]>();
     /** One axis tried whole: planned, built, its edges rounded, measured. */
-    const attempt = async (frame: (typeof frames)[number], meshPieces: boolean, step: IProgress) => {
+    const attempt = async (
+        frame: (typeof frames)[number],
+        meshPieces: boolean,
+        step: IProgress,
+        sharp?: Sharpened,
+        /** Time the build may take, ms (the features after it are not built: the attempt fails). */
+        buildBudget?: number,
+        /** Longest plan worth building (a sharpened part planned in many more slabs is not simpler). */
+        maxPlans = MAX_FEATURES,
+    ) => {
         const ta = Date.now();
         await step.report(0);
         const axisName = frame.axis.map((x) => x.toFixed(2)).join(",");
         const treatments: EdgeTreatment[] = [];
-        const plans = planExtrusions(mesh, frame, tol, { treatments, meshPieces });
+        const plans = planExtrusions(sharp?.mesh ?? mesh, frame, tol, {
+            treatments,
+            meshPieces,
+        });
         REBUILD_DEBUG?.(
-            `axis ${axisName}${meshPieces ? " +pieces" : ""}: ${plans.length} plans (${plans.filter((p) => p.fromMesh).length} pieces), ${treatments.length} treatments, plan ${Date.now() - ta} ms`,
+            `axis ${axisName}${meshPieces ? " +pieces" : ""}${sharp ? " sharp" : ""}: ${plans.length} plans (${plans.filter((p) => p.fromMesh).length} pieces), ${treatments.length} treatments, plan ${Date.now() - ta} ms`,
         );
         if (plans.length === 0) return undefined;
         // with no mesh piece in it the plan is the one this axis already built: nothing new to try
-        if (meshPieces && tried.has(frame) && !plans.some((p) => p.fromMesh)) {
+        if (meshPieces && sharp === undefined && tried.has(frame) && !plans.some((p) => p.fromMesh)) {
             REBUILD_DEBUG?.(`axis ${axisName} +pieces: same plan as before, skipped`);
             return undefined;
         }
-        if (!meshPieces) tried.add(frame);
+        if (!meshPieces && sharp === undefined) tried.add(frame);
         // a tree this long, or this much of the part as pieces, is no rebuild worth having — and
         // every piece is re-read on each rebuild of the chain, which is what runs the heap out
-        if (plans.length > MAX_FEATURES || plans.filter((p) => p.fromMesh).length > MAX_PIECES)
+        if (
+            plans.length > Math.min(maxPlans, MAX_FEATURES) ||
+            plans.filter((p) => p.fromMesh).length > MAX_PIECES
+        )
             return undefined;
         // pieces are the stretches between features; a part that is mostly pieces is not rebuilt
         const volumeOf = (list: typeof plans) =>
@@ -273,10 +312,11 @@ export async function rebuildPart(
                 step.throwIfCancelled();
                 await step.report(0.05 + (0.65 * done) / total, "stl.stage.build{0}{1}", done + 1, total);
             },
+            buildBudget === undefined ? undefined : () => Date.now() - tb > buildBudget,
         );
         live.add(model);
         const shape = bodyShape(model);
-        const failed = failedFeature(model);
+        const failed = model.stopped ? "build over its time" : failedFeature(model);
         // the kernel's memory itself damaged (not OCCT's own «Aborted()», which it survives):
         // nothing it computes from here on can be trusted — stop, keep nothing
         if (failed !== undefined && KERNEL_CORRUPTED.test(failed)) throw new KernelCorrupted(failed);
@@ -287,7 +327,17 @@ export async function rebuildPart(
             `axis ${axisName}: build ${Date.now() - tb} ms${failed ? ` failed: ${failed}` : ""}${sound ? "" : " (unsound)"}`,
         );
         if (failed !== undefined || shape === undefined)
-            return { model, ratio: 1, rounded: 0, plans, frame, sound, error: failed ?? "no shape" };
+            return {
+                model,
+                ratio: 1,
+                rounded: 0,
+                plans,
+                frame,
+                sound,
+                buildMs: Date.now() - tb,
+                roundsKept: 0,
+                error: failed ?? "no shape",
+            };
         // the rounds and chamfers the sharp slabs left out, each kept only if it brings the part closer
         await step.report(0.7, "stl.stage.measure");
         const tm = Date.now();
@@ -321,7 +371,72 @@ export async function rebuildPart(
             REBUILD_DEBUG?.(
                 `axis ${axisName}: ${rounded}/${treatments.length} treatments kept, ${Date.now() - tt} ms`,
             );
-        return { model, ratio, rounded, plans, frame, sound, error: undefined as string | undefined };
+        let roundsKept = 0;
+        if (sharp !== undefined && sound) {
+            const tr = Date.now();
+            const r = roundBands(model, sharp, ratio);
+            ratio = r.ratio;
+            rounded += r.kept;
+            roundsKept = r.kept;
+            REBUILD_DEBUG?.(
+                `axis ${axisName}: ${r.kept}/${r.tried} rounds kept → ${(ratio * 100).toFixed(3)}%, ${Date.now() - tr} ms`,
+            );
+        }
+        return {
+            model,
+            ratio,
+            rounded,
+            plans,
+            frame,
+            sound,
+            buildMs: Date.now() - tb,
+            roundsKept,
+            error: undefined as string | undefined,
+        };
+    };
+    /**
+     * The rounds and chamfers a sharpened plan left out, put back on its sharp edges: one feature
+     * per size, each kept only if it brings the part closer (a feature the kernel refuses whole is
+     * tried band by band).
+     */
+    const roundBands = (model: BuiltModel, sharp: Sharpened, start: number) => {
+        let ratio = start;
+        let kept = 0;
+        let tried = 0;
+        const groups = new Map<string, number[]>();
+        sharp.bands.forEach((band, i) => {
+            const key = `${band.kind}:${band.size.toFixed(3)}`;
+            groups.set(key, [...(groups.get(key) ?? []), i]);
+        });
+        const order = [...groups.values()].sort((a, b) => b.length - a.length);
+        const tryRound = (members: readonly number[]): boolean => {
+            const samples = edgeSamples(model);
+            const indexes: number[] = [];
+            samples.forEach((pts, i) => {
+                if (pts !== undefined && members.includes(bandOfEdge(sharp.bands, pts, tol))) indexes.push(i);
+            });
+            if (indexes.length === 0) return true;
+            tried++;
+            const band = sharp.bands[members[0]];
+            const before = model.body.features;
+            if (!appendRound(model, band.kind, band.size, indexes)) return false;
+            const after = bodyShape(model);
+            const next = soundBody(after, partSolids) ? measure(referenceMesh, after) : 1;
+            if (next <= ratio + 1e-5) {
+                ratio = next;
+                kept++;
+            } else model.body.setFeaturesEmitShapeChanged(before);
+            return true;
+        };
+        for (const members of order) {
+            if (!inTime() || kept + tried > 40) break;
+            if (!tryRound(members) && members.length > 1)
+                for (const m of members) {
+                    if (!inTime()) break;
+                    tryRound([m]);
+                }
+        }
+        return { ratio, kept, tried };
     };
     /** The other views to cut to: the world axes and the best-scoring frames, not along `main`. */
     const viewFrames = (main: SliceFrame): SliceFrame[] => {
@@ -376,6 +491,46 @@ export async function rebuildPart(
                 best = next;
             } else {
                 discard(next.model);
+            }
+        }
+        // ---- the part planned with sharp edges, its rounds and chamfers put back as features ----
+        let sharpChosen: Sharpened | undefined;
+        if (
+            best !== undefined &&
+            best.error === undefined &&
+            best.sound &&
+            inTime() &&
+            options.sharpRounds === true
+        ) {
+            const ts = Date.now();
+            const sharp = segments === undefined ? undefined : sharpenMesh(mesh, segments, tol);
+            REBUILD_DEBUG?.(
+                `segments ${segments?.length}, bands ${sharp === undefined ? 0 : `${sharp.bands.filter((b) => b.kind === "fillet").length} fillets, ${sharp.bands.filter((b) => b.kind === "chamfer").length} chamfers`}, ${Date.now() - ts} ms`,
+            );
+            if (sharp !== undefined) {
+                progress.throwIfCancelled();
+                const alt = await attempt(
+                    best.frame,
+                    false,
+                    subProgress(progress, 0.5, 0.55),
+                    sharp,
+                    Math.max(30_000, best.buildMs * 2),
+                    Math.ceil(best.plans.length * 1.5) + 2,
+                );
+                if (
+                    alt !== undefined &&
+                    alt.error === undefined &&
+                    alt.sound &&
+                    // its rounds put back, and clearly closer: a sharpened plan a hair closer
+                    // before the views and holes was further off after them (idler, adxl mount)
+                    alt.roundsKept > 0 &&
+                    alt.ratio < best.ratio * 0.95 - 1e-4
+                ) {
+                    discard(best.model);
+                    best = alt;
+                    sharpChosen = sharp;
+                } else if (alt !== undefined) discard(alt.model);
+                REBUILD_DEBUG?.(`sharp plan ${sharpChosen ? "kept" : "dropped"}`);
             }
         }
         const t1 = Date.now();
@@ -453,6 +608,53 @@ export async function rebuildPart(
                     rounded = 0;
                     viewRatio = altRatio;
                 } else discard(alt);
+            }
+        }
+        // ---- holes read off the mesh's faces, in any direction ----------------------------------
+        // a concave cylinder or cone going round its axis is a hole's wall (a side hole, a
+        // countersink the slices along the best axis cannot see): cut with its exact circle,
+        // kept when it brings the part closer
+        if (
+            best.sound &&
+            inTime() &&
+            !options.off?.includes("holes") &&
+            soundBody(bodyShape(model), partSolids)
+        ) {
+            const th = Date.now();
+            const holes =
+                segments === undefined
+                    ? []
+                    : primitiveHoles(mesh, soup, segments, tol, (axis) => frameFor(mesh, axis));
+            REBUILD_DEBUG?.(`segments ${segments?.length}, ${holes.length} holes, ${Date.now() - th} ms`);
+            const eps = Math.max(tol * 4, 0.05);
+            const surfaceNowOf = (shape: IShape) =>
+                surfaceFit(mesh, shape, eps, 3000, inPlaceTriangles(shape)).off;
+            let surfaceNow = holes.length > 0 ? surfaceNowOf(bodyShape(model)!) : 1;
+            for (const hole of holes.slice(0, MAX_HOLES)) {
+                if (!inTime()) break;
+                progress.throwIfCancelled();
+                const before = model.body.features;
+                const sketchesBefore = model.sketches.length;
+                for (const plan of hole.plans) appendExtrude(model, document, plan, tol);
+                const after = bodyShape(model);
+                const ok = failedFeature(model) === undefined && soundBody(after, partSolids);
+                const next = ok ? measure(referenceMesh, after) : 1;
+                let kept = ok && next <= viewRatio + 1e-5 && viewRatio - next >= 1e-4;
+                if (ok && !kept && next <= viewRatio + 1e-5) {
+                    // a countersink takes little volume: judged by the surface it puts right
+                    const s = surfaceNowOf(after!);
+                    if (s < surfaceNow - 0.002) kept = true;
+                }
+                REBUILD_DEBUG?.(
+                    `hole ${hole.label}: ${(next * 100).toFixed(3)}% ${kept ? "kept" : "dropped"}`,
+                );
+                if (kept) {
+                    viewRatio = next;
+                    surfaceNow = surfaceNowOf(after!);
+                } else {
+                    model.body.setFeaturesEmitShapeChanged(before);
+                    for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
+                }
             }
         }
         const deadline = Math.min(t3 + (options.budgetMs ?? 60_000), finishBy);
@@ -574,7 +776,12 @@ export async function rebuildPart(
                 progress.throwIfCancelled();
                 const from = 0.78 + (0.22 * i) / axes;
                 await progress.report(from, "stl.stage.pieces{0}{1}", i + 1, axes);
-                const alt = await attempt(frame, true, subProgress(progress, from, from + 0.22 / axes));
+                const alt = await attempt(
+                    frame,
+                    true,
+                    subProgress(progress, from, from + 0.22 / axes),
+                    sharpChosen,
+                );
                 const altSurface = alt === undefined || alt.error !== undefined ? 1 : surfaceOf(alt.model);
                 REBUILD_DEBUG?.(
                     `pieces on axis ${frame.axis.map((x) => x.toFixed(2))}: ${alt === undefined ? "none" : `${(alt.ratio * 100).toFixed(3)}% surface ${(altSurface * 100).toFixed(1)}% ${alt.error ?? ""}`}`,

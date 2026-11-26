@@ -2,8 +2,9 @@
 // See LICENSE file in the project root for full license information.
 
 import { describe, expect, test } from "@rstest/core";
-import { weldTriangles } from "../src/stlRebuild/mesh";
+import { meshVolume, weldTriangles } from "../src/stlRebuild/mesh";
 import { primitiveDistance, refine, type Segment, segmentMesh } from "../src/stlRebuild/segment";
+import { bandOfEdge, sharpenMesh } from "../src/stlRebuild/sharpen";
 
 type P2 = [number, number];
 
@@ -206,5 +207,65 @@ describe("STL primitive segmentation", () => {
         if (fitted.kind !== "cylinder") throw new Error();
         expect(fitted.radius).toBeCloseTo(7, 5);
         for (const p of points) expect(Math.abs(primitiveDistance(fitted, p))).toBeLessThan(1e-5);
+    });
+
+    test("sharpened: a round collapses onto its sharp edge, a fillet of its radius", () => {
+        const mesh = weldTriangles(extrude(roundedRect(30, 20, [0, 3, 0, 0], 8), 10));
+        const sharp = sharpenMesh(mesh, segmentMesh(mesh, 0.005), 0.005);
+        expect(sharp).toBeDefined();
+        expect(sharp!.bands).toHaveLength(1);
+        expect(sharp!.bands[0].kind).toBe("fillet");
+        expect(sharp!.bands[0].size).toBeCloseTo(3, 4);
+        expect(Math.abs(meshVolume(sharp!.mesh))).toBeCloseTo(6000, 3);
+        const along = [0, 2.5, 5, 10].map((z) => [30, 20, z] as [number, number, number]);
+        expect(bandOfEdge(sharp!.bands, along, 0.005)).toBe(0);
+        expect(
+            bandOfEdge(
+                sharp!.bands,
+                [
+                    [0, 0, 0],
+                    [0, 0, 10],
+                ],
+                0.005,
+            ),
+        ).toBe(-1);
+        expect(
+            bandOfEdge(
+                sharp!.bands,
+                [
+                    [30, 0, 10],
+                    [30, 20, 10],
+                ],
+                0.005,
+            ),
+        ).toBe(-1);
+    });
+
+    test("sharpened: a chamfer collapses, its equal distance read off", () => {
+        const chamfered: P2[] = [
+            [0, 0],
+            [30, 0],
+            [30, 18],
+            [28, 20],
+            [0, 20],
+        ];
+        const mesh = weldTriangles(extrude(chamfered, 10));
+        const sharp = sharpenMesh(mesh, segmentMesh(mesh, 0.005), 0.005);
+        expect(sharp?.bands.map((b) => b.kind)).toEqual(["chamfer"]);
+        expect(sharp!.bands[0].size).toBeCloseTo(2, 4);
+        expect(Math.abs(meshVolume(sharp!.mesh))).toBeCloseTo(6000, 3);
+    });
+
+    test("sharpened: a plain box, a hexagonal prism and a cylinder have no band", () => {
+        const box = weldTriangles(extrude(roundedRect(30, 20, [0, 0, 0, 0], 1), 10));
+        expect(sharpenMesh(box, segmentMesh(box, 0.005), 0.005)).toBeUndefined();
+        const hex: P2[] = Array.from({ length: 6 }, (_, i) => [
+            5 * Math.cos((i * Math.PI) / 3),
+            5 * Math.sin((i * Math.PI) / 3),
+        ]);
+        const prism = weldTriangles(extrude(hex, 10));
+        expect(sharpenMesh(prism, segmentMesh(prism, 0.005), 0.005)).toBeUndefined();
+        const disc = weldTriangles(extrude(arc(0, 0, 5, 0, 2 * Math.PI, 48).slice(0, 48), 10));
+        expect(sharpenMesh(disc, segmentMesh(disc, 0.005), 0.005)).toBeUndefined();
     });
 });
