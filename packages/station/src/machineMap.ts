@@ -125,6 +125,10 @@ export class MapView {
         path?: Pick<ProgramPath, "min" | "max">;
         stock?: Stock;
         homed: boolean;
+        /** The fixed tool length sensor (machine X, Y), when there is one. */
+        setter?: { x: number; y: number };
+        /** Where the machine waits for a cutter change when it cannot home (machine X, Y). */
+        changeAt?: { x: number; y: number };
     }) {
         const { ctx, canvas } = this;
         const dpr = devicePixelRatio;
@@ -233,6 +237,24 @@ export class MapView {
             ctx.textAlign = "left";
             ctx.fillText("ноль детали", zx + fs * 0.6, zy + fs * 1.3);
         }
+        // the tool length sensor: a fixed place on the table
+        const mark = (pt: { x: number; y: number }, colour: string, label: string, square: boolean) => {
+            const mx = X(pt.x);
+            const my = Y(pt.y);
+            const inside = pt.x >= -tx - 0.01 && pt.x <= 0.01 && pt.y >= -ty - 0.01 && pt.y <= 0.01;
+            ctx.strokeStyle = inside ? colour : "#ff5a5a";
+            ctx.fillStyle = inside ? colour : "#ff5a5a";
+            ctx.lineWidth = 2 * dpr;
+            const r = fs * 0.45;
+            ctx.beginPath();
+            if (square) ctx.rect(mx - r, my - r, 2 * r, 2 * r);
+            else ctx.arc(mx, my, r, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.textAlign = "left";
+            ctx.fillText(inside ? label : `${label} — вне хода!`, mx + r + 4 * dpr, my - r);
+        };
+        if (p.setter) mark(p.setter, "#c38bff", "датчик длины", false);
+        if (p.changeAt) mark(p.changeAt, "rgba(255,255,255,.6)", "смена фрезы", true);
         // the spindle
         if (p.mpos) {
             const sx = X(p.mpos[0]);

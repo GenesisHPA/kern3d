@@ -853,6 +853,8 @@ export class StationUi {
                 path: s.job?.path,
                 stock: this.stock,
                 homed: s.homed || !s.machine.homing,
+                setter: this.machine.probe.setter.enabled ? this.machine.probe.setter : undefined,
+                changeAt: s.machine.homing ? undefined : this.machine.probe.change,
             });
         } else this.view.draw();
     }

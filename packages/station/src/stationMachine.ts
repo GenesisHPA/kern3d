@@ -455,6 +455,28 @@ export class StationMachine {
         }
     }
 
+    /**
+     * The tool length sensor checked: to its place at the safe height, a touch (fast, then slow),
+     * back up. The machine Z it touched at, for the screen: it shows the sensor is where the
+     * settings say and is wired (a touch that never comes is reported).
+     */
+    async checkSetter(): Promise<number> {
+        const grbl = this.grbl;
+        if (!grbl || grbl.jobActive || this.busy || this.measuring) throw new Error("Станок занят");
+        if (!this.probe.setter.enabled) throw new Error("Датчик длины выключен: ⚙ → Инструмент");
+        const m = machineSettings(this.settings);
+        if (m.homing && !this.homed)
+            throw new Error("Сначала «Домой»: место датчика задано в координатах станка");
+        this.measuring = { axis: "Z", stage: "касание датчика длины" };
+        this.changed();
+        try {
+            return await measureTool(new StationProbeIO(grbl), this.probe);
+        } finally {
+            this.measuring = undefined;
+            this.changed();
+        }
+    }
+
     /** Sets an axis's travel in the controller ($130–$132). */
     async setTravel(axis: Axis, travel: number): Promise<void> {
         await this.sendLines([`$${130 + "XYZ".indexOf(axis)}=${travel.toFixed(1)}`, "$$"]);

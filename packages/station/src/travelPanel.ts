@@ -20,6 +20,8 @@ export class TravelPanel {
     private readonly info = h("div", "rotaryCalc");
     private readonly rows = h("div", "travelRows");
     private readonly found = new Map<Axis, number>();
+    private readonly setter = h("div", "wifiRow");
+    private touched?: number;
     private timer?: ReturnType<typeof setInterval>;
 
     constructor(
@@ -30,6 +32,14 @@ export class TravelPanel {
         host.append(
             h("div", "label", "Контроллер"),
             this.info,
+            h("div", "label", "Датчик длины фрезы (стационарный)"),
+            this.setter,
+            h(
+                "p",
+                "hint",
+                "Место датчика задаётся в ⚙ → Инструмент («📍 Отсюда»: подведите фрезу над датчиком). " +
+                    "Оно в координатах станка, поэтому сначала «Домой». «Проверить» — станок едет к датчику и касается его.",
+            ),
             h("div", "label", "Замер хода по концевикам"),
             this.rows,
             h(
@@ -52,6 +62,39 @@ export class TravelPanel {
               `мягкие пределы ${m.softLimits ? "<b>вкл</b>" : "выкл"} · ${s.homed ? "станок инициализирован" : "ноль не найден"}`
             : "Контроллер не подключён";
         const busy = this.machine.measuring;
+        const sp = this.machine.probe.setter;
+        const name = h(
+            "div",
+            "wifiName",
+            sp.enabled ? `X ${sp.x} · Y ${sp.y} · начало поиска Z ${sp.z}` : "Датчик выключен",
+        );
+        const inside =
+            !t || (sp.x >= -t[0] && sp.x <= 0 && sp.y >= -t[1] && sp.y <= 0 && sp.z >= -t[2] && sp.z <= 0);
+        name.append(
+            h(
+                "small",
+                "",
+                busy?.stage === "касание датчика длины"
+                    ? "⏳ касается датчика…"
+                    : !inside
+                      ? "⚠ место вне хода станка"
+                      : this.touched !== undefined
+                        ? `коснулся на Z ${this.touched.toFixed(3)} (машинные)`
+                        : "",
+            ),
+        );
+        const check = h("button", "sheetBtn", "Проверить");
+        check.disabled = !sp.enabled || busy !== undefined || !s.connected;
+        check.onclick = () =>
+            this.machine
+                .checkSetter()
+                .then((z) => {
+                    this.touched = z;
+                    this.toast(`Датчик на месте: касание на Z ${z.toFixed(3)}`);
+                    this.render();
+                })
+                .catch((e) => this.toast(`⚠ ${e instanceof Error ? e.message : String(e)}`));
+        this.setter.replaceChildren(name, check);
         this.rows.replaceChildren(
             ...(["X", "Y", "Z"] as Axis[]).map((axis, i) => {
                 const row = h("div", "wifiRow");
