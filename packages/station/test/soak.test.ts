@@ -17,8 +17,13 @@ import { jobProgram } from "../src/toolJob";
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** A small seeded random generator (mulberry32), so a failure can be replayed. */
+/** SOAK_SEED shifts every seed: the long runs try new programs each round. */
+const SHIFT = Number(
+    (globalThis as { process?: { env?: Record<string, string> } }).process?.env?.SOAK_SEED ?? 0,
+);
+
 function rng(seed: number) {
-    let a = seed >>> 0;
+    let a = (seed + SHIFT) >>> 0;
     return () => {
         a = (a + 0x6d2b79f5) >>> 0;
         let t = a;
