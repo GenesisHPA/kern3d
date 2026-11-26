@@ -190,6 +190,8 @@ export function surfaceFit(
     samples = 3000,
     /** The body's own triangles, when they are at hand: the probes are classified against them. */
     bodyTriangles?: ArrayLike<number>,
+    /** Told each sampled triangle and whether the body misses it (diagnostics). */
+    onSample?: (triangle: number, off: boolean) => void,
 ): SurfaceFit {
     // the body's display mesh lies within ~0.01 mm of its faces, far inside `eps` (≥ 0.05 mm):
     // classifying the probes against it answers as the kernel would, thousands of times faster;
@@ -219,7 +221,9 @@ export function surfaceFit(
         sampled++;
         const out = { x: p[0] + n[0] * eps, y: p[1] + n[1] * eps, z: p[2] + n[2] * eps };
         const inn = { x: p[0] - n[0] * eps, y: p[1] - n[1] * eps, z: p[2] - n[2] * eps };
-        if (contains(out) || !contains(inn)) {
+        const missed = contains(out) || !contains(inn);
+        onSample?.(k, missed);
+        if (missed) {
             off++;
             if (misses.length < 20) misses.push(p);
         }

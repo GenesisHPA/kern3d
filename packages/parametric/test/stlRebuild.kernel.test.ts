@@ -18,6 +18,7 @@ import { type EdgeTreatment, planExtrusions, setPlanDebug } from "../src/stlRebu
 import { meshDifference } from "../src/stlRebuild/raycast";
 import { rebuildPart, setRebuildDebug } from "../src/stlRebuild/rebuild";
 import { setSafeTriangulator } from "../src/stlRebuild/safeMesh";
+import { describeSegment, segmentMesh } from "../src/stlRebuild/segment";
 import { loopArea, slabsOf, sliceFrames } from "../src/stlRebuild/slices";
 import { deviation, solidVolume, surfaceFit, trianglesOf } from "../src/stlRebuild/verify";
 import "../src/features";
@@ -195,6 +196,47 @@ describe.skipIf(corpus === undefined)("STL corpus", () => {
         setRebuildDebug((line) => log(`  ${path.basename(file)}: ${line}`));
         const report = await rebuildPart(document(), trianglesOf(stl), reference.value, path.basename(file));
         setRebuildDebug(undefined);
+        if (process.env["KERN3D_STL_SEGMENTS"] && report.model?.body.shape.isOk) {
+            // where the rebuilt surface misses, by the STL's faces (primitive segmentation)
+            const mesh = weldTriangles(trianglesOf(stl));
+            const ts = Date.now();
+            const segments = segmentMesh(mesh, Math.max(0.005, mesh.size * 5e-5));
+            const segOf = new Int32Array(mesh.areas.length);
+            for (const s of segments) for (const k of s.triangles) segOf[k] = s.id;
+            const kinds = new Map<string, number>();
+            const total = mesh.areas.reduce((a, b) => a + b, 0);
+            for (const s of segments)
+                kinds.set(s.primitive.kind, (kinds.get(s.primitive.kind) ?? 0) + s.area);
+            log(
+                `  ${path.basename(file)}: segments ${segments.length} in ${Date.now() - ts} ms: ${[...kinds].map(([k, a]) => `${k} ${((a / total) * 100).toFixed(1)}%`).join(", ")}`,
+            );
+            const hit = new Map<number, { off: number; all: number }>();
+            surfaceFit(
+                mesh,
+                report.model.body.shape.value,
+                Math.max(0.005 * 4, 0.05),
+                3000,
+                undefined,
+                (k, off) => {
+                    const e = hit.get(segOf[k]) ?? { off: 0, all: 0 };
+                    e.all++;
+                    if (off) e.off++;
+                    hit.set(segOf[k], e);
+                },
+            );
+            const worst = [...hit].filter(([, e]) => e.off > 0).sort((a, b) => b[1].off - a[1].off);
+            const sampled = [...hit.values()].reduce((a, e) => a + e.all, 0);
+            const byKind = new Map<string, number>();
+            for (const [id, e] of worst) {
+                const kind = segments[id].primitive.kind;
+                byKind.set(kind, (byKind.get(kind) ?? 0) + e.off);
+            }
+            log(
+                `  ${path.basename(file)}: misses by kind: ${[...byKind].map(([k, n]) => `${k} ${((n / sampled) * 100).toFixed(1)}%`).join(", ")}`,
+            );
+            for (const [id, e] of worst.slice(0, 12))
+                log(`  ${path.basename(file)}:   miss ${e.off}/${e.all} ${describeSegment(segments[id])}`);
+        }
         const names = report.model?.sketches.map((x) => x.name.split(" ")[0]) ?? [];
         const counts = [...new Set(names)]
             .map((n) => `${n}×${names.filter((x) => x === n).length}`)
