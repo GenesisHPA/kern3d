@@ -1341,3 +1341,23 @@ body {
     height: auto;
 }
 
+/* --- «Сменить фрезу?» --- */
+.askChange {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+    place-items: center;
+    padding: calc(var(--u) * 2);
+    background: rgba(12, 13, 16, 0.86);
+    backdrop-filter: blur(4px);
+    border-radius: inherit;
+}
+.askChange.show {
+    display: grid;
+}
+.askChange .hint {
+    color: var(--dim);
+    font-size: calc(var(--u) * 1.8);
+}
+

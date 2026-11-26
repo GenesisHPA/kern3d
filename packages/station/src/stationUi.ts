@@ -104,6 +104,7 @@ export class StationUi {
                 this.ref("gline", h("div", { class: "gline" })),
                 this.emergencyButton(),
                 this.ref("changeBox", h("div", { class: "changeBox" })),
+                this.askChangeBox(),
             ),
             this.jobCard(),
             h("div", { class: "mid card" }, this.jogCard(), this.queueCard()),
@@ -246,29 +247,62 @@ export class StationUi {
         return chip;
     }
 
-    /** 🔧 in the corner of the view while a job runs: two taps — the second within 3 s — begin it. */
+    /** 🔧 in the corner of the view while a job runs: asks first, then begins the change. */
     private emergencyButton() {
         const b = this.ref("emergency", h("button", { class: "emergency" }, "🔧 Замена фрезы"));
-        let armed: ReturnType<typeof setTimeout> | undefined;
-        b.onclick = () => {
-            if (armed === undefined) {
-                b.classList.add("armed");
-                b.textContent = "Ещё раз — остановить и заменить";
-                armed = setTimeout(() => {
-                    armed = undefined;
-                    b.classList.remove("armed");
-                    b.textContent = "🔧 Замена фрезы";
-                }, 3000);
-                return;
-            }
-            clearTimeout(armed);
-            armed = undefined;
-            b.classList.remove("armed");
-            b.textContent = "🔧 Замена фрезы";
-            const why = this.machine.emergencyChange();
-            if (why) this.toast(`⚠ ${why}`);
-        };
+        b.onclick = () => this.askChange();
         return b;
+    }
+
+    /** The «are you sure» before an emergency cutter change is open (the gamepad answers it too). */
+    get askingChange(): boolean {
+        return this.el["askChange"]?.classList.contains("show") ?? false;
+    }
+
+    /** Asks whether to stop the job and change the cutter; «Да» begins it. */
+    askChange() {
+        const s = this.machine.snapshot();
+        if (s.change || !(s.jobState === "running" || s.jobState === "paused")) {
+            this.toast("⚠ Сейчас нет работающего задания");
+            return;
+        }
+        this.el["askChange"].classList.add("show");
+    }
+
+    /** The answer to `askChange`. */
+    answerChange(yes: boolean) {
+        this.el["askChange"].classList.remove("show");
+        if (!yes) return;
+        const why = this.machine.emergencyChange();
+        if (why) this.toast(`⚠ ${why}`);
+    }
+
+    private askChangeBox() {
+        const yes = h("button", { class: "primary" }, "Да, сменить");
+        yes.onclick = () => this.answerChange(true);
+        const no = h("button", {}, "Нет");
+        no.onclick = () => this.answerChange(false);
+        return this.ref(
+            "askChange",
+            h(
+                "div",
+                { class: "askChange" },
+                h(
+                    "div",
+                    { class: "changeCard" },
+                    h("div", { class: "changeIcon" }, "🔧"),
+                    h("div", { class: "changeTitle" }, "Сменить фрезу?"),
+                    h(
+                        "p",
+                        {},
+                        "Фрезеровка остановится, шпиндель выключится и поднимется, станок уедет в ноль по упорам. " +
+                            "После замены новая фреза замерится на датчике, и работа продолжится с того же места.",
+                    ),
+                    h("div", { class: "changeBtns" }, yes, no),
+                    h("small", { class: "hint" }, "Джойстик: «Старт» — да, «Стоп» — нет"),
+                ),
+            ),
+        );
     }
 
     private gearButton() {
@@ -567,7 +601,7 @@ export class StationUi {
         this.el["emergency"].classList.toggle("show", active && !s.change);
         const box = this.el["changeBox"];
         const c = s.change;
-        const key = c ? `${c.kind}|${c.stage}|${c.tool}|${c.error}` : "";
+        const key = c ? `${c.kind}|${c.stage}|${c.tool}|${c.error}|${c.at}` : "";
         box.classList.toggle("show", c !== undefined);
         if (key === this.shownChange) return;
         this.shownChange = key;
@@ -594,14 +628,15 @@ export class StationUi {
             moving: [
                 emergency ? "Экстренная замена фрезы" : "Смена инструмента",
                 emergency
-                    ? "Задание остановлено на месте. Шпиндель выключается, станок едет в точку смены…"
-                    : "Шпиндель выключается, станок едет в точку смены…",
+                    ? "Фрезеровка остановлена. Шпиндель выключается и поднимается, станок едет в ноль по упорам…"
+                    : "Шпиндель выключается и поднимается, станок едет в ноль по упорам…",
                 [spin, cancel],
             ],
             waiting: [
                 emergency ? "Замените фрезу" : `Поставьте ${tool}`,
-                "Шпиндель выключен. Поставьте фрезу и нажмите «Готово» (или «Старт» на джойстике).",
-                [done("✓ Готово"), cancel],
+                `Шпиндель выключен, станок ${c.at === "place" ? "в точке смены (поиск нуля в контроллере выключен)" : "в нуле по упорам"}. ` +
+                    "Смените фрезу и нажмите «Фреза сменена» (или «Старт» на джойстике). Затем она замерится на датчике.",
+                [done("✓ Фреза сменена"), cancel],
             ],
             measuring: ["Замер новой фрезы", "Фреза касается датчика длины…", [spin, cancel]],
             zero: [

@@ -49,6 +49,8 @@ export interface ToolChange {
     /** reference: the tool measured before the job; zero: no sensor — Z to be zeroed by hand. */
     stage: "reference" | "moving" | "waiting" | "measuring" | "zero" | "failed";
     error?: string;
+    /** Where the machine went for the change: home by the limit switches, or the change place. */
+    at?: "home" | "place";
 }
 
 export interface StationSnapshot {
@@ -355,7 +357,8 @@ export class StationMachine {
         this.changed();
         try {
             const io = new StationProbeIO(grbl);
-            await io.send(toChangeLines(this.probe));
+            const at = await this.toChangePosition(io);
+            this.change = { ...this.change, at };
             this.stage("waiting");
             await this.waitForUser();
             if (change.kind === "planned" && change.tool !== undefined)
@@ -374,6 +377,28 @@ export class StationMachine {
             this.changed();
         } catch (e) {
             if (this.change) this.stage("failed", e instanceof Error ? e.message : String(e));
+        }
+    }
+
+    /**
+     * To where the cutter is changed: spindle and coolant off, the spindle up to the safe height,
+     * then home by the limit switches ($H — machine zero, so nothing in the way of the hands). A
+     * controller without homing (error:5, no switches) goes to the change place instead.
+     */
+    private async toChangePosition(io: StationProbeIO): Promise<"home" | "place"> {
+        const grbl = this.grbl!;
+        // a reset with homing on leaves GRBL locked until $H or $X
+        if (grbl.status.state === "Alarm") await io.send(["$X"]);
+        this.alarm = undefined;
+        await io.send(["M5", "M9", "G21 G90", `G53 G0 Z${this.probe.safeZ}`]);
+        try {
+            await io.send(["$H"]);
+            return "home";
+        } catch (e) {
+            const message = e instanceof Error ? e.message : String(e);
+            if (!/error:5\b/.test(message)) throw e;
+            await io.send(toChangeLines(this.probe));
+            return "place";
         }
     }
 
@@ -414,7 +439,6 @@ export class StationMachine {
             try {
                 await this.waitFor(() => grbl.jobState !== "stopping", 20000);
                 await this.waitFor(() => grbl.status.state === "Idle" || grbl.status.state === "Alarm", 8000);
-                if (grbl.status.state === "Alarm") throw new Error("Контроллер ушёл в тревогу при остановке");
                 await this.toolChange({ kind: "emergency", stage: "moving" }, from);
             } catch (e) {
                 this.stage("failed", e instanceof Error ? e.message : String(e));

@@ -149,6 +149,11 @@ const gamepadJog = new GamepadJog(
     () => padCapture.active || !padEnabled(),
     (button) => {
         if (padCapture.active || !padEnabled()) return;
+        if (ui.askingChange) {
+            // the «Сменить фрезу?» question: «Старт» — yes, «Стоп» or «Пауза» — no
+            ui.answerChange(button === "start");
+            return;
+        }
         const change = machine.snapshot().change;
         if (change && (change.stage === "waiting" || change.stage === "zero")) {
             // in a tool change «Старт» is «Готово» / «Продолжить»; the rest wait
@@ -204,12 +209,7 @@ setInterval(() => {
         if (edge(map.aPlus)) machine.jogA(1, step, feed);
         if (edge(map.aMinus)) machine.jogA(-1, step, feed);
     }
-    if (edge(map.toolChange))
-        setTimeout(() => {
-            if (!firstPad()?.buttons[padMap().toolChange]?.pressed) return;
-            const why = machine.emergencyChange();
-            ui.toast(why ? `⚠ ${why}` : "🔧 Экстренная замена фрезы");
-        }, 1000);
+    if (edge(map.toolChange)) ui.askChange();
 }, 50);
 
 addEventListener("gamepadconnected", (e) => {

@@ -39,7 +39,7 @@ export const PAD_ACTIONS: readonly [PadAction, string][] = [
     ["zeroZ", "Обнулить Z"],
     ["aPlus", "A+ на шаг (4-я ось)"],
     ["aMinus", "A− на шаг (4-я ось)"],
-    ["toolChange", "Экстренная замена фрезы (держать 1 с)"],
+    ["toolChange", "Замена фрезы (спросит подтверждение)"],
 ];
 
 /** A button number for each action; −1 = none. */

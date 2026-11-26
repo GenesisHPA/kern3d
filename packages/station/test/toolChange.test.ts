@@ -9,6 +9,15 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Polls until `ok`, letting timers and promise chains run (up to 3 s). */
+/** Answers every line until the change waits for the person (the moves come in several batches). */
+async function toWaiting(r: { okAll: () => Promise<void>; machine: StationMachine }) {
+    for (let i = 0; i < 30 && r.machine.snapshot().change?.stage !== "waiting"; i++) {
+        await r.okAll();
+        await wait(10);
+    }
+    expect(r.machine.snapshot().change?.stage).toBe("waiting");
+}
+
 async function until(ok: () => boolean) {
     for (let i = 0; i < 300 && !ok(); i++) await wait(10);
     expect(ok()).toBe(true);
@@ -120,9 +129,11 @@ describe("tool changes on the station", () => {
         await r.okAll(); // first part done
         await until(() => r.machine.snapshot().change?.stage === "moving");
         expect(r.machine.snapshot().change).toMatchObject({ kind: "planned", tool: 2, name: "Фреза 3 мм" });
-        await r.okAll(); // the moves to the change place
-        await until(() => r.machine.snapshot().change?.stage === "waiting");
+        await toWaiting(r); // up, then home
         expect(r.lines()).toContain("M5");
+        // up, then home by the limit switches
+        expect(r.lines()).toContain("$H");
+        expect(r.machine.snapshot().change?.at).toBe("home");
         expect(r.machine.changeDone()).toBe(true);
         await until(() => r.machine.snapshot().change?.stage === "zero");
         expect(r.machine.zero(["Z"])).toBe(true);
@@ -151,8 +162,7 @@ describe("tool changes on the station", () => {
         await until(() => r.lines().includes("G1X10F800"));
         await r.okAll(); // first part
         await until(() => r.machine.snapshot().change?.stage === "moving");
-        await r.okAll();
-        await until(() => r.machine.snapshot().change?.stage === "waiting");
+        await toWaiting(r);
         r.machine.changeDone();
         await until(() => r.machine.snapshot().change?.stage === "measuring");
         // the new cutter is 1.5 mm longer: it touches the sensor 1.5 mm higher
@@ -160,6 +170,29 @@ describe("tool changes on the station", () => {
         await until(() => r.machine.snapshot().change === undefined);
         expect(r.machine.snapshot().offset).toBe(1.5);
         expect(r.lines()).toContain("G43.1 Z1.5");
+        await r.machine.disconnect();
+    });
+
+    test("without homing in the controller (error:5) the change goes to the change place", async () => {
+        const r = rig();
+        await r.machine.connect();
+        r.machine.addJob("two tools", PROGRAM, "file");
+        r.machine.start();
+        await r.okAll(); // first part done
+        await until(() => r.machine.snapshot().change?.stage === "moving");
+        // answer line by line: «$H» is refused as a controller without homing does
+        for (let i = 0; i < 30 && r.machine.snapshot().change?.stage !== "waiting"; i++) {
+            await tick();
+            const all = r.lines();
+            const last = all.at(-1);
+            if (last === "$H" && !r.written.includes("error-sent")) {
+                r.written.push("error-sent");
+                r.answer("error:5");
+            } else await r.okAll();
+            await wait(10);
+        }
+        expect(r.machine.snapshot().change).toMatchObject({ stage: "waiting", at: "place" });
+        expect(r.lines().some((l) => /^G53 G0 X/.test(l))).toBe(true);
         await r.machine.disconnect();
     });
 
@@ -203,8 +236,7 @@ describe("tool changes on the station", () => {
         r.answer("<Idle|WPos:4.000,10.000,-1.000|FS:0,0>");
         r.skip();
         await until(() => r.lines().includes("M5"));
-        await r.okAll();
-        await until(() => r.machine.snapshot().change?.stage === "waiting");
+        await toWaiting(r);
         r.machine.changeDone();
         await until(() => r.machine.snapshot().change?.stage === "measuring");
         for (let i = 0; i < 10 && r.machine.snapshot().change; i++) await r.okAll(-41);
