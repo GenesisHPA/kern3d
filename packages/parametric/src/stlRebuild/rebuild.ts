@@ -122,6 +122,9 @@ const MAX_PIECE_FEATURES = 8;
  */
 const MAX_DIFFERENCE_FACES = 1000;
 
+/** Most faces the reference may have for the surface pass's mesh pieces (see above). */
+const MAX_PIECES_FACES = 6000;
+
 /** Tolerance for a part of this size: 0.005 mm, more for a big part (5e-5 of its size). */
 export function defaultTolerance(mesh: TriMesh): number {
     return Math.max(0.005, mesh.size * 5e-5);
@@ -398,6 +401,9 @@ export async function rebuildPart(
         // other view (kept only when it brings the part closer), then try the views' hull itself.
         const views = viewFrames(best.frame);
         let viewRatio = best.ratio;
+        /** A cut along an oblique view was kept: the difference booleans on such a body have
+         * damaged the kernel's heap (UHP_350_Mount), so no corrections follow it. */
+        let obliqueTrim = false;
         if (best.sound && viewRatio > goal) {
             for (const frame of views) {
                 if (!inTime() || viewRatio <= goal) break;
@@ -416,8 +422,10 @@ export async function rebuildPart(
                 REBUILD_DEBUG?.(
                     `view trim ${frame.axis.map((x) => x.toFixed(2))}: ${(next * 100).toFixed(3)}% ${kept ? "kept" : "dropped"}`,
                 );
-                if (kept) viewRatio = next;
-                else {
+                if (kept) {
+                    viewRatio = next;
+                    if (!frame.axis.some((x) => Math.abs(Math.abs(x) - 1) < 1e-9)) obliqueTrim = true;
+                } else {
                     model.body.setFeaturesEmitShapeChanged(before);
                     for (const sketch of model.sketches.splice(sketchesBefore)) sketch.parent?.remove(sketch);
                 }
@@ -451,10 +459,10 @@ export async function rebuildPart(
         let ratio = viewRatio;
         let corrections = 0;
         const refVolume = solidVolume(reference);
-        const corrective = referenceFaces <= MAX_DIFFERENCE_FACES && best.sound;
+        const corrective = referenceFaces <= MAX_DIFFERENCE_FACES && best.sound && !obliqueTrim;
         if (!corrective)
             REBUILD_DEBUG?.(
-                `corrections skipped: ${best.sound ? `${referenceFaces} faces` : "unsound body"}`,
+                `corrections skipped: ${!best.sound ? "unsound body" : obliqueTrim ? "oblique view cut" : `${referenceFaces} faces`}`,
             );
         for (
             let pass = 0;
@@ -555,7 +563,11 @@ export async function rebuildPart(
         const ts = Date.now();
         let surface = surfaceOf(model);
         REBUILD_DEBUG?.(`surface ${(surface * 100).toFixed(1)}%, ${Date.now() - ts} ms`);
-        if (surface > 0.02) {
+        // mesh pieces of a reference this big are booleans on thousands of faces each, which no
+        // budget can stop once begun (extruder-motor-plate ran past 15 min)
+        if (surface > 0.02 && referenceFaces > MAX_PIECES_FACES)
+            REBUILD_DEBUG?.(`pieces skipped: ${referenceFaces} faces`);
+        else if (surface > 0.02) {
             // on every axis tried: the axis features liked best need not be the one the pieces fit
             for (const [i, frame] of frames.slice(0, 3).entries()) {
                 if (surface <= 0.02 || !inTime()) break;
