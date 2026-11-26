@@ -235,6 +235,8 @@ describe("tool changes on the station", () => {
         r.answer("Grbl 1.1h ['$' for help]");
         r.answer("<Idle|WPos:4.000,10.000,-1.000|FS:0,0>");
         r.skip();
+        await tick();
+        r.answer("ok"); // the «$$» asked after the reset
         await until(() => r.lines().includes("M5"));
         await toWaiting(r);
         r.machine.changeDone();

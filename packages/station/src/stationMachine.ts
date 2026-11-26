@@ -3,17 +3,22 @@
 
 import {
     applyOffsetLines,
+    type Corner,
     defaultProbeSettings,
     lengthOffset,
     measureTool,
     type ProbeIO,
     type ProbeSettings,
     parsePrb,
+    probeBoss,
+    probeCorner,
+    probeHole,
+    probeTop,
     toChangeLines,
     type Vec3,
 } from "@chili3d/app/src/cam/camProbe";
 import { runFromLine } from "@chili3d/app/src/cam/camRun";
-import { type Axis, jogLine, OVERRIDE } from "@chili3d/app/src/cam/machineControl";
+import { type Axis, jogLine, OVERRIDE, probeLines } from "@chili3d/app/src/cam/machineControl";
 import {
     cleanLine,
     GrblController,
@@ -106,7 +111,13 @@ interface Run {
 class StationProbeIO implements ProbeIO {
     constructor(private readonly grbl: GrblController) {}
 
-    private run(lines: string[]): Promise<Vec3[]> {
+    /** Until every line sent before is answered: an ok counted here must be for a line of ours. */
+    private async drained(): Promise<void> {
+        for (let i = 0; i < 200 && this.grbl.pending > 0; i++) await new Promise((r) => setTimeout(r, 25));
+    }
+
+    private async run(lines: string[]): Promise<Vec3[]> {
+        await this.drained();
         return new Promise((resolve, reject) => {
             let left = lines.length;
             const touches: Vec3[] = [];
@@ -471,6 +482,63 @@ export class StationMachine {
         this.changed();
         try {
             return await measureTool(new StationProbeIO(grbl), this.probe);
+        } finally {
+            this.measuring = undefined;
+            this.changed();
+        }
+    }
+
+    /**
+     * Work zero by probing (3D probe in the spindle, or the cutter on a touch plate), with the
+     * station's probe settings: the top, a corner, the centre of a hole or a boss, Z by a plate.
+     * Returns what was found, in words. G10 L2 P0 sets the active work system (G54 by default).
+     */
+    async probeRun(
+        kind: "top" | "corner" | "hole" | "boss" | "plate",
+        o: { corner: Corner; withZ: boolean; boss: number; plate: number },
+    ): Promise<string> {
+        const grbl = this.grbl;
+        if (!grbl || grbl.jobActive || this.busy || this.measuring) throw new Error("Станок занят");
+        if (grbl.status.state === "Alarm" || this.alarm !== undefined)
+            throw new Error("Станок в тревоге — разблокируйте");
+        if (grbl.status.pins?.includes("P"))
+            throw new Error("Щуп уже замкнут — проверьте провод или отведите его");
+        const io = new StationProbeIO(grbl);
+        const s = this.probe;
+        const f = (v: number) => v.toFixed(3);
+        const names = { top: "верх", corner: "угол", hole: "отверстие", boss: "бобышка", plate: "пластина" };
+        this.measuring = { axis: "Z", stage: `щуп: ${names[kind]}` };
+        this.changed();
+        try {
+            switch (kind) {
+                case "top": {
+                    const z = await probeTop(io, s, this.offset);
+                    return `Z = 0 по верху (касание на ${f(z)} машинных)`;
+                }
+                case "corner": {
+                    const r = await probeCorner(io, s, o.corner, o.withZ, this.offset);
+                    return `X и Y = 0 в углу${r.z !== undefined ? ", Z = 0 по верху" : ""}`;
+                }
+                case "hole": {
+                    const r = await probeHole(io, s, true);
+                    return `X и Y = 0 в центре отверстия Ø${r.d.toFixed(3)}`;
+                }
+                case "boss": {
+                    const r = await probeBoss(io, s, o.boss, true);
+                    return `X и Y = 0 в центре бобышки Ø${r.d.toFixed(3)}`;
+                }
+                case "plate": {
+                    await io.send(
+                        probeLines({
+                            thickness: o.plate,
+                            travel: s.travel,
+                            feed: s.latchFeed * 2,
+                            retract: s.retract + 3,
+                        }),
+                    );
+                    return `Z = 0 по верху заготовки (пластина ${o.plate} мм)`;
+                }
+            }
         } finally {
             this.measuring = undefined;
             this.changed();

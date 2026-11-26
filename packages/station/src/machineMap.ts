@@ -35,8 +35,8 @@ export interface Stock {
     width: number; // X
     depth: number; // Y
     height: number; // Z
-    /** The work zero on the stock's top: its front-left corner, or its centre. */
-    zeroAt: "frontLeft" | "centre";
+    /** The work zero on the stock's top: one of its corners, or its centre. */
+    zeroAt: "frontLeft" | "frontRight" | "backLeft" | "backRight" | "centre";
 }
 
 const STOCK_KEY = "kern3d.station.stock";
@@ -56,7 +56,9 @@ export function saveStock(s: Stock | undefined) {
 
 /** The stock's box in work coordinates. */
 export function stockBox(s: Stock): { min: Point3; max: Point3 } {
-    const [x0, y0] = s.zeroAt === "centre" ? [-s.width / 2, -s.depth / 2] : [0, 0];
+    const at = s.zeroAt;
+    const x0 = at === "centre" ? -s.width / 2 : at === "frontRight" || at === "backRight" ? -s.width : 0;
+    const y0 = at === "centre" ? -s.depth / 2 : at === "backLeft" || at === "backRight" ? -s.depth : 0;
     return { min: [x0, y0, -s.height], max: [x0 + s.width, y0 + s.depth, 0] };
 }
 

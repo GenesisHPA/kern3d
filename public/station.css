@@ -1466,3 +1466,81 @@ body {
     gap: var(--u);
 }
 
+/* --- «Щуп» over the view --- */
+.probeBox {
+    position: absolute;
+    inset: calc(var(--u) * 1);
+    z-index: 4;
+    display: none;
+    flex-direction: column;
+    gap: var(--u);
+    padding: calc(var(--u) * 2);
+    border-radius: calc(var(--u) * 1.8);
+    background: rgba(23, 24, 28, 0.97);
+    border: 1px solid var(--acc);
+    overflow-y: auto;
+}
+.probeBox.show {
+    display: flex;
+}
+.probeHead {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 1.6);
+}
+.probeHead .changeTitle {
+    flex: 1;
+    font-size: calc(var(--u) * 3);
+}
+.probeLive {
+    padding: calc(var(--u) * 0.6) calc(var(--u) * 1.6);
+    border-radius: calc(var(--u) * 99);
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    font-size: calc(var(--u) * 2);
+    color: var(--dim);
+}
+.probeLive.on {
+    color: #fff;
+    background: #2f9e44;
+    border-color: transparent;
+}
+.probeClose {
+    width: calc(var(--u) * 5.4);
+    height: calc(var(--u) * 5.4);
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    color: var(--fg);
+    font-size: calc(var(--u) * 2.4);
+}
+.probeBody {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 1.2);
+}
+.choices.probeKinds {
+    flex-wrap: wrap;
+}
+.probeKinds .choice,
+.probeCorners .choice,
+.probeOpts > .choice {
+    font-size: calc(var(--u) * 2);
+}
+.probeOpts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--u);
+    align-items: center;
+}
+.probeCorners {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--u);
+}
+.probeGo {
+    align-self: flex-start;
+    height: calc(var(--u) * 6.4);
+    font-size: calc(var(--u) * 2.4);
+}
+

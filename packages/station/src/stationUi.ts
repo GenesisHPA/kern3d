@@ -6,6 +6,7 @@ import type { BtApi } from "./btPanel";
 import { grblErrorText } from "./grblText";
 import { MapView, type Stock, savedStock, saveStock } from "./machineMap";
 import { padEnabled, setPadEnabled } from "./padMap";
+import { ProbePanel } from "./probePanel";
 import { rotary } from "./rotary";
 import { scrollArrows } from "./scrollArrows";
 import { type DisplayApi, type Layout, resolveLayout, SettingsSheet, savedLayout } from "./settings";
@@ -105,6 +106,7 @@ export class StationUi {
                 this.mapCanvas(),
                 this.viewSwitch(),
                 this.stockBox(),
+                this.probePanel.el,
                 this.ref("gline", h("div", { class: "gline" })),
                 this.emergencyButton(),
                 this.ref("changeBox", h("div", { class: "changeBox" })),
@@ -137,6 +139,7 @@ export class StationUi {
         addEventListener("station-rotary", showRotary);
         // ?open=settings: the settings sheet open at start (checks, screenshots)
         const open = new URLSearchParams(location.search).get("open");
+        if (new URLSearchParams(location.search).has("probe")) this.probePanel.show();
         if (new URLSearchParams(location.search).has("map")) {
             this.showMap = true;
             this.root.classList.add("mapMode");
@@ -316,9 +319,30 @@ export class StationUi {
 
     // ---- the map of the table, the stock, initialisation -----------------------------------------
 
+    private probe?: ProbePanel;
+    /** «Щуп» over the view, made on first use (the machine is set by then). */
+    private get probePanel(): ProbePanel {
+        this.probe ??= new ProbePanel(
+            this.machine,
+            (t) => this.toast(t),
+            (at) => {
+                // the stock follows the probed zero: same size, its zero at that corner or the centre
+                if (!this.stock) return;
+                this.stock = { ...this.stock, zeroAt: at };
+                saveStock(this.stock);
+            },
+        );
+        return this.probe;
+    }
+
     private showMap = false;
     private mapView!: MapView;
     private stock: Stock | undefined = savedStock();
+
+    private probeKey(b: HTMLElement) {
+        b.onclick = () => (this.probePanel.open ? this.probePanel.hide() : this.probePanel.show());
+        return b;
+    }
 
     private mapCanvas() {
         const c = this.ref("mapCanvas", h("canvas", { class: "mapCanvas" }));
@@ -369,13 +393,20 @@ export class StationUi {
             );
         });
         const zero = h("button", { class: "stockZero" });
+        const order: Stock["zeroAt"][] = ["frontLeft", "frontRight", "backLeft", "backRight", "centre"];
+        const names: Record<Stock["zeroAt"], string> = {
+            frontLeft: "левый передний угол",
+            frontRight: "правый передний угол",
+            backLeft: "левый задний угол",
+            backRight: "правый задний угол",
+            centre: "центр",
+        };
         const showZero = () => {
-            zero.textContent =
-                st.zeroAt === "centre" ? "Ноль: в центре верха" : "Ноль: левый передний угол верха";
+            zero.textContent = `Ноль: ${names[st.zeroAt]} верха`;
         };
         showZero();
         zero.onclick = () => {
-            st.zeroAt = st.zeroAt === "centre" ? "frontLeft" : "centre";
+            st.zeroAt = order[(order.indexOf(st.zeroAt) + 1) % order.length];
             showZero();
         };
         const save = h("button", { class: "primary" }, "Поставить на карту");
@@ -532,7 +563,7 @@ export class StationUi {
             home,
             key("X+", "X", 1),
             h("span"),
-            key("Щуп", undefined, undefined, "c z"),
+            this.probeKey(key("Щуп", undefined, undefined, "z")),
             key("↙", undefined, undefined, "c"),
             key("Y−", "Y", -1),
             key("↘", undefined, undefined, "c"),
@@ -841,6 +872,7 @@ export class StationUi {
         );
         (this.root.querySelector(".fan") as SVGElement).style.animationPlayState =
             rpm > 100 ? "running" : "paused";
+        this.probePanel.tick();
         if (this.showMap) {
             const st = s.status;
             this.mapView.draw({
