@@ -12,7 +12,7 @@ import type { Point3 } from "./gcodePath";
 export class DemoGrbl {
     private readonly lines: string[] = [];
     private mpos: Point3 = [-250, -140, -30];
-    private wco: Point3 = [-250, -140, -40];
+    private wco: Point3 = [-200, -90, -40];
     private target?: Point3;
     private feed = 600;
     private rapid = false;
@@ -104,6 +104,12 @@ export class DemoGrbl {
 
     private execute(line: string) {
         if (line === "$X") return this.say("ok");
+        // the demo machine: 350 × 150 × 120 mm of travel, no homing switches
+        if (line === "$$") {
+            for (const s of ["$20=0", "$21=0", "$22=0", "$130=350.000", "$131=150.000", "$132=120.000"])
+                this.say(s);
+            return this.say("ok");
+        }
         if (line === "$H") {
             this.state = "Home";
             this.rapid = true;

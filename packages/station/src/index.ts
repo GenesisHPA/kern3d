@@ -166,7 +166,7 @@ const gamepadJog = new GamepadJog(
         else
             setTimeout(() => {
                 if (firstPad()?.buttons[padMap().start]?.pressed && !machine.start())
-                    ui.toast("Нечего запускать или станок занят");
+                    ui.toast(`⚠ ${machine.whyNotStart() ?? "Нечего запускать или станок занят"}`);
             }, START_HOLD_MS);
     },
     {

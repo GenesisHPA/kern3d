@@ -24,6 +24,13 @@ import {
     REALTIME,
 } from "@chili3d/app/src/laser/grblController";
 import { estimateSeconds, type ProgramPath, programLines, programPath } from "./gcodePath";
+import {
+    type MachineSettings,
+    machineSettings,
+    overrunText,
+    readSetting,
+    travelOverruns,
+} from "./machineMap";
 import { jobProgram, type PlannedChange, resumeLine, type ToolRef } from "./toolJob";
 
 /** A program waiting to run (or running): its text, path and rough time. */
@@ -74,6 +81,9 @@ export interface StationSnapshot {
     tool?: ToolRef;
     /** The controller's welcome line («Grbl 1.1h …», «Grbl 3.7 [FluidNC …]»). */
     firmware?: string;
+    /** What the controller says about the machine ($$), and whether it has found its zero since. */
+    machine: MachineSettings;
+    homed: boolean;
     change?: ToolChange;
     /** The tool length offset applied now (G43.1), mm; the reference tool's machine Z on the sensor. */
     offset: number;
@@ -184,6 +194,11 @@ export class StationMachine {
     /** The tool in the spindle: the program's first at its start, each change's after it. */
     tool?: ToolRef;
     private firmware?: string;
+    private readonly settings = new Map<number, number>();
+    /** The machine has found its zero by the limit switches since it was switched on (or unlocked). */
+    private homed = false;
+    private sawHoming = false;
+    private checkLock = false;
 
     constructor(
         private readonly connectWith: Connect,
@@ -226,6 +241,8 @@ export class StationMachine {
             ...this.jobTools(),
             tool: this.tool,
             firmware: this.firmware,
+            machine: machineSettings(this.settings),
+            homed: this.homed,
             change: this.change,
             offset: this.offset,
             reference: this.reference,
@@ -245,6 +262,9 @@ export class StationMachine {
         controller.on((e) => this.onEvent(e));
         this.grbl = controller;
         this.port = port;
+        this.homed = false;
+        // what the machine is: travel, homing, limits ($$; again after every reset)
+        controller.send("$$", true);
         this.poll = setInterval(() => void this.grbl?.realtime(REALTIME.status), 200);
         this.changed();
         return true;
@@ -264,14 +284,31 @@ export class StationMachine {
     }
 
     private onEvent(e: GrblEvent) {
+        if (e.type === "in") {
+            if (readSetting(this.settings, e.text)) this.changed();
+            return;
+        }
         if (e.type === "alarm") this.alarm = e.code;
         else if (e.type === "error") this.lastError = `error:${e.code} ${e.line}`;
         else if (e.type === "welcome") {
             this.alarm = undefined;
             this.firmware = e.version;
+            this.grbl?.send("$$", true);
+            // a reset with homing on locks the machine until $H: then its zero is lost
+            this.checkLock = true;
             // a reset drops the tool length offset; the tool in the spindle still needs it
             if (this.offset !== 0) this.grbl?.send(applyOffsetLines(this.offset)[0], true);
         } else if (e.type === "status") {
+            const state = e.status.state;
+            if (this.checkLock) {
+                this.checkLock = false;
+                if (state === "Alarm") this.homed = false;
+            }
+            if (state === "Home") this.sawHoming = true;
+            else if (this.sawHoming) {
+                this.sawHoming = false;
+                this.homed = state !== "Alarm";
+            }
             // an M0 left in the program holds GRBL: show it as a pause, so «Старт» carries on
             if (this.grbl?.jobState === "running" && e.status.state === "Hold" && !this.change)
                 this.grbl.pause();
@@ -534,6 +571,30 @@ export class StationMachine {
         this.changed();
     }
 
+    /**
+     * Why the selected job cannot start now, in words, or undefined when it can: no job, busy,
+     * alarm, the machine has not found its zero (homing on), or the program at the current work
+     * zero leaves the travel.
+     */
+    whyNotStart(): string | undefined {
+        const grbl = this.grbl;
+        if (!grbl) return "Контроллер не подключён";
+        if (grbl.jobState === "paused") return undefined;
+        if (!this.current) return "Нет задания";
+        if (this.change || grbl.jobActive) return "Станок занят";
+        if (this.alarm !== undefined || grbl.status.state === "Alarm")
+            return "Станок в тревоге — разблокируйте";
+        const m = machineSettings(this.settings);
+        if (m.homing && !this.homed) return "Станок не инициализирован — нажмите «Домой» (ноль по упорам)";
+        const st = grbl.status;
+        if (m.travel && st.mpos && st.wpos) {
+            const wco = st.mpos.map((v, i) => v - st.wpos![i]) as [number, number, number];
+            const out = travelOverruns(this.current.path, wco, m.travel);
+            if (out.length > 0) return `Программа не помещается в ход станка: ${overrunText(out)}`;
+        }
+        return undefined;
+    }
+
     /** Runs the selected job, or resumes a paused one. Refused in alarm or without a job. */
     start(): boolean {
         const grbl = this.grbl;
@@ -544,6 +605,7 @@ export class StationMachine {
         }
         if (this.change || grbl.jobActive) return false;
         if (this.alarm !== undefined || grbl.status.state === "Alarm" || !this.current) return false;
+        if (this.whyNotStart() !== undefined) return false;
         const program = jobProgram(this.current.lines);
         if (program.code.length === 0) return false;
         this.run = { job: this.current, ...program, from: 0, end: 0, sentCode: [] };

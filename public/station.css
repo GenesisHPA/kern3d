@@ -1361,3 +1361,101 @@ body {
     font-size: calc(var(--u) * 1.8);
 }
 
+/* --- the map of the table, the stock, initialisation --- */
+.mapCanvas {
+    display: none;
+    width: 100%;
+    height: 100%;
+}
+.screen.mapMode .view canvas:not(.mapCanvas) {
+    display: none;
+}
+.screen.mapMode .view .mapCanvas {
+    display: block;
+}
+.screen.mapMode .view .gline {
+    display: none;
+}
+.viewSwitch {
+    position: absolute;
+    left: 50%;
+    top: calc(var(--u) * 1.4);
+    transform: translateX(-50%);
+    z-index: 3;
+    display: flex;
+    gap: var(--u);
+}
+.viewBtn {
+    height: calc(var(--u) * 5);
+    padding: 0 calc(var(--u) * 1.8);
+    border-radius: calc(var(--u) * 99);
+    border: 1px solid var(--line);
+    background: rgba(23, 24, 28, 0.88);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: calc(var(--u) * 1.9);
+    font-weight: 700;
+}
+.viewSwitch .viewBtn:nth-child(2) {
+    display: none;
+}
+.screen.mapMode .viewSwitch .viewBtn:nth-child(2) {
+    display: block;
+}
+.stockBox {
+    position: absolute;
+    left: 50%;
+    top: calc(var(--u) * 8);
+    transform: translateX(-50%);
+    z-index: 4;
+    display: none;
+    flex-direction: column;
+    gap: var(--u);
+    padding: calc(var(--u) * 2);
+    border-radius: calc(var(--u) * 1.8);
+    background: rgba(23, 24, 28, 0.96);
+    border: 1px solid var(--acc);
+}
+.stockBox.show {
+    display: flex;
+}
+.stockRow {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 0.8);
+    font-size: calc(var(--u) * 2.1);
+}
+.stockRow span {
+    width: calc(var(--u) * 14);
+    color: var(--dim);
+}
+.stockRow b {
+    width: calc(var(--u) * 9);
+    text-align: center;
+    font-size: calc(var(--u) * 2.6);
+}
+.stockRow button,
+.stockZero,
+.stockBox .changeBtns button {
+    height: calc(var(--u) * 5.4);
+    min-width: calc(var(--u) * 6);
+    border-radius: calc(var(--u) * 1.2);
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: calc(var(--u) * 2);
+    font-weight: 700;
+}
+.stockBox .changeBtns button.primary {
+    background: var(--grad);
+    border-color: transparent;
+    color: #fff;
+}
+.initBanner {
+    border-color: #ffb43c;
+}
+.screen .initBanner {
+    top: calc(var(--u) * 8.4);
+}
+

@@ -23,10 +23,23 @@ function rig() {
         },
         () => clock,
     );
+    // the «$$» the machine asks on connect (travel, homing) is answered at once, and left out of
+    // the lines the tests look at
+    const connect = machine.connect.bind(machine);
+    machine.connect = async () => {
+        const ok = await connect();
+        await tick();
+        feed("ok\r\n");
+        return ok;
+    };
     return {
         machine,
         written,
-        lines: () => written.filter((w) => w.endsWith("\n")).map((w) => w.trim()),
+        lines: () =>
+            written
+                .filter((w) => w.endsWith("\n"))
+                .map((w) => w.trim())
+                .filter((l) => l !== "$$"),
         answer: (text: string) => feed(`${text}\r\n`),
         advance: (ms: number) => {
             clock += ms;

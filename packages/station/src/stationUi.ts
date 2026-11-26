@@ -4,6 +4,7 @@
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
 import type { BtApi } from "./btPanel";
 import { grblErrorText } from "./grblText";
+import { MapView, type Stock, savedStock, saveStock } from "./machineMap";
 import { padEnabled, setPadEnabled } from "./padMap";
 import { rotary } from "./rotary";
 import { scrollArrows } from "./scrollArrows";
@@ -101,6 +102,9 @@ export class StationUi {
                 "div",
                 { class: "view card" },
                 canvas,
+                this.mapCanvas(),
+                this.viewSwitch(),
+                this.stockBox(),
                 this.ref("gline", h("div", { class: "gline" })),
                 this.emergencyButton(),
                 this.ref("changeBox", h("div", { class: "changeBox" })),
@@ -110,6 +114,7 @@ export class StationUi {
             h("div", { class: "mid card" }, this.jogCard(), this.queueCard()),
             this.actions(),
             this.connectOverlay(),
+            this.initBanner(),
         );
         document.body.append(this.root);
         this.settings = new SettingsSheet(
@@ -132,6 +137,10 @@ export class StationUi {
         addEventListener("station-rotary", showRotary);
         // ?open=settings: the settings sheet open at start (checks, screenshots)
         const open = new URLSearchParams(location.search).get("open");
+        if (new URLSearchParams(location.search).has("map")) {
+            this.showMap = true;
+            this.root.classList.add("mapMode");
+        }
         if (open === "settings") this.settings.show();
         else if (open) this.settings.showSection(open);
         machine.onChange(() => this.render());
@@ -301,6 +310,118 @@ export class StationUi {
                     h("div", { class: "changeBtns" }, yes, no),
                     h("small", { class: "hint" }, "Джойстик: «Старт» — да, «Стоп» — нет"),
                 ),
+            ),
+        );
+    }
+
+    // ---- the map of the table, the stock, initialisation -----------------------------------------
+
+    private showMap = false;
+    private mapView!: MapView;
+    private stock: Stock | undefined = savedStock();
+
+    private mapCanvas() {
+        const c = this.ref("mapCanvas", h("canvas", { class: "mapCanvas" }));
+        this.mapView = new MapView(c as HTMLCanvasElement);
+        return c;
+    }
+
+    /** «🗺 Карта стола» / «◆ 3D», and «Заготовка» on the map. */
+    private viewSwitch() {
+        const toggle = h("button", { class: "viewBtn" }, "🗺 Карта стола");
+        const stock = h("button", { class: "viewBtn" }, "▭ Заготовка");
+        stock.onclick = () => this.el["stockBox"].classList.toggle("show");
+        toggle.onclick = () => {
+            this.showMap = !this.showMap;
+            this.root.classList.toggle("mapMode", this.showMap);
+            toggle.textContent = this.showMap ? "◆ 3D" : "🗺 Карта стола";
+        };
+        return h("div", { class: "viewSwitch" }, toggle, stock);
+    }
+
+    /** The stock's size, by ± buttons (no keyboard on the station), and where its work zero is. */
+    private stockBox() {
+        const st: Stock = this.stock ?? { width: 100, depth: 60, height: 20, zeroAt: "frontLeft" };
+        const fields: [keyof Stock & ("width" | "depth" | "height"), string][] = [
+            ["width", "Ширина X"],
+            ["depth", "Глубина Y"],
+            ["height", "Высота Z"],
+        ];
+        const rows = fields.map(([key, label]) => {
+            const value = h("b", {}, String(st[key]));
+            const step = (d: number) => {
+                const b = h("button", {}, d > 0 ? `+${d}` : String(d));
+                b.onclick = () => {
+                    st[key] = Math.max(1, Math.round((st[key] + d) * 10) / 10);
+                    value.textContent = String(st[key]);
+                };
+                return b;
+            };
+            return h(
+                "div",
+                { class: "stockRow" },
+                h("span", {}, label),
+                step(-10),
+                step(-1),
+                value,
+                step(1),
+                step(10),
+            );
+        });
+        const zero = h("button", { class: "stockZero" });
+        const showZero = () => {
+            zero.textContent =
+                st.zeroAt === "centre" ? "Ноль: в центре верха" : "Ноль: левый передний угол верха";
+        };
+        showZero();
+        zero.onclick = () => {
+            st.zeroAt = st.zeroAt === "centre" ? "frontLeft" : "centre";
+            showZero();
+        };
+        const save = h("button", { class: "primary" }, "Поставить на карту");
+        save.onclick = () => {
+            this.stock = { ...st };
+            saveStock(this.stock);
+            this.el["stockBox"].classList.remove("show");
+            this.toast(`Заготовка ${st.width}×${st.depth}×${st.height} мм`);
+        };
+        const clear = h("button", {}, "Убрать");
+        clear.onclick = () => {
+            this.stock = undefined;
+            saveStock(undefined);
+            this.el["stockBox"].classList.remove("show");
+        };
+        return this.ref(
+            "stockBox",
+            h(
+                "div",
+                { class: "stockBox" },
+                h("div", { class: "changeTitle" }, "Заготовка"),
+                ...rows,
+                zero,
+                h("div", { class: "changeBtns" }, save, clear),
+            ),
+        );
+    }
+
+    /** Until the machine has found its zero (homing on): say so, and offer «Домой». */
+    private initBanner() {
+        const button = h("button", {}, "⌂ Домой");
+        button.onclick = () => {
+            if (!this.machine.home()) this.toast("⚠ Станок занят");
+        };
+        return this.ref(
+            "initBanner",
+            h(
+                "div",
+                { class: "connect initBanner" },
+                h(
+                    "p",
+                    {},
+                    h("b", {}, "Станок не инициализирован. "),
+                    "Найдите ноль по упорам — до этого координаты машины неизвестны, старт заблокирован.",
+                ),
+                button,
             ),
         );
     }
@@ -487,7 +608,8 @@ export class StationUi {
                 start.classList.remove("holding");
                 const s = this.machine.snapshot();
                 if (s.alarm !== undefined || s.status.state === "Alarm") this.machine.unlock();
-                else if (!this.machine.start()) this.toast("Нечего запускать или станок занят");
+                else if (!this.machine.start())
+                    this.toast(`⚠ ${this.machine.whyNotStart() ?? "Нечего запускать или станок занят"}`);
             }, 1000);
         };
         const cancel = () => {
@@ -528,6 +650,10 @@ export class StationUi {
         this.el["state"].textContent = STATE_TEXT[state] ?? state;
         this.el["state"].className = `chip st-${state}`;
         this.el["connect"].classList.toggle("show", !s.connected);
+        this.el["initBanner"].classList.toggle(
+            "show",
+            s.connected && s.machine.homing && !s.homed && s.status.state !== "Home",
+        );
         const alarmed = s.alarm !== undefined || state === "Alarm";
         this.root.classList.toggle("alarmed", alarmed);
         this.el["msg"].textContent = alarmed
@@ -715,6 +841,19 @@ export class StationUi {
         );
         (this.root.querySelector(".fan") as SVGElement).style.animationPlayState =
             rpm > 100 ? "running" : "paused";
-        this.view.draw();
+        if (this.showMap) {
+            const st = s.status;
+            this.mapView.draw({
+                travel: s.machine.travel,
+                mpos: st.mpos,
+                wco:
+                    st.mpos && st.wpos
+                        ? (st.mpos.map((v, i) => v - st.wpos![i]) as [number, number, number])
+                        : undefined,
+                path: s.job?.path,
+                stock: this.stock,
+                homed: s.homed || !s.machine.homing,
+            });
+        } else this.view.draw();
     }
 }
