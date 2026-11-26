@@ -583,10 +583,14 @@ export async function rebuildPart(
                 if (
                     alt !== undefined &&
                     alt.error === undefined &&
-                    altSurface < surface - 0.01 &&
-                    // against the volume before the view trims: they lower the volume measure of a
-                    // body the pieces would have beaten on the surface, and must not keep it
-                    alt.ratio <= Math.max(ratio, firstRatio) * 1.2 + 0.001
+                    // closer on the surface and not further off in volume — against the volume
+                    // before the view trims: they lower the volume measure of a body the pieces
+                    // would have beaten on the surface, and must not keep it
+                    ((altSurface < surface - 0.01 &&
+                        alt.ratio <= Math.max(ratio, firstRatio) * 1.2 + 0.001) ||
+                        // or far closer in volume for a little more surface off (a view cut can
+                        // trim the surface while it leaves much of the volume wrong: LED diffuser)
+                        (ratio > 0.01 && alt.ratio < ratio * 0.5 && altSurface <= surface + 0.05))
                 ) {
                     discard(model);
                     model = alt.model;
