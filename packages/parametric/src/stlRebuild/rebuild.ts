@@ -140,7 +140,7 @@ const MAX_PIECE_FEATURES = 8;
  */
 const MAX_DIFFERENCE_FACES = 1000;
 
-/** Most faces the reference may have for the surface pass's mesh pieces (see above). */
+/** Most faces the reference may have for mesh pieces along an axis whose build cost is unknown. */
 const MAX_PIECES_FACES = 6000;
 
 /** Most holes read off the faces that are tried (each is a cut and a measure). */
@@ -254,6 +254,8 @@ export async function rebuildPart(
         options.sharpRounds !== true && options.off?.includes("holes") ? undefined : segmentMesh(mesh, tol);
     /** The frames already built without pieces. */
     const tried = new Set<(typeof frames)[number]>();
+    /** How long each frame's plain build took, ms: what its pieces build is judged against. */
+    const buildMs = new Map<(typeof frames)[number], number>();
     /** One axis tried whole: planned, built, its edges rounded, measured. */
     const attempt = async (
         frame: (typeof frames)[number],
@@ -323,6 +325,7 @@ export async function rebuildPart(
         // an unsound body is still a result (the mesh pieces' sewn faces often fail the strict
         // check); it only takes no more booleans — corrections and rounds are for sound ones
         const sound = soundBody(shape, partSolids);
+        if (!meshPieces) buildMs.set(frame, Date.now() - tb);
         REBUILD_DEBUG?.(
             `axis ${axisName}: build ${Date.now() - tb} ms${failed ? ` failed: ${failed}` : ""}${sound ? "" : " (unsound)"}`,
         );
@@ -480,13 +483,13 @@ export async function rebuildPart(
             await progress.report(0.04 + (0.51 * (i + 1)) / axes, "stl.stage.axis{0}{1}", i + 2, axes);
             const next = await attempt(frame, false, axisStep(i + 1));
             if (next === undefined) continue;
-            // a sound body before an unsound one, then the closer
-            const rank = (x: NonNullable<typeof best>) => (x.error !== undefined ? 2 : x.sound ? 0 : 1);
-            if (
-                best === undefined ||
-                rank(next) < rank(best) ||
-                (rank(next) === rank(best) && next.error === undefined && next.ratio < best.ratio)
-            ) {
+            // the closer, a failed build last, and an unsound body (no corrections, no rounds can
+            // follow it) counted twice as far off: a sound 10 % loses to an unsound 1.8 %
+            // (extruder-motor-plate), a sound 1 % beats an unsound 0.8 % — whatever order the
+            // axes were built in, and whether time was left for all of them
+            const score = (x: NonNullable<typeof best>) =>
+                x.error !== undefined ? Number.POSITIVE_INFINITY : x.sound ? x.ratio : x.ratio * 2 + 0.005;
+            if (best === undefined || score(next) < score(best)) {
                 if (best !== undefined) discard(best.model);
                 best = next;
             } else {
@@ -765,14 +768,22 @@ export async function rebuildPart(
         const ts = Date.now();
         let surface = surfaceOf(model);
         REBUILD_DEBUG?.(`surface ${(surface * 100).toFixed(1)}%, ${Date.now() - ts} ms`);
-        // mesh pieces of a reference this big are booleans on thousands of faces each, which no
-        // budget can stop once begun (extruder-motor-plate ran past 15 min)
-        if (surface > 0.02 && referenceFaces > MAX_PIECES_FACES)
-            REBUILD_DEBUG?.(`pieces skipped: ${referenceFaces} faces`);
-        else if (surface > 0.02) {
+        if (surface > 0.02) {
             // on every axis tried: the axis features liked best need not be the one the pieces fit
             for (const [i, frame] of frames.slice(0, 3).entries()) {
                 if (surface <= 0.02 || !inTime()) break;
+                // a pieces build is the axis's build again plus booleans on the reference: started
+                // only with twice that build time (and half a minute) still left — a boolean cannot
+                // be stopped once begun (extruder-motor-plate ran past 15 min). An axis never built
+                // has no measure of its cost: on a big reference it is left out.
+                const cost = buildMs.get(frame);
+                const left = finishBy - Date.now();
+                if (cost === undefined ? referenceFaces > MAX_PIECES_FACES : left < 2 * cost + 30_000) {
+                    REBUILD_DEBUG?.(
+                        `pieces on axis ${frame.axis.map((x) => x.toFixed(2))} skipped: build ${cost ?? "?"} ms, ${left} ms left`,
+                    );
+                    continue;
+                }
                 progress.throwIfCancelled();
                 const from = 0.78 + (0.22 * i) / axes;
                 await progress.report(from, "stl.stage.pieces{0}{1}", i + 1, axes);
