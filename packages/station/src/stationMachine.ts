@@ -378,6 +378,88 @@ export class StationMachine {
         });
     }
 
+    // ---- the travel measured between the limit switches ----------------------------------------
+
+    /** A travel measurement under way (the screen shows its stage). */
+    measuring?: { axis: Axis; stage: string };
+
+    /**
+     * The travel of one axis between its two limit switches: home ($H — the machine zero at one
+     * switch, `pull-off` ($27) away from it), then a slow jog to the far end until the other switch
+     * trips (ALARM 1, hard limit); where it tripped is the far end. Then a reset, the lock lifted,
+     * soft limits put back, and home again. Needs hard limits on ($21=1) and both switches wired.
+     * Returns the far switch's machine position and the travel to set ($13x): from the home
+     * position to `pull-off` short of the far switch.
+     */
+    async measureTravel(
+        axis: Axis,
+        feed = 300,
+    ): Promise<{ trippedAt: number; pullOff: number; travel: number }> {
+        const grbl = this.grbl;
+        if (!grbl || grbl.jobActive || this.busy || this.measuring) throw new Error("Станок занят");
+        const i = "XYZ".indexOf(axis);
+        const soft = this.settings.get(20) === 1;
+        if (this.settings.get(21) !== 1)
+            throw new Error("Концевики выключены в контроллере ($21=0) — включите их");
+        if (this.settings.get(22) !== 1) throw new Error("Поиск нуля выключен в контроллере ($22=0)");
+        const pullOff = this.settings.get(27) ?? 1;
+        const guess = this.settings.get(130 + i) ?? 300;
+        const io = new StationProbeIO(grbl);
+        const stage = (text: string) => {
+            this.measuring = { axis, stage: text };
+            this.changed();
+        };
+        try {
+            stage("поиск нуля по упорам");
+            if (grbl.status.state === "Alarm") await io.send(["$X"]);
+            await io.send(["$H"]);
+            if (soft) await io.send(["$20=0"]); // a jog past the set travel would be refused
+            stage(`едет до дальнего концевика ${axis}`);
+            // far more than the travel: it stops at the switch (or, with none, at the end of the jog)
+            const distance = Math.round(guess * 1.5 + 50);
+            let tripped: number | undefined;
+            const off = grbl.on((e) => {
+                if (e.type === "alarm" && tripped === undefined)
+                    tripped = grbl.status.mpos?.[i] ?? Number.NaN;
+            });
+            grbl.send(`$J=G91 G21 ${axis}-${distance} F${Math.round(feed)}`);
+            try {
+                await this.waitFor(
+                    () => tripped !== undefined || (grbl.status.state === "Idle" && grbl.pending === 0),
+                    ((distance / feed) * 60 + 20) * 1000,
+                );
+            } finally {
+                off();
+            }
+            if (tripped === undefined)
+                throw new Error(`Концевик ${axis} не сработал за ${distance} мм — проверьте проводку`);
+            // the position the controller reported when the switch tripped (it stops at once)
+            await this.waitFor(() => grbl.status.state === "Alarm", 3000).catch(() => {});
+            const at = grbl.status.mpos?.[i] ?? tripped;
+            stage("сброс и снова поиск нуля");
+            void grbl.realtime(REALTIME.reset);
+            await this.waitFor(() => this.firmware !== undefined && grbl.status.state !== "Run", 5000).catch(
+                () => {},
+            );
+            await new Promise((r) => setTimeout(r, 1500));
+            await io.send(["$X"]);
+            if (soft) await io.send(["$20=1"]);
+            await io.send(["$H"]);
+            this.alarm = undefined;
+            const trippedAt = Math.round(at * 1000) / 1000;
+            const travel = Math.round((Math.abs(trippedAt) - pullOff) * 10) / 10;
+            return { trippedAt, pullOff, travel };
+        } finally {
+            this.measuring = undefined;
+            this.changed();
+        }
+    }
+
+    /** Sets an axis's travel in the controller ($130–$132). */
+    async setTravel(axis: Axis, travel: number): Promise<void> {
+        await this.sendLines([`$${130 + "XYZ".indexOf(axis)}=${travel.toFixed(1)}`, "$$"]);
+    }
+
     private waitForUser(): Promise<void> {
         return new Promise((resolve, reject) => (this.changeWait = { resolve, reject }));
     }

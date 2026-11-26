@@ -8,6 +8,7 @@ import { RotaryPanel } from "./rotaryPanel";
 import { scrollArrows, scrollerIn } from "./scrollArrows";
 import type { StationMachine } from "./stationMachine";
 import { ToolPanel } from "./toolPanel";
+import { TravelPanel } from "./travelPanel";
 import { type WifiApi, WifiPanel } from "./wifiPanel";
 
 export type Layout = "auto" | "portrait" | "landscape";
@@ -233,6 +234,15 @@ export class SettingsSheet {
             rotEl,
             () => rotPanel.show(),
             () => rotPanel.hide(),
+        );
+        const travelEl = h("div", "section");
+        const travelPanel = new TravelPanel(travelEl, machine, toast);
+        this.add(
+            "machine",
+            "Станок",
+            travelEl,
+            () => travelPanel.show(),
+            () => travelPanel.hide(),
         );
         const helpEl = h("div", "section");
         this.add("help", "Справка", helpEl, () => helpEl.replaceChildren(padHelp()));

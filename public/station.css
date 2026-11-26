@@ -1459,3 +1459,10 @@ body {
     top: calc(var(--u) * 8.4);
 }
 
+/* --- ⚙ Станок: travel by the limit switches --- */
+.travelRows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--u);
+}
+
