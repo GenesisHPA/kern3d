@@ -106,6 +106,7 @@ export class StationUi {
                 this.mapCanvas(),
                 this.viewSwitch(),
                 this.stockBox(),
+                this.ref("fromBox", h("div", { class: "stockBox fromBox" })),
                 this.probePanel.el,
                 this.ref("gline", h("div", { class: "gline" })),
                 this.emergencyButton(),
@@ -521,8 +522,102 @@ export class StationUi {
                 h("div", { class: "label" }, "Задание"),
                 this.ref("jobName", h("div", { class: "name" }, "—")),
                 this.ref("jobTimes", h("div", { class: "t" })),
+                this.jobTools(),
             ),
             gauge,
+        );
+    }
+
+    /** Under the job's name: «⬚ Обвести», «↦ С строки…», and «Продолжить с N» after a stop. */
+    private jobTools() {
+        const frame = h("button", { class: "jobBtn" }, "⬚ Обвести");
+        frame.onclick = () =>
+            this.machine
+                .frameJob()
+                .then(() => this.toast("Контур обведён на безопасной высоте"))
+                .catch((e) => this.toast(`⚠ ${e instanceof Error ? e.message : String(e)}`));
+        const from = h("button", { class: "jobBtn" }, "↦ С строки…");
+        from.onclick = () => this.openFrom();
+        const resume = this.ref("resumeBtn", h("button", { class: "jobBtn resume" }));
+        resume.onclick = () => {
+            const i = this.machine.interrupted;
+            if (i) this.openFrom(i.line);
+        };
+        return h("div", { class: "jobTools" }, frame, from, resume);
+    }
+
+    private fromLine = 0;
+
+    /** The «start from a line» chooser over the view, at `line` (0-based). */
+    private openFrom(line?: number) {
+        const job = this.machine.snapshot().job;
+        if (!job) {
+            this.toast("⚠ Нет задания");
+            return;
+        }
+        this.fromLine = Math.max(0, Math.min(job.lines.length - 1, line ?? this.machine.snapshot().doneLine));
+        this.renderFrom();
+        this.el["fromBox"].classList.add("show");
+    }
+
+    private renderFrom() {
+        const job = this.machine.snapshot().job;
+        const box = this.el["fromBox"];
+        if (!job) return box.classList.remove("show");
+        const n = this.fromLine;
+        const step = (d: number) => {
+            const b = h("button", {}, d > 0 ? `+${d}` : String(d));
+            b.onclick = () => {
+                this.fromLine = Math.max(0, Math.min(job.lines.length - 1, this.fromLine + d));
+                this.renderFrom();
+            };
+            return b;
+        };
+        const view = h("div", { class: "fromLines" });
+        for (let i = Math.max(0, n - 3); i <= Math.min(job.lines.length - 1, n + 3); i++)
+            view.append(h("div", { class: i === n ? "cur" : "old" }, `${i + 1}  ${job.lines[i]}`));
+        const tool = this.machine.toolAt(n);
+        const go = h("button", { class: "primary" }, `Запустить со строки ${n + 1}`);
+        const no = h("button", {}, "Отмена");
+        no.onclick = () => box.classList.remove("show");
+        go.onclick = () => {
+            if (!go.classList.contains("armed")) {
+                // a second press to be sure: a wrong line cuts where it must not
+                go.classList.add("armed");
+                go.textContent = "Точно? Нажмите ещё раз";
+                setTimeout(() => {
+                    go.classList.remove("armed");
+                    go.textContent = `Запустить со строки ${n + 1}`;
+                }, 4000);
+                return;
+            }
+            box.classList.remove("show");
+            if (!this.machine.startFrom(n))
+                this.toast(`⚠ ${this.machine.whyNotStart() ?? "Не удалось запустить с этой строки"}`);
+        };
+        box.replaceChildren(
+            h("div", { class: "changeTitle" }, "Запуск с выбранной строки"),
+            h(
+                "div",
+                { class: "stockRow" },
+                h("span", {}, "Строка"),
+                step(-100),
+                step(-10),
+                step(-1),
+                h("b", {}, String(n + 1)),
+                step(1),
+                step(10),
+                step(100),
+            ),
+            view,
+            h(
+                "p",
+                { class: "hint" },
+                `Станок восстановит режимы строк до неё (единицы, система координат, шпиндель, подача), ` +
+                    `подъедет над точкой начала на безопасной высоте и опустится на подаче врезания. ` +
+                    (tool ? `Нужна фреза T${tool.tool}${tool.name ? ` · ${tool.name}` : ""}.` : ""),
+            ),
+            h("div", { class: "changeBtns" }, go, no),
         );
     }
 
@@ -708,6 +803,12 @@ export class StationUi {
 
     private renderJob(s: StationSnapshot) {
         const job = s.job;
+        const i = this.machine.interrupted;
+        const active = s.jobState === "running" || s.jobState === "paused";
+        const resume = this.el["resumeBtn"];
+        resume.textContent = i ? `⟳ Продолжить со строки ${i.line + 1}` : "";
+        resume.classList.toggle("show", i !== undefined && i.jobId === job?.id && !active);
+        this.root.classList.toggle("jobActive", active);
         if (job?.id !== this.shownJobId) {
             this.shownJobId = job?.id;
             this.view.setPath(job?.path);

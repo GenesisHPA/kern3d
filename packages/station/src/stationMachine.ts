@@ -209,6 +209,10 @@ export class StationMachine {
     /** The machine has found its zero by the limit switches since it was switched on (or unlocked). */
     private homed = false;
     private sawHoming = false;
+    /** When a soft reset was asked for, until the welcome that answers it. */
+    private resetAt?: number;
+    /** When the job was last resumed (a Hold reported just after is the hold just lifted). */
+    private resumedAt = Number.NEGATIVE_INFINITY;
     private checkLock = false;
 
     constructor(
@@ -304,6 +308,7 @@ export class StationMachine {
         else if (e.type === "welcome") {
             this.alarm = undefined;
             this.firmware = e.version;
+            this.resetAt = undefined;
             this.grbl?.send("$$", true);
             // a reset with homing on locks the machine until $H: then its zero is lost
             this.checkLock = true;
@@ -320,8 +325,15 @@ export class StationMachine {
                 this.sawHoming = false;
                 this.homed = state !== "Alarm";
             }
-            // an M0 left in the program holds GRBL: show it as a pause, so «Старт» carries on
-            if (this.grbl?.jobState === "running" && e.status.state === "Hold" && !this.change)
+            // an M0 left in the program holds GRBL: show it as a pause, so «Старт» carries on. Not
+            // in the second after a resume: a report made before the «~» and read after it still
+            // says Hold, and taking it for an M0 paused the job again (found by the soak test)
+            if (
+                this.grbl?.jobState === "running" &&
+                e.status.state === "Hold" &&
+                !this.change &&
+                this.now() - this.resumedAt > 1000
+            )
                 this.grbl.pause();
             return this.changed();
         } else if (e.type === "job" && (e.state === "done" || e.state === "stopped" || e.state === "error"))
@@ -342,6 +354,11 @@ export class StationMachine {
         }
         // our own stop for an emergency change: the change carries on
         if (state !== "done" && this.change?.kind === "emergency" && this.change.stage === "moving") return;
+        // stopped or failed part way: remember the program line it got to, to carry on from
+        if (state !== "done" && run) {
+            const line = this.snapshot().doneLine;
+            this.interrupted = line >= 0 ? { jobId: run.job.id, name: run.job.name, line } : undefined;
+        } else if (state === "done") this.interrupted = undefined;
         if (state === "done" && this.current) {
             const i = this.jobs.findIndex((j) => j.id === this.current!.id);
             if (i >= 0) this.jobs.splice(i, 1);
@@ -643,10 +660,12 @@ export class StationMachine {
         const from = Math.max(run.from, found >= 0 ? found : Math.max(0, lo));
         this.change = { kind: "emergency", stage: "moving" };
         this.changed();
+        this.resetAt = this.now();
         grbl.stop();
         void (async () => {
             try {
                 await this.waitFor(() => grbl.jobState !== "stopping", 20000);
+                await this.waitFor(() => !this.restarting, 5000);
                 await this.waitFor(() => grbl.status.state === "Idle" || grbl.status.state === "Alarm", 8000);
                 await this.toolChange({ kind: "emergency", stage: "moving" }, from);
             } catch (e) {
@@ -754,6 +773,7 @@ export class StationMachine {
         if (grbl.jobState === "paused") return undefined;
         if (!this.current) return "Нет задания";
         if (this.change || grbl.jobActive) return "Станок занят";
+        if (this.restarting) return "Контроллер перезапускается после стопа — секунду";
         if (this.alarm !== undefined || grbl.status.state === "Alarm")
             return "Станок в тревоге — разблокируйте";
         const m = machineSettings(this.settings);
@@ -767,12 +787,86 @@ export class StationMachine {
         return undefined;
     }
 
+    /** A job stopped or failed part way: its id, name and the program line (0-based) it got to. */
+    interrupted?: { jobId: number; name: string; line: number };
+
+    /**
+     * Runs the selected job from program line `line` (0-based, of the job's lines): the state the
+     * lines before set up (units, distance mode, work system, spindle, coolant, feed) restored, the
+     * tool brought over that line's start point at a clear height and down at the plunge feed,
+     * then the rest — tool changes after it as usual. Which tool the part needs is the caller's
+     * to say (`toolAt`).
+     */
+    startFrom(line: number): boolean {
+        const grbl = this.grbl;
+        if (!grbl || grbl.jobActive || this.change || !this.current) return false;
+        if (this.whyNotStart() !== undefined) return false;
+        const program = jobProgram(this.current.lines);
+        const from = program.src.findIndex((s) => s >= line);
+        if (from < 0) return false;
+        this.run = { job: this.current, ...program, from: 0, end: 0, sentCode: [] };
+        const tool = this.toolAt(line);
+        if (tool) this.tool = tool;
+        this.started = this.now();
+        this.lastError = undefined;
+        if (!this.sendFrom(from)) {
+            this.run = undefined;
+            return false;
+        }
+        this.changed();
+        return true;
+    }
+
+    /** The tool the selected job has in the spindle at program line `line`. */
+    toolAt(line: number): ToolRef | undefined {
+        if (!this.current) return undefined;
+        const p = jobProgram(this.current.lines);
+        const code = p.src.findIndex((s) => s >= line);
+        const before = p.changes.filter((c) => code < 0 || c.at <= code);
+        const last = before.at(-1);
+        return last ? { tool: last.tool, name: last.name } : p.tools[0];
+    }
+
+    /**
+     * Traces the selected job's outline (its XY box) at the safe height, the spindle off: where on
+     * the stock it will cut. Refused when it would leave the travel.
+     */
+    async frameJob(feed = 1500): Promise<void> {
+        const grbl = this.grbl;
+        const job = this.current;
+        if (!grbl || !job) throw new Error("Нет задания");
+        if (grbl.jobActive || this.busy || this.measuring) throw new Error("Станок занят");
+        const why = this.whyNotStart();
+        if (why) throw new Error(why);
+        const [x0, y0] = job.path.min;
+        const [x1, y1] = job.path.max;
+        const f = (v: number) => (Math.round(v * 1000) / 1000).toString();
+        this.measuring = { axis: "Z", stage: "обвод контура" };
+        this.changed();
+        try {
+            await this.sendLines([
+                "G21 G90",
+                "M5",
+                `G53 G0 Z${f(this.probe.safeZ)}`,
+                `G0 X${f(x0)} Y${f(y0)}`,
+                `G1 X${f(x1)} F${Math.round(feed)}`,
+                `Y${f(y1)}`,
+                `X${f(x0)}`,
+                `Y${f(y0)}`,
+            ]);
+        } finally {
+            this.measuring = undefined;
+            this.changed();
+        }
+    }
+
     /** Runs the selected job, or resumes a paused one. Refused in alarm or without a job. */
     start(): boolean {
         const grbl = this.grbl;
         if (!grbl) return false;
         if (grbl.jobState === "paused") {
             grbl.resume();
+            this.resumedAt = this.now();
             return true;
         }
         if (this.change || grbl.jobActive) return false;
@@ -822,8 +916,16 @@ export class StationMachine {
             this.changed();
         }
         if (!this.grbl) return;
+        // a soft reset follows: until the controller's welcome nothing new may start — a late
+        // welcome flushes whatever was sent and fails a job just begun (found by the soak test)
+        this.resetAt = this.now();
         if (this.grbl.jobActive) this.grbl.stop();
         else void this.grbl.realtime(REALTIME.reset);
+    }
+
+    /** A reset sent and its welcome not back yet (at most 3 s: a controller that never says one). */
+    private get restarting(): boolean {
+        return this.resetAt !== undefined && this.now() - this.resetAt < 3000;
     }
 
     // ---- by hand -------------------------------------------------------------------------------

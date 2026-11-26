@@ -1544,3 +1544,53 @@ body {
     font-size: calc(var(--u) * 2.4);
 }
 
+/* --- the job's tools: frame, start from a line, carry on after a stop --- */
+.jobTools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--u) * 0.8);
+    margin-top: var(--u);
+}
+.jobBtn {
+    height: calc(var(--u) * 4.8);
+    padding: 0 calc(var(--u) * 1.4);
+    border-radius: calc(var(--u) * 1.2);
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: calc(var(--u) * 1.8);
+    font-weight: 700;
+}
+.screen.jobActive .jobBtn {
+    display: none;
+}
+.jobBtn.resume {
+    display: none;
+    border-color: var(--acc);
+    color: var(--acc2);
+}
+.screen:not(.jobActive) .jobBtn.resume.show {
+    display: block;
+}
+.fromBox {
+    min-width: 70%;
+}
+.fromLines {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: calc(var(--u) * 1.9);
+    background: var(--bg);
+    border-radius: calc(var(--u) * 1.2);
+    padding: var(--u) calc(var(--u) * 1.4);
+}
+.fromLines .old {
+    color: var(--dim);
+}
+.fromLines .cur {
+    color: var(--acc2);
+    font-weight: 800;
+}
+.fromBox .changeBtns button.armed {
+    background: var(--err);
+}
+
