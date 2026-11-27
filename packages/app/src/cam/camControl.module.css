@@ -615,6 +615,14 @@
     &:active {
         transform: translateY(1px) scale(0.97);
     }
+
+    /* switched off (the spindle with a drag knife): faded, no glow, no press */
+    &:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+    }
 }
 
 .go:hover {

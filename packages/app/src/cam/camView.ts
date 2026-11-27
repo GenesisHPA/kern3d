@@ -520,7 +520,11 @@ export class CamView {
         const prefix = kinds.map(() => new Uint32Array(n + 1));
         const color = new THREE.Color();
         let prev: MillMove | undefined;
-        this.moves.forEach(({ move, op }, i) => {
+        // a knife cuts only a slit, so its path in the material would be hidden under the top:
+        // drawn on the surface instead (the loops at the corners seen from above)
+        const top = this.stock().top + 0.04;
+        this.moves.forEach(({ move: raw, op, tool }, i) => {
+            const move = isKnife(tool) ? { ...raw, z: Math.max(raw.z, top) } : raw;
             const k = move.type === "rapid" ? 0 : move.type === "plunge" ? 1 : 2;
             if (prev) {
                 pos[k].push(prev.x, prev.y, prev.z, move.x, move.y, move.z);
@@ -699,7 +703,15 @@ export class CamView {
         const THREE = this.three!;
         const offset = knifeOf(tool).offset;
         const steel = new THREE.MeshStandardMaterial({ color: 0xe9ecef, metalness: 0.85, roughness: 0.25 });
-        const body = new THREE.MeshStandardMaterial({ color: 0x868e96, metalness: 0.7, roughness: 0.35 });
+        // the holder see-through: it is wide, and over a small part it would hide the cut
+        const body = new THREE.MeshStandardMaterial({
+            color: 0x868e96,
+            metalness: 0.7,
+            roughness: 0.35,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+        });
         // the blade: a thin plate, back edge up the axis, the edge sloping to the tip at x = −offset
         const shape = new THREE.Shape();
         const w = Math.max(0.5, offset + 0.4);
@@ -728,7 +740,7 @@ export class CamView {
         this.glow?.scale.set(0.6, 0.6, 1);
     }
 
-    /** The lines the knife's blade cuts (its tip, trailing the path): red, just above the top. */
+    /** The lines the knife's blade cuts (its tip, trailing the path): dark, just above the top. */
     private buildKnifeCuts(world: Three.Group, program: MillProgram, top: number) {
         const THREE = this.three!;
         const pos: number[] = [];
@@ -744,7 +756,7 @@ export class CamView {
         geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
         const lines = new THREE.LineSegments(
             geometry,
-            new THREE.LineBasicMaterial({ color: 0xff4d4f, transparent: true, opacity: 0.9 }),
+            new THREE.LineBasicMaterial({ color: 0x212529, transparent: true, opacity: 0.95 }),
         );
         lines.renderOrder = 3;
         world.add(lines);
