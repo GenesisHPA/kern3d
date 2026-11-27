@@ -47,7 +47,9 @@ async function broadcast(html) {
         const thread = state.threads?.[chatId];
         const extra = thread ? { message_thread_id: thread } : {};
         try {
-            await tg.sendMessage(chatId, html, extra);
+            const sent = await tg.sendMessage(chatId, html, extra);
+            // kept so a post can be corrected later (editMessageText needs its id)
+            if (sent?.message_id) state.lastPosts = { ...state.lastPosts, [chatId]: sent.message_id };
         } catch (error) {
             const migrated = error.parameters?.migrate_to_chat_id;
             if (migrated) {

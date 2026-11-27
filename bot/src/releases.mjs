@@ -9,6 +9,7 @@ export const LINKS = {
     online: "https://genesishpa.github.io/kern3d/",
     releases: `https://github.com/${REPO}/releases/latest`,
     issues: `https://github.com/${REPO}/issues`,
+    wiki: `https://github.com/${REPO}/wiki`,
 };
 const LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
 
@@ -31,6 +32,7 @@ export function linksHtml(releaseUrl = LINKS.releases) {
         `• <a href="${LINKS.linux}">Linux — Kern3D-x86_64.AppImage</a>`,
         `• <a href="${LINKS.online}">Онлайн-версия (без установки)</a>`,
         `• <a href="${escapeHtml(releaseUrl)}">Страница релиза</a>`,
+        `• <a href="${LINKS.wiki}">📖 Справка (вики): все функции, FAQ, указатель команд</a>`,
     ].join("\n");
 }
 

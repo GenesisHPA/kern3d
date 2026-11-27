@@ -53,7 +53,7 @@ describe("release post", () => {
         assert.match(html, /21\.11\.2026/);
         assert.match(html, /<b>Добавлено<\/b>\n• Новое/);
         assert.doesNotMatch(html, /Установка|Что нового в/);
-        for (const url of [LINKS.windows, LINKS.linux, LINKS.online]) assert.ok(html.includes(url));
+        for (const url of [LINKS.windows, LINKS.linux, LINKS.online, LINKS.wiki]) assert.ok(html.includes(url));
         assert.ok(html.includes("releases/tag/v0.9.7"));
     });
 
