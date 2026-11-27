@@ -17,6 +17,7 @@ import {
     outsideTravel,
     parseOffsetLine,
     runFromLine,
+    startsSpindle,
     timeLeft,
     withoutSpindle,
 } from "./camRun";
@@ -246,7 +247,15 @@ export class MachineControl {
 
     private send(...lines: string[]) {
         if (!this.grbl) return;
-        for (const l of lines) this.grbl.send(l);
+        const knife = this.host.knife();
+        for (const l of lines) {
+            // a knife's job: no command typed or pressed may start the spindle either
+            if (knife && startsSpindle(l)) {
+                this.addLog(`✂ ${t("cnc.knife.noSpindle")} ← ${l}`);
+                continue;
+            }
+            this.grbl.send(l);
+        }
     }
 
     private rt(byte: string) {
