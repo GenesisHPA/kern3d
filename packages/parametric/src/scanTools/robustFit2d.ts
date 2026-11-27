@@ -267,7 +267,7 @@ function crossing(a: P2, b: P2, c: P2, d: P2): P2 | undefined {
 /** The pieces as curves with shared ends (see the module comment). */
 function joinPieces(pieces: readonly Piece[]): Curve2D[] {
     const n = pieces.length;
-    const lines = pieces.map((p) => (p.kind === "line" ? lineFit(p.points) : undefined));
+    const lines = pieces.map((p) => (p.kind === "line" ? snapToAxis(lineFit(p.points)) : undefined));
     // joint i: between piece i-1 and piece i
     const joints: P2[] = pieces.map((p, i) => {
         const prev = (i - 1 + n) % n;
@@ -295,6 +295,31 @@ function joinPieces(pieces: readonly Piece[]): Curve2D[] {
         curves.push(arcThrough(a, b, piece));
     }
     return curves.filter((c) => dist(c.a, c.b) > 1e-9);
+}
+
+/** Within this of the sketch's x or y a wall is taken as square to it: the sketch marks it H or V. */
+const AXIS_SNAP = Math.sin((0.5 * Math.PI) / 180);
+
+/** A fitted line turned about its middle onto the sketch's x or y when it is that close to it. */
+function snapToAxis<T extends { a: P2; b: P2 }>(line: T): T {
+    const dx = line.b[0] - line.a[0];
+    const dy = line.b[1] - line.a[1];
+    const l = Math.hypot(dx, dy);
+    if (l === 0) return line;
+    const mid: P2 = [(line.a[0] + line.b[0]) / 2, (line.a[1] + line.b[1]) / 2];
+    if (Math.abs(dy) / l < AXIS_SNAP)
+        return {
+            ...line,
+            a: [mid[0] - (Math.sign(dx) * l) / 2, mid[1]],
+            b: [mid[0] + (Math.sign(dx) * l) / 2, mid[1]],
+        };
+    if (Math.abs(dx) / l < AXIS_SNAP)
+        return {
+            ...line,
+            a: [mid[0], mid[1] - (Math.sign(dy) * l) / 2],
+            b: [mid[0], mid[1] + (Math.sign(dy) * l) / 2],
+        };
+    return line;
 }
 
 function closestOn(line: { a: P2; b: P2 }, p: P2): P2 {

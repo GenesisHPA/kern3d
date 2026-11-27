@@ -156,6 +156,11 @@ describe("sectionProfiles on a noisy scan", () => {
         const square = result.profiles.find((p) => p.kind === "chain");
         expect(circle!.kind === "circle" && circle!.r).toBeCloseTo(6, 0);
         expect(kinds(square!)).toBe("line,line,line,line");
+        // the walls are exactly square to the sketch axes, so the sketch marks them H / V
+        if (square!.kind !== "chain") return;
+        for (const c of square!.curves) {
+            expect(Math.min(Math.abs(c.a[0] - c.b[0]), Math.abs(c.a[1] - c.b[1]))).toBeLessThan(1e-9);
+        }
     });
 });
 
