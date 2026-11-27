@@ -29,6 +29,7 @@ import "./removeFeatureCommand";
 import "./reselectCommand";
 import "./revolveCommand";
 import "./ribCommand";
+import "./scanSectionCommand";
 import "./sewCommand";
 import "./shellCommand";
 import "./splitCommand";

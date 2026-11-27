@@ -2094,6 +2094,20 @@ export const I18N_KEYS = [
     "laser.machine.connectFirst",
     "laser.machine.alertToast",
     "laser.jobs",
+    "settings.scan.title",
+    "settings.scan.sectionSketch",
+    "settings.scan.deviationMap",
+    "settings.scan.fitRegion",
+    "settings.scan.prepare",
+    "toast.command.disabled",
+    "ribbon.group.scan",
+    "command.scan.sectionSketch",
+    "scan.section.offset",
+    "scan.section.sketchName{0}",
+    "prompt.select.scanMesh",
+    "toast.scan.section.empty",
+    "toast.scan.section.unfitted",
+    "toast.scan.section{0}{1}{2}",
 ] as const;
 
 export type I18nKeys = (typeof I18N_KEYS)[number];

@@ -167,7 +167,16 @@ export class MainWindow extends HTMLElement implements IWindow {
             I18n.changeLanguage(Config.instance.language);
         }
 
-        const shouldSaveProps: (keyof Config)[] = ["themeMode", "language", "navigation3D", "orbitMode"];
+        const shouldSaveProps: (keyof Config)[] = [
+            "themeMode",
+            "language",
+            "navigation3D",
+            "orbitMode",
+            "scanSectionSketch",
+            "scanDeviationMap",
+            "scanFitRegion",
+            "scanPrepare",
+        ];
         if (shouldSaveProps.includes(prop)) {
             Config.instance.saveToStorage();
         }

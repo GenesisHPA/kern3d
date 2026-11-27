@@ -51,9 +51,13 @@ export function createDropdownItem(
     const data = getItemData(item);
     const icon = data.icon ? createIcon(data.icon) : div();
     icon.classList.add(classes.icon);
+    // built anew on every open, so a command switched off in the settings is just left out
+    const enabled =
+        data.command === undefined || CommandStore.getComandData(data.command)?.isEnabled?.() !== false;
     return div(
         {
             className: classes.item,
+            ...(enabled ? {} : { style: { display: "none" } }),
             onclick: (e) => {
                 e.stopPropagation();
                 PubSub.default.pub("executeCommand", data.command);

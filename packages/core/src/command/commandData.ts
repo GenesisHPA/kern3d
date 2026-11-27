@@ -34,4 +34,10 @@ export interface CommandData {
      * committed yet. That is the deliberate trade for never refusing a save.
      */
     alwaysAvailable?: boolean;
+    /**
+     * A command a setting can switch off (a `Config` flag): false hides its ribbon buttons
+     * (they watch `Config` and come back when it turns on) and refuses it in the command
+     * service, so nothing of it runs. Undefined is always on.
+     */
+    isEnabled?: () => boolean;
 }

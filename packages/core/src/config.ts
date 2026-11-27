@@ -184,6 +184,43 @@ export class Config extends Observable {
         this.setProperty("trustedDomains", value);
     }
 
+    /**
+     * The scan-to-CAD tools (mesh section → sketch, deviation map, fit region, scan clean-up),
+     * each switchable in the home screen's settings. Off hides the tool's ribbon buttons and
+     * refuses its command (see `CommandData.isEnabled`); nothing of it runs.
+     */
+    @serialize()
+    get scanSectionSketch(): boolean {
+        return this.getPrivateValue("scanSectionSketch", true);
+    }
+    set scanSectionSketch(value: boolean) {
+        this.setProperty("scanSectionSketch", value);
+    }
+
+    @serialize()
+    get scanDeviationMap(): boolean {
+        return this.getPrivateValue("scanDeviationMap", true);
+    }
+    set scanDeviationMap(value: boolean) {
+        this.setProperty("scanDeviationMap", value);
+    }
+
+    @serialize()
+    get scanFitRegion(): boolean {
+        return this.getPrivateValue("scanFitRegion", true);
+    }
+    set scanFitRegion(value: boolean) {
+        this.setProperty("scanFitRegion", value);
+    }
+
+    @serialize()
+    get scanPrepare(): boolean {
+        return this.getPrivateValue("scanPrepare", true);
+    }
+    set scanPrepare(value: boolean) {
+        this.setProperty("scanPrepare", value);
+    }
+
     #storageKey: string = "config";
     get storageKey() {
         return this.#storageKey;

@@ -45,17 +45,35 @@ export class RibbonPushButton extends HTMLElement {
             Logger.warn(`commandData of ${commandName} is undefined`);
             return undefined;
         }
-        if (data.toggle) {
-            return new RibbonToggleButton(data, size);
-        }
+        const button = data.toggle
+            ? new RibbonToggleButton(data, size)
+            : new RibbonPushButton(data.key, data.icon, size, () => {
+                  PubSub.default.pub("executeCommand", commandName);
+              });
+        if (data.isEnabled) button.gate(data.isEnabled);
+        return button;
+    }
 
-        return new RibbonPushButton(data.key, data.icon, size, () => {
-            PubSub.default.pub("executeCommand", commandName);
-        });
+    #gate?: () => boolean;
+    readonly #onConfigChanged = () => this.applyGate();
+
+    /**
+     * Hides the button while a setting has its command switched off (`CommandData.isEnabled`),
+     * and shows it again when the setting turns it on.
+     */
+    gate(isEnabled: () => boolean): void {
+        this.#gate = isEnabled;
+        this.applyGate();
+        Config.instance.onPropertyChanged(this.#onConfigChanged);
+    }
+
+    private applyGate() {
+        if (this.#gate !== undefined) this.style.display = this.#gate() ? "" : "none";
     }
 
     dispose(): void {
         this.removeEventListener("click", this.onClick);
+        if (this.#gate !== undefined) Config.instance.removePropertyChanged(this.#onConfigChanged);
     }
 
     private initHTML(display: I18nKeys, icon: CommandIcon, size: ButtonSize) {

@@ -133,7 +133,7 @@ export class CommandToolbox {
 
     private entries(): ToolboxEntry[] {
         return CommandStore.getAllCommands()
-            .filter((data) => !HIDDEN.has(data.key))
+            .filter((data) => !HIDDEN.has(data.key) && (data.isEnabled?.() ?? true))
             .map((data) => ({ data, name: I18n.translate(`command.${data.key}`) }));
     }
 

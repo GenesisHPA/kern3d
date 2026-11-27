@@ -45,6 +45,12 @@ export class CommandStore {
         return prototype.data;
     }
 
+    /** Whether a command is switched on (`CommandData.isEnabled`); an unknown one is not. */
+    static isEnabled(name: string): boolean {
+        const data = CommandStore.getComandData(name);
+        return data !== undefined && (data.isEnabled?.() ?? true);
+    }
+
     static getCommand(name: string): CommandConstructor | undefined {
         return commandRegistry.get(name);
     }

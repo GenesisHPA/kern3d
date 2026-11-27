@@ -19,6 +19,7 @@ import { type ChangelogRelease, parseChangelog } from "./changelog";
 import style from "./home.module.css";
 import { LanguageSelector } from "./languageSelector";
 import { problemReportUrl, watchErrors } from "./problemReport";
+import { ScanToolsSettings } from "./scanToolsSettings";
 import { ThemeSelector } from "./themeSelector";
 
 watchErrors();
@@ -148,6 +149,11 @@ export class Home extends HTMLElement {
                 }),
                 div({ className: style.settingControl }, ThemeSelector({})),
             ),
+            ScanToolsSettings({
+                group: `${style.settingItem} ${style.settingGroup}`,
+                title: style.settingLabel,
+                row: style.settingCheck,
+            }),
         );
     }
 

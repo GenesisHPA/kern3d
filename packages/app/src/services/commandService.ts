@@ -130,6 +130,11 @@ export class CommandService implements IService {
 
     private async checking(commandName: CommandKeys) {
         const commandData = CommandStore.getComandData(commandName);
+        // switched off in the settings: a hotkey or a pinned button must not run it either
+        if (commandData?.isEnabled?.() === false) {
+            PubSub.default.pub("showToast", "toast.command.disabled");
+            return false;
+        }
         if (!commandData?.isApplicationCommand && this.app.activeView === undefined) {
             Logger.error("No active document");
             return false;

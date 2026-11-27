@@ -193,6 +193,7 @@ describe("ParametricRibbonProfiles", () => {
         expect(tab.groups.map((g) => g.groupName)).toEqual([
             "ribbon.group.create",
             "ribbon.group.modify",
+            "ribbon.group.scan",
             "ribbon.group.assemble",
             "ribbon.group.construct",
             "ribbon.group.inspect",
