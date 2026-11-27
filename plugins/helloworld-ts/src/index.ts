@@ -44,6 +44,14 @@ const DemoPlugin: Plugin = {
                 "demo.hello.message": "你好，这是一个演示插件！",
             },
         } as any,
+        {
+            language: "ru",
+            display: "Русский",
+            translation: {
+                "command.demo.hello": "TS-плагин",
+                "demo.hello.message": "Привет! Это демонстрационный плагин.",
+            },
+        } as any,
     ],
 };
 

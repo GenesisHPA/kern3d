@@ -52,6 +52,14 @@ const DemoPlugin = {
                 "demo.hello.message": "你好，这是一个演示插件！",
             },
         },
+        {
+            language: "ru",
+            display: "Русский",
+            translation: {
+                "command.jsdemo.hello": "JS-плагин",
+                "demo.hello.message": "Привет! Это демонстрационный плагин.",
+            },
+        },
     ],
 };
 

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type I18nKeys, type IApplication, PubSub } from "@chili3d/core";
+import { I18n, type I18nKeys, type IApplication, PubSub } from "@chili3d/core";
 
 export async function runMacro(app: IApplication, code: string) {
     if (!code.trim()) {
@@ -16,6 +16,6 @@ export async function runMacro(app: IApplication, code: string) {
         })
         .catch((error: Error) => {
             console.error("Macro execution error:", error);
-            alert(`macro.editor.error: ${(error as Error).message}`);
+            alert(`${I18n.translate("macro.editor.error" as I18nKeys)}${(error as Error).message}`);
         });
 }
