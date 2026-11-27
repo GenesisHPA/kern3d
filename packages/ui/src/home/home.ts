@@ -25,9 +25,9 @@ import { ThemeSelector } from "./themeSelector";
 watchErrors();
 
 /** The users' group: questions, testing, release news. */
-/** Where is what: the Russian FAQ in the repository. */
-const FAQ = "https://github.com/GenesisHPA/kern3d/blob/main/docs/FAQ.md";
-const GUIDE = "https://github.com/GenesisHPA/kern3d/blob/main/docs/guide/README.md";
+/** Where is what: the Russian manual and FAQ, published to the project wiki from docs/. */
+const FAQ = "https://github.com/GenesisHPA/kern3d/wiki/FAQ";
+const GUIDE = "https://github.com/GenesisHPA/kern3d/wiki";
 const TELEGRAM_GROUP = "https://t.me/HPA_AirSoft_System_Development/71332";
 
 interface ApplicationCommand {
