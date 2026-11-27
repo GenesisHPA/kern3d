@@ -10,7 +10,8 @@ import {
     ShapeNode,
     VisualNode,
 } from "@chili3d/core";
-import { type TriMesh, weldTriangles } from "../stlRebuild/mesh";
+import { weldSoup } from "../scanTools/scanPrep";
+import type { TriMesh } from "../stlRebuild/mesh";
 import { sourceTriangles } from "../stlRebuild/sourceMesh";
 import { trianglesOf } from "../stlRebuild/verify";
 
@@ -60,9 +61,9 @@ function isIdentity(m: Matrix4): boolean {
     return a.every((v, i) => Math.abs(v - (i % 5 === 0 ? 1 : 0)) < 1e-12);
 }
 
-/** The node's welded mesh in world coordinates (see `worldTriangles`). */
+/** The node's welded mesh in world coordinates (see `worldTriangles`; a numeric weld: scans are big). */
 export function worldMesh(node: MeshNode | ShapeNode): TriMesh {
-    return weldTriangles(worldTriangles(node));
+    return weldSoup(worldTriangles(node));
 }
 
 /**

@@ -2136,6 +2136,14 @@ export const I18N_KEYS = [
     "scan.fit.holeSketch{0}",
     "scan.fit.bossSketch{0}",
     "scan.fit.bossBody{0}",
+    "command.scan.prepare",
+    "scan.prepare.name{0}",
+    "scan.prepare.info{0}",
+    "scan.prepare.target",
+    "scan.prepare.smoothing",
+    "scan.prepare.holes",
+    "toast.scan.prepare.running",
+    "toast.scan.prepare{0}{1}{2}{3}{4}{5}",
 ] as const;
 
 export type I18nKeys = (typeof I18N_KEYS)[number];

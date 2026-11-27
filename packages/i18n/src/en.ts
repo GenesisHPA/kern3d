@@ -2272,5 +2272,15 @@ export default {
         "scan.fit.holeSketch{0}": "Hole Ø{0}",
         "scan.fit.bossSketch{0}": "Boss Ø{0} sketch",
         "scan.fit.bossBody{0}": "Boss Ø{0}",
+        "command.scan.prepare": "Scan Clean-up",
+        "scan.prepare.name{0}": "{0} (cleaned)",
+        "scan.prepare.info{0}":
+            "The mesh has {0} triangles. Holes are filled and the noise smoothed first, then the mesh is decimated.",
+        "scan.prepare.target": "Target triangles (0 — keep)",
+        "scan.prepare.smoothing": "Smoothing passes (0 — none)",
+        "scan.prepare.holes": "Fill holes up to, edges (0 — none)",
+        "toast.scan.prepare.running": "Cleaning up the scan…",
+        "toast.scan.prepare{0}{1}{2}{3}{4}{5}":
+            "Scan cleaned: triangles {0} → {1}, holes filled {2} (left {3}), noise {4} → {5} mm",
     },
 } satisfies Locale;

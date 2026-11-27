@@ -31,6 +31,7 @@ import "./revolveCommand";
 import "./ribCommand";
 import "./scanDeviationCommand";
 import "./scanFitRegionCommand";
+import "./scanPrepareCommand";
 import "./scanSectionCommand";
 import "./sewCommand";
 import "./shellCommand";

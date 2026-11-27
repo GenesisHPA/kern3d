@@ -30,7 +30,7 @@ import {
     signedDistances,
 } from "../scanTools/deviation";
 import { estimateNoise } from "../scanTools/noise";
-import { weldTriangles } from "../stlRebuild/mesh";
+import { weldSoup } from "../scanTools/scanPrep";
 import { sourceTriangles } from "../stlRebuild/sourceMesh";
 import { isMeshSource, worldTriangles } from "./scanCommon";
 
@@ -168,7 +168,7 @@ export function computeDeviationMap(
     const display = refineForDisplay(body, Math.max(size / 120, 1e-3));
     const grid = new ClosestPointGrid(reference);
     const d = signedDistances(display.position, grid);
-    const noise = reference.length / 9 <= 2_000_000 ? estimateNoise(weldTriangles(reference)) : 0;
+    const noise = reference.length / 9 <= 2_000_000 ? estimateNoise(weldSoup(reference)) : 0;
     const tol = Math.max(MIN_TOLERANCE, 3 * noise);
     const range = deviationRange(d, tol);
     return { display, colors: deviationColors(d, tol, range), stats: deviationStats(d, tol), tol, range };

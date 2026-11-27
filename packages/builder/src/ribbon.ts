@@ -219,7 +219,7 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
             {
                 // the scan-to-CAD tools; each is switched in the settings (hidden when off)
                 groupName: "ribbon.group.scan",
-                items: ["scan.sectionSketch", "scan.deviationMap", "scan.fitRegion"],
+                items: ["scan.prepare", "scan.sectionSketch", "scan.fitRegion", "scan.deviationMap"],
             },
             {
                 groupName: "ribbon.group.assemble",

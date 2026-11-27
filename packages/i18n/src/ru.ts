@@ -2110,5 +2110,15 @@ export default {
         "scan.fit.holeSketch{0}": "Отверстие Ø{0}",
         "scan.fit.bossSketch{0}": "Эскиз бобышки Ø{0}",
         "scan.fit.bossBody{0}": "Бобышка Ø{0}",
+        "command.scan.prepare": "Подготовка скана",
+        "scan.prepare.name{0}": "{0} (подготовлен)",
+        "scan.prepare.info{0}":
+            "В сетке {0} треугольников. Сначала заделываются дыры и сглаживается шум, затем сетка упрощается.",
+        "scan.prepare.target": "Целевое число треугольников (0 — не менять)",
+        "scan.prepare.smoothing": "Проходов сглаживания (0 — без)",
+        "scan.prepare.holes": "Заделывать дыры до, рёбер (0 — нет)",
+        "toast.scan.prepare.running": "Подготовка скана…",
+        "toast.scan.prepare{0}{1}{2}{3}{4}{5}":
+            "Скан подготовлен: треугольников {0} → {1}, дыр заделано {2} (осталось {3}), шум {4} → {5} мм",
     },
 } satisfies Locale;
