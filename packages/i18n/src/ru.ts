@@ -610,6 +610,7 @@ export default {
         "fileMenu.import.hint": "STL, STEP, IGES, BREP — открыть модель из другой программы",
         "fileMenu.export.hint": "STL для печати, STEP/IGES/BREP для CAD",
         "home.faq": "FAQ: где что находится",
+        "home.guide": "Справка",
         "home.community": "Вопросы, тесты и новости —",
         "home.report": "Сообщить о проблеме",
         "home.report.hint":

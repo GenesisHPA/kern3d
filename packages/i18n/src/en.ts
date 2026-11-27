@@ -696,6 +696,7 @@ export default {
         "fileMenu.import.hint": "STL, STEP, IGES, BREP — bring in a model from another program",
         "fileMenu.export.hint": "STL for printing, STEP/IGES/BREP for CAD",
         "home.faq": "FAQ: where is what",
+        "home.guide": "Guides",
         "home.community": "Questions, testing and news —",
         "home.report": "Report a problem",
         "home.report.hint":

@@ -27,6 +27,7 @@ watchErrors();
 /** The users' group: questions, testing, release news. */
 /** Where is what: the Russian FAQ in the repository. */
 const FAQ = "https://github.com/GenesisHPA/kern3d/blob/main/docs/FAQ.md";
+const GUIDE = "https://github.com/GenesisHPA/kern3d/blob/main/docs/guide/README.md";
 const TELEGRAM_GROUP = "https://t.me/HPA_AirSoft_System_Development/71332";
 
 interface ApplicationCommand {
@@ -192,6 +193,13 @@ export class Home extends HTMLElement {
                         target: "_blank",
                         rel: "noopener",
                         textContent: new Localize("home.faq"),
+                    }),
+                    span({ textContent: "·" }),
+                    a({
+                        href: GUIDE,
+                        target: "_blank",
+                        rel: "noopener",
+                        textContent: new Localize("home.guide"),
                     }),
                     span({ textContent: "·" }),
                     a({

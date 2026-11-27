@@ -11,6 +11,7 @@
   <a href="https://genesishpa.github.io/kern3d/"><strong>Открыть онлайн-версию</strong></a> ·
   <a href="https://genesistactical.net/kern3d/">Страница проекта</a> ·
   <a href="./docs/FAQ.md"><strong>FAQ: где что находится</strong></a> ·
+  <a href="./docs/guide/README.md"><strong>Справка</strong></a> ·
   <a href="https://t.me/HPA_AirSoft_System_Development/71332">Группа в Telegram</a>
 </p>
 

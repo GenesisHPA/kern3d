@@ -659,6 +659,7 @@ export const I18N_KEYS = [
     "fileMenu.import.hint",
     "fileMenu.export.hint",
     "home.faq",
+    "home.guide",
     "home.community",
     "home.community.telegram",
     "home.report",
