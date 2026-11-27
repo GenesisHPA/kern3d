@@ -114,6 +114,10 @@ export class Editor extends HTMLElement {
             },
         });
         toggle.textContent = "☰";
+        // nothing to slide in without a document; on the home screen it would sit over its buttons
+        const showFor = (view: unknown) => (toggle.style.visibility = view === undefined ? "hidden" : "");
+        showFor(this.app.activeView);
+        PubSub.default.sub("activeViewChanged", showFor);
         return toggle;
     }
 
