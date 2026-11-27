@@ -8,7 +8,7 @@ import { meshSectionLoops, sectionProfiles } from "../../src/scanTools/sectionSk
 import { type Profile2D, profileArea } from "../../src/stlRebuild/fit2d";
 import { meshVolume, weldTriangles } from "../../src/stlRebuild/mesh";
 import type { Loop2D } from "../../src/stlRebuild/slices";
-import { gaussian, plateWithHole, seeded, withNoise } from "./meshes";
+import { gaussian, plateWithHole, seeded, withHole, withNoise } from "./meshes";
 
 const plate = () => weldTriangles(plateWithHole(40, 10, 6, 64, 4, 4));
 const denseNoisy = (sigma: number) =>
@@ -156,5 +156,30 @@ describe("sectionProfiles on a noisy scan", () => {
         const square = result.profiles.find((p) => p.kind === "chain");
         expect(circle!.kind === "circle" && circle!.r).toBeCloseTo(6, 0);
         expect(kinds(square!)).toBe("line,line,line,line");
+    });
+});
+
+describe("a section through a scan with holes", () => {
+    test("a hole in the outer wall and one in the bore, both cut by the plane: still the square and the circle", () => {
+        const holed = withHole(
+            withHole(weldTriangles(plateWithHole(40, 10, 6, 128, 12, 12)), [20, 3, 5], 1.2),
+            [-6, 0, 5],
+            0.8,
+        );
+        const loops = meshSectionLoops(holed, XY);
+        expect(loops.length).toBe(2);
+        const result = sectionProfiles(holed, XY);
+        const circle = result.profiles.find((p) => p.kind === "circle");
+        const square = result.profiles.find((p) => p.kind === "chain");
+        expect(circle!.kind === "circle" && circle!.r).toBeCloseTo(6, 1);
+        expect(kinds(square!)).toBe("line,line,line,line");
+        expect(Math.abs(profileArea(square!))).toBeCloseTo(1600, 0);
+    });
+
+    test("a gap wider than 5% of the part is not bridged", () => {
+        const holed = withHole(weldTriangles(plateWithHole(40, 10, 6, 128, 12, 12)), [20, 3, 5], 4);
+        const loops = meshSectionLoops(holed, XY);
+        // the outer square is open by 8 mm (> 5% of 57 mm): only the bore closes
+        expect(loops.length).toBe(1);
     });
 });
