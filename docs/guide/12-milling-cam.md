@@ -78,7 +78,7 @@
 
 ## 3. Окно редактора фрезеровки
 
-<!-- SHOT 12-editor-overview: the milling editor with a profile operation and the finished part in the 3D view; runCommand "create.box" (any box, e.g. 60×40×10), then runCommand "mill.new"; in the left panel «Операции» click «Из модели», then «Контур», then the top-bar «⏭ Результат»; view «Изо» -->
+![Редактор фрезеровки: операция «Контур» и результат в 3D](images/12-editor-overview.png)
 
 **Верхняя строка** (слева направо):
 
@@ -180,7 +180,7 @@
 - **Отключить** / **Включить** — отключённая операция остаётся в списке с пометкой «(откл.)», но не попадает в G-code и в симуляцию;
 - **Удалить** — убрать операцию.
 
-<!-- SHOT 12-op-profile-card: the open card of a «Контур» operation (fields Название, Инструмент, Контур, Глубина, Сторона, Попутное фрезерование, Врезание наклоном, Припуск, Перемычки, Режимы резания); state of 12-editor-overview, click the operation line «1. Контур» if the card is collapsed -->
+![Карточка операции «Контур»](images/12-op-profile-card.png)
 
 ### 7.2. Общие поля и режимы резания
 
@@ -334,7 +334,7 @@ V-резьба делается за один проход по глубине. 
 
 ## 8. Инструменты (библиотека фрез)
 
-<!-- SHOT 12-tools-panel: the «Инструменты» tab of the milling editor with the tool profile pictures and fields of T1; runCommand "mill.new", click the left-panel tab «Инструменты» -->
+![Вкладка «Инструменты»](images/12-tools-panel.png)
 
 **Где:** вкладка **«Инструменты»**.
 
@@ -382,7 +382,7 @@ V-резьба делается за один проход по глубине. 
 
 ## 9. Станок: контроллер, смена инструмента, высоты
 
-<!-- SHOT 12-machine-panel: the «Станок» tab: Заготовка fields, «Открыть пульт станка», Контроллер (постпроцессор), Смена инструмента, Обдув / СОЖ, heights; runCommand "mill.new", click the left-panel tab «Станок» -->
+![Вкладка «Станок»](images/12-machine-panel.png)
 
 **Где:** вкладка **«Станок»**. Сверху — «Заготовка» ([раздел 5](#5-заготовка-и-ноль-детали-рабочий-ноль)), затем «Станок по USB (GRBL)» с кнопкой **«Открыть пульт станка»** (то же, что «🕹 Пульт станка»), затем раздел «Станок»:
 
@@ -424,7 +424,7 @@ V-резьба делается за один проход по глубине. 
 
 ## 11. Симуляция фрезеровки
 
-<!-- SHOT 12-simulation: the 3D stage halfway through the simulation: stock partly cut, the cutter, the paths (rapids dashed red), the readout X Y Z / tool / operation at bottom-left, the timeline; state of 12-editor-overview, click «⏮ Сначала», then «▶ Симуляция», wait ~3 s, click «⏸» -->
+![Симуляция на паузе: фреза, траектория, показания внизу слева](images/12-simulation.png)
 
 Справа в редакторе показана заготовка, которую «съедает» фреза. Это карта высот с шагом около 0,25 мм, окрашенная по глубине. Форма кончика (плоская, сферическая, с радиусом, V) учитывается.
 
@@ -488,7 +488,7 @@ V-резьба делается за один проход по глубине. 
 
 ## 13. Пульт станка: подключение по USB и по сети
 
-<!-- SHOT 12-control-panel: the machine control panel (not connected, veil «Станок не подключён…»): header with «🔌 Подключить станок», address field, «🖧 По сети», cards Положение, Ручное перемещение, Шпиндель и охлаждение, Программа, tabs G-code / Команды (MDI) / Щуп и датчик / Смещения / Настройки GRBL; runCommand "mill.new", click «🕹 Пульт станка» in the top bar -->
+![Пульт станка без подключения](images/12-control-panel.png)
 
 Пульт управляет станком на **GRBL 1.1 или grblHAL** прямо из Kern3D: положение, ноль, ручное перемещение, шпиндель, запуск программы, щуп. Он устроен по образцу экранов LinuxCNC.
 
