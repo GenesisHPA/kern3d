@@ -3,7 +3,7 @@
 
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
 import type { BtApi } from "./btPanel";
-import { grblErrorText } from "./grblText";
+import { grblAlarmText, grblErrorText } from "./grblText";
 import { MapView, type Stock, savedStock, saveStock } from "./machineMap";
 import { padEnabled, setPadEnabled } from "./padMap";
 import { ProbePanel } from "./probePanel";
@@ -781,10 +781,12 @@ export class StationUi {
             s.connected && s.machine.homing && !s.homed && s.status.state !== "Home",
         );
         const alarmed = s.alarm !== undefined || state === "Alarm";
-        this.root.classList.toggle("alarmed", alarmed);
+        this.root.classList.toggle("alarmed", alarmed || state === "Door");
         this.el["msg"].textContent = alarmed
-            ? `⚠ Тревога${s.alarm !== undefined ? ` ${s.alarm}` : ""}. Устраните причину и удерживайте «Разблокировать».`
-            : "";
+            ? `⚠ Тревога${s.alarm !== undefined ? ` ${s.alarm}` : ""}: ${grblAlarmText(s.alarm)}. Удерживайте «Разблокировать».`
+            : s.status.state === "Door"
+              ? "⚠ Открыта дверь или нажат аварийный стоп — закройте / отожмите, затем «Старт»."
+              : "";
         this.el["startText"].textContent = alarmed
             ? "🔓 Разблокировать"
             : s.jobState === "paused"

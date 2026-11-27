@@ -19,7 +19,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** A small seeded random generator (mulberry32), so a failure can be replayed. */
 /** SOAK_SEED shifts every seed: the long runs try new programs each round. */
 const SHIFT = Number(
-    (globalThis as { process?: { env?: Record<string, string> } }).process?.env?.SOAK_SEED ?? 0,
+    (globalThis as { process?: { env?: Record<string, string> } }).process?.env?.["SOAK_SEED"] ?? 0,
 );
 
 function rng(seed: number) {
@@ -180,7 +180,7 @@ describe("soak: random programs through the station", () => {
             machine.addJob(`p${seed}`, text, "file");
             expect(machine.start()).toBe(true);
             await until(() => machine.snapshot().queue.length === 0);
-            const code = jobProgram(programLines(text)).code;
+            const code = jobProgram(programLines(text)).code.map((l) => machine.withSpinUp(l));
             if (received.join("|") !== code.join("|"))
                 throw new Error(
                     `seed ${seed}: got ${received.slice(0, 4).join(" ")} … (${received.length}) want ${code.slice(0, 4).join(" ")} … (${code.length}); ${debugModel()}`,
@@ -209,7 +209,7 @@ describe("soak: random programs through the station", () => {
                 expect(machine.start()).toBe(true); // «Старт» on a paused job resumes it
             }
             await until(() => machine.snapshot().queue.length === 0);
-            expect(received).toEqual(jobProgram(programLines(text)).code);
+            expect(received).toEqual(jobProgram(programLines(text)).code.map((l) => machine.withSpinUp(l)));
             await machine.disconnect();
         }
     }, 120_000);
@@ -255,7 +255,7 @@ describe("soak: random programs through the station", () => {
             // the rest, exactly, follows the restoring preamble
             const after = received.slice(before);
             expect(after.slice(after.length - (program.code.length - from))).toEqual(
-                program.code.slice(from),
+                program.code.slice(from).map((l) => machine.withSpinUp(l)),
             );
             expect(machine.interrupted).toBeUndefined();
             carried++;
@@ -284,7 +284,9 @@ describe("soak: random programs through the station", () => {
             expect(machine.startFrom(line)).toBe(true);
             await until(() => machine.snapshot().queue.length === 0);
             const pre = received.slice(0, received.length - (program.code.length - from));
-            expect(received.slice(pre.length)).toEqual(program.code.slice(from));
+            expect(received.slice(pre.length)).toEqual(
+                program.code.slice(from).map((l) => machine.withSpinUp(l)),
+            );
             // the preamble: up to a clear height first; any move down comes after the XY move
             const zMoves = pre.map((l, i) => ({ l, i })).filter(({ l }) => /Z-?[\d.]/.test(l));
             if (zMoves.length > 0) {

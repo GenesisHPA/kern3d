@@ -704,12 +704,16 @@ export class StationMachine {
         let lines: string[];
         let sentCode: number[];
         if (from === 0) {
-            lines = run.code.slice(0, end);
+            lines = run.code.slice(0, end).map((l) => this.withSpinUp(l));
             sentCode = lines.map((_, i) => i);
         } else {
             // the state the lines before set up, the tool over the start point, then the rest
             const clear = Math.max(run.job.path.max[2], 3);
-            lines = runFromLine(run.code.slice(0, end), from, clear)
+            lines = runFromLine(
+                run.code.slice(0, end).map((l) => this.withSpinUp(l)),
+                from,
+                clear,
+            )
                 .map(cleanLine)
                 .filter((l) => l !== "");
             const pre = lines.length - (end - from);
@@ -726,6 +730,16 @@ export class StationMachine {
             return true;
         }
         return grbl.startJob(lines);
+    }
+
+    /**
+     * A spindle start (M3 / M4) with a dwell after it in the same block — GRBL runs the spindle
+     * before the dwell — so the cutter never meets the stock before it is at speed. Lines that
+     * already dwell are left alone; so is everything when `spinUp` is 0.
+     */
+    withSpinUp(line: string): string {
+        if (this.spinUp <= 0 || !/M0?[34](?!\d)/i.test(line) || /G0?4(?!\d)/i.test(line)) return line;
+        return `${line}G4P${this.spinUp}`;
     }
 
     // ---- jobs ----------------------------------------------------------------------------------
@@ -865,6 +879,7 @@ export class StationMachine {
         const grbl = this.grbl;
         if (!grbl) return false;
         if (grbl.jobState === "paused") {
+            this.spindleStopped = false; // the resume itself restores a stopped spindle
             grbl.resume();
             this.resumedAt = this.now();
             return true;
@@ -900,8 +915,27 @@ export class StationMachine {
         return true;
     }
 
+    /** Pause also stops the spindle (GRBL's spindle stop override; resume restores it). */
+    stopSpindleOnPause = true;
+    /** Seconds to wait after M3 / M4 for the spindle to reach speed (0 = as the program says). */
+    spinUp = 3;
+    private spindleStopped = false;
+
     pause() {
-        this.grbl?.pause();
+        const grbl = this.grbl;
+        if (!grbl) return;
+        grbl.pause();
+        if (!this.stopSpindleOnPause || !grbl.jobActive) return;
+        // the override works only once the hold has settled: then the spindle stops; «~» starts it
+        // again and GRBL waits for it before moving on
+        void this.waitFor(() => grbl.status.state === "Hold" && grbl.status.sub === 0, 8000)
+            .then(() => {
+                if (grbl.jobState === "paused" && !this.spindleStopped && (grbl.status.spindle ?? 0) > 0) {
+                    this.spindleStopped = true;
+                    void grbl.realtime(OVERRIDE.spindleStop);
+                }
+            })
+            .catch(() => {});
     }
 
     /** Stops whatever runs: the job, a jog, the spindle (a soft reset). */

@@ -14,6 +14,7 @@ import { useServerPads } from "./serverPads";
 import { demoDisplay, serverDisplay } from "./settings";
 import { type Connect, StationMachine } from "./stationMachine";
 import { StationUi } from "./stationUi";
+import { loadSpindle } from "./travelPanel";
 import { demoWifi, serverWifi } from "./wifiPanel";
 
 /**
@@ -44,6 +45,7 @@ const jobs = new JobStore(machine);
 
 // the length sensor settings, and the reference tool and offset, kept in this browser
 machine.probe = loadProbeSettings();
+loadSpindle(machine);
 const TOOL_KEY = "kern3d.station.toolref";
 try {
     const kept = JSON.parse(localStorage.getItem(TOOL_KEY) ?? "null") as {

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { Axis } from "@chili3d/app/src/cam/machineControl";
+import { PINS } from "./grblText";
 import type { StationMachine } from "./stationMachine";
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
@@ -20,6 +21,8 @@ export class TravelPanel {
     private readonly info = h("div", "rotaryCalc");
     private readonly rows = h("div", "travelRows");
     private readonly found = new Map<Axis, number>();
+    private readonly pins = h("div", "pinRow");
+    private readonly spindle = h("div", "probeOpts");
     private readonly setter = h("div", "wifiRow");
     private touched?: number;
     private timer?: ReturnType<typeof setInterval>;
@@ -32,6 +35,16 @@ export class TravelPanel {
         host.append(
             h("div", "label", "Контроллер"),
             this.info,
+            h("div", "label", "Шпиндель"),
+            this.spindle,
+            h("div", "label", "Входы контроллера (горят — замкнуты)"),
+            this.pins,
+            h(
+                "p",
+                "hint",
+                "Нажмите рукой концевик, щуп, аварийную кнопку — должен загореться свой вход. Горит без нажатия — " +
+                    "провод замкнут или концевик нормально-закрытый (инверсия в $5 / $6 / конфиге FluidNC).",
+            ),
             h("div", "label", "Датчик длины фрезы (стационарный)"),
             this.setter,
             h(
@@ -62,6 +75,39 @@ export class TravelPanel {
               `мягкие пределы ${m.softLimits ? "<b>вкл</b>" : "выкл"} · ${s.homed ? "станок инициализирован" : "ноль не найден"}`
             : "Контроллер не подключён";
         const busy = this.machine.measuring;
+        const m0 = this.machine;
+        const stopBtn = h(
+            "button",
+            `choice${m0.stopSpindleOnPause ? " on" : ""}`,
+            m0.stopSpindleOnPause ? "Пауза останавливает шпиндель" : "Пауза: шпиндель крутится",
+        );
+        stopBtn.onclick = () => {
+            m0.stopSpindleOnPause = !m0.stopSpindleOnPause;
+            saveSpindle(m0);
+            this.render();
+        };
+        const spin = (d: number) => {
+            const b = h("button", "sheetBtn", d > 0 ? `+${d}` : String(d));
+            b.onclick = () => {
+                m0.spinUp = Math.max(0, Math.min(30, m0.spinUp + d));
+                saveSpindle(m0);
+                this.render();
+            };
+            return b;
+        };
+        this.spindle.replaceChildren(
+            stopBtn,
+            h("span", "hint", "Разгон после M3/M4:"),
+            spin(-1),
+            h("b", "", `${m0.spinUp} с`),
+            spin(1),
+        );
+        const on = s.status.pins ?? "";
+        this.pins.replaceChildren(
+            ...PINS.map(([key, label]) =>
+                h("span", `pin${on.includes(key) ? " on" : ""}`, `${key} · ${label}`),
+            ),
+        );
         const sp = this.machine.probe.setter;
         const name = h(
             "div",
@@ -165,4 +211,22 @@ export function armZ(toast: (t: string) => void): boolean {
         "⚠ Z поедет вниз до нижнего концевика: уберите фрезу и всё из-под шпинделя. Нажмите «Замерить» ещё раз.",
     );
     return false;
+}
+
+const SPINDLE_KEY = "kern3d.station.spindle";
+
+export function saveSpindle(m: StationMachine) {
+    localStorage.setItem(SPINDLE_KEY, JSON.stringify({ stop: m.stopSpindleOnPause, spinUp: m.spinUp }));
+}
+
+/** The spindle settings kept on the station, put on the machine at start. */
+export function loadSpindle(m: StationMachine) {
+    try {
+        const v = JSON.parse(localStorage.getItem(SPINDLE_KEY) ?? "null") as {
+            stop?: boolean;
+            spinUp?: number;
+        } | null;
+        if (typeof v?.stop === "boolean") m.stopSpindleOnPause = v.stop;
+        if (typeof v?.spinUp === "number") m.spinUp = v.spinUp;
+    } catch {}
 }

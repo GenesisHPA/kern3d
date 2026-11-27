@@ -1594,3 +1594,24 @@ body {
     background: var(--err);
 }
 
+/* --- inputs (Pn:) --- */
+.pinRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--u) * 0.8);
+}
+.pin {
+    padding: calc(var(--u) * 0.6) calc(var(--u) * 1.4);
+    border-radius: calc(var(--u) * 99);
+    border: 1px solid var(--line);
+    background: var(--panel2);
+    color: var(--dim);
+    font-size: calc(var(--u) * 1.8);
+}
+.pin.on {
+    background: #e8590c;
+    border-color: transparent;
+    color: #fff;
+    font-weight: 800;
+}
+

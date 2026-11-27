@@ -143,7 +143,8 @@ describe("tool changes on the station", () => {
         await tick();
         const sent = r.lines();
         expect(sent.at(-1)).toBe("G1X30");
-        expect(sent).toContain("S12000M3");
+        // the spindle start waits for the spindle to reach speed (spin-up dwell in the same block)
+        expect(sent).toContain("S12000M3G4P3");
         expect(r.machine.snapshot().jobState).toBe("running");
         expect(r.machine.snapshot().tool).toEqual({ tool: 2, name: "Фреза 3 мм" });
         await r.okAll();
@@ -247,7 +248,7 @@ describe("tool changes on the station", () => {
         const sent = r.lines();
         const resumed = sent.slice(sent.lastIndexOf("G43.1 Z1") + 1);
         // back over the stop point with the spindle on, then the side it was cutting, and the rest
-        expect(resumed).toContain("S9000M3");
+        expect(resumed.some((l) => l.startsWith("S9000M3"))).toBe(true);
         expect(resumed.slice(-2)).toEqual(["G1X0", "G1Y0"]);
         expect(r.machine.snapshot().jobState).toBe("running");
         await r.machine.disconnect();
