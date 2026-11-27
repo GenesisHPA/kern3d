@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IDocument, IView } from "@chili3d/core";
-import { type I18nKeys, type IProgress, NoProgress, setProgressHost } from "@chili3d/core";
+import { I18n, type I18nKeys, type IProgress, NoProgress, setProgressHost } from "@chili3d/core";
 import { createMockApplication, createMockDocument, createMockView } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, test } from "@rstest/core";
 import { importFiles } from "../src/utils";
@@ -66,7 +66,7 @@ describe("importFiles", () => {
 
             await importFiles(app, [new File([], "test.igs")]);
 
-            expect(newDocumentCalls).toEqual(["Untitled"]);
+            expect(newDocumentCalls).toEqual([I18n.translate("document.untitled")]);
         });
 
         test("should create new document when activeView is undefined", async () => {
@@ -83,7 +83,7 @@ describe("importFiles", () => {
 
             await importFiles(app, [new File([], "model.stl")]);
 
-            expect(newDocumentCalls).toEqual(["Untitled"]);
+            expect(newDocumentCalls).toEqual([I18n.translate("document.untitled")]);
         });
     });
 

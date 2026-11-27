@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { ICommand, IDocument, IView, IVisualFactory, Serialized } from "@chili3d/core";
-import { Logger, ObservableCollection, PubSub } from "@chili3d/core";
+import { I18n, Logger, ObservableCollection, PubSub } from "@chili3d/core";
 import { createMockView, createMockVisualWithDocument } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
 import { Application } from "../src/application";
@@ -383,7 +383,7 @@ describe("Application", () => {
             // A new document is created for the imported file
             expect(sharedApp.documents.size).toBe(1);
             const doc = [...sharedApp.documents][0];
-            expect(doc.name).toBe("Untitled");
+            expect(doc.name).toBe(I18n.translate("document.untitled"));
             expect(sharedApp.activeView?.document).toBe(doc);
             expect(errorSpy).not.toHaveBeenCalled();
 
