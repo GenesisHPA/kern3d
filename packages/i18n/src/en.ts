@@ -928,8 +928,7 @@ export default {
         "text.depth": "Depth",
         "text.edit": "Edit Text",
         "text.size": "Height",
-        "prompt.default{0}{1}":
-            "{0} to pan the view, {1} to rotate the view, Mouse wheel to scroll the zoom view",
+        "prompt.default{0}{1}": "Hold {0} to pan the view, {1} to rotate it, scroll the wheel to zoom",
         "prompt.deleteDocument{0}": "Do you want to delete {0}?",
         "prompt.dragToPressPull": "Drag the arrow to set the distance, or type it",
         "prompt.pressPull": "Pick a face or an edge to push or pull, or a sketch profile to extrude",

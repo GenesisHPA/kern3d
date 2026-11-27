@@ -47,7 +47,10 @@ rs.mock("@chili3d/core", () => {
     return {
         ...actual,
         Config: { instance: configChanged.instance },
-        I18n: { set: i18nSetMock },
+        I18n: {
+            set: i18nSetMock,
+            translate: (key: string) => (key === "navbar.middleButton" ? "wheel" : key),
+        },
         Navigation3D: {
             navigationKeyMap: () => ({ pan: "Middle", rotate: "Shift+Middle" }),
         },
@@ -62,7 +65,7 @@ import type { I18nKeys } from "@chili3d/core";
 import { Statusbar } from "../src/statusbar/statusbar";
 import { mustQuery } from "./_helpers/domHelpers";
 
-const DEFAULT_TIP_ARGS = ["textContent", "prompt.default{0}{1}", "Middle", "Shift+Middle"];
+const DEFAULT_TIP_ARGS = ["textContent", "prompt.default{0}{1}", "wheel", "Shift + wheel"];
 
 describe("Statusbar", () => {
     beforeEach(() => {

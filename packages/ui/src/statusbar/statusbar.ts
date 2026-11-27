@@ -73,8 +73,13 @@ export class Statusbar extends HTMLElement {
     private readonly setDefaultTip = () => {
         this._isDefaultTip = true;
         const { pan, rotate } = Navigation3D.navigationKeyMap();
-        I18n.set(this.tip, "textContent", "prompt.default{0}{1}", pan, rotate);
+        I18n.set(this.tip, "textContent", "prompt.default{0}{1}", mouseGesture(pan), mouseGesture(rotate));
     };
+}
+
+/** "Shift+Middle" → "Shift + wheel" in the UI language: the profile names the button in English. */
+function mouseGesture(keys: string): string {
+    return keys.replace("Middle", I18n.translate("navbar.middleButton")).replaceAll("+", " + ");
 }
 
 customElements.define("chili-statusbar", Statusbar);
