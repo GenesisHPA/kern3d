@@ -725,7 +725,7 @@ describe("OccWire", () => {
         const wire = factory.wire([circle]).value as OccWire;
         const result = wire.offset(0, "arc");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Invalid distance");
+        expect(result.error).toBe("error.command.invalidDistance");
     });
 });
 

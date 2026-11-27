@@ -7,6 +7,7 @@ import {
     type EdgeMeshData,
     type FaceMeshData,
     gc,
+    I18n,
     type ICompound,
     type ICompoundSolid,
     type ICurve,
@@ -571,11 +572,11 @@ export class OccEdge extends OccShape implements IEdge {
         return gc((c) => {
             const occDir = c(toDir(dir));
             if (MathUtils.anyEqualZero(distance)) {
-                return Result.err("Invalid distance");
+                return Result.err(I18n.translate("error.command.invalidDistance"));
             }
             const edge = wasm.Edge.offset(this.edge, occDir, distance);
             if (edge.isNull()) {
-                return Result.err("Offset failed");
+                return Result.err(I18n.translate("error.kernel.offsetFailed"));
             }
             return Result.ok(OccShape.wrap(edge));
         });
@@ -645,18 +646,18 @@ export class OccWire extends OccShape implements IWire {
     toFace(): Result<IFace> {
         const face = wasm.Wire.makeFace(this.wire);
         if (face.isNull()) {
-            return Result.err("To face failed");
+            return Result.err(I18n.translate("error.kernel.faceFailed"));
         }
         return Result.ok(new OccFace({ shape: face }));
     }
 
     offset(distance: number, joinType: JoinType): Result<IShape> {
         if (MathUtils.anyEqualZero(distance)) {
-            return Result.err("Invalid distance");
+            return Result.err(I18n.translate("error.command.invalidDistance"));
         }
         const offseted = wasm.Wire.offset(this.wire, distance, getJoinType(joinType));
         if (offseted.isNull()) {
-            return Result.err("Offset failed");
+            return Result.err(I18n.translate("error.kernel.offsetFailed"));
         }
         return Result.ok(OccShape.wrap(offseted));
     }

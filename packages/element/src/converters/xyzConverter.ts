@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IConverter, Result, XY, XYZ } from "@chili3d/core";
+import { I18n, type IConverter, Result, XY, XYZ } from "@chili3d/core";
 
 export class XYConverter implements IConverter<XY> {
     convert(value: XY) {
@@ -12,7 +12,7 @@ export class XYConverter implements IConverter<XY> {
         const vs = value.split(",").map(Number).filter(isFinite);
         return vs.length === 2
             ? Result.ok(new XY({ x: vs[0], y: vs[1] }))
-            : Result.err(`${value} convert to XY error`);
+            : Result.err(I18n.translate("error.input.convertXYError{0}", value));
     }
 }
 
@@ -23,6 +23,8 @@ export class XYZConverter implements IConverter<XYZ> {
 
     convertBack(value: string): Result<XYZ> {
         const vs = value.split(",").map(Number).filter(isFinite);
-        return vs.length === 3 ? Result.ok(XYZ.fromArray(vs)) : Result.err(`${value} convert to XYZ error`);
+        return vs.length === 3
+            ? Result.ok(XYZ.fromArray(vs))
+            : Result.err(I18n.translate("error.input.convertXYZError{0}", value));
     }
 }

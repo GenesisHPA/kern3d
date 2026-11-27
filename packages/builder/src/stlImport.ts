@@ -4,6 +4,7 @@
 import {
     EditableShapeNode,
     GroupNode,
+    I18n,
     type IDocument,
     type INode,
     Material,
@@ -62,7 +63,7 @@ export async function importStlNode(
         const bodies = solidBodies(document, name, converted.value, materialId);
         if (bodies !== undefined) return Result.ok(group(document, fileName, bodies));
     }
-    if (mesh === undefined) return Result.err("can not convert");
+    if (mesh === undefined) return Result.err(I18n.translate("error.kernel.canNotConvert"));
     PubSub.default.pub(
         "showToast",
         !converted.ok && converted.crashed ? "toast.import.stlKernelCrash" : "toast.import.stlAsMesh",

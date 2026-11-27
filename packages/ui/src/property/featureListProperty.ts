@@ -769,7 +769,7 @@ export class FeatureListProperty extends HTMLElement {
         const current = item.parameters.find((x) => x.key === key)?.value;
         const text = box.value.trim();
         if (text === "") {
-            PubSub.default.pub("showToast", "error.default:{0}", "invalid input");
+            PubSub.default.pub("showToast", "error.default:{0}", I18n.translate("error.app.invalidInput"));
             box.value = String(current ?? "");
             return;
         }

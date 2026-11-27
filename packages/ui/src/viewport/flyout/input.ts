@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { I18n, type I18nKeys, type IDisposable, Localize, type Result } from "@chili3d/core";
+import { I18n, type I18nKeys, type IDisposable, type Result } from "@chili3d/core";
 import { input, label } from "@chili3d/element";
 import style from "./input.module.css";
 
@@ -72,16 +72,14 @@ export class Input extends HTMLElement implements IDisposable {
         this._completedCallbacks.length = 0;
     }
 
+    /** A key is localized; a message a handler already worded (a feature's refusal) is shown as it is. */
     private showTip(tip: I18nKeys) {
         if (this.tip === undefined) {
-            this.tip = label({
-                textContent: new Localize(tip),
-                className: style.error,
-            });
+            this.tip = label({ className: style.error });
             this.append(this.tip);
-        } else {
-            I18n.set(this.tip, "textContent", tip);
         }
+        if (I18n.isI18nKey(tip)) I18n.set(this.tip, "textContent", tip);
+        else this.tip.textContent = tip;
     }
 
     private removeTip() {

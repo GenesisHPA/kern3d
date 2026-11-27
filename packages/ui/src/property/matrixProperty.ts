@@ -3,6 +3,7 @@
 
 import {
     type GroupNode,
+    I18n,
     type IConverter,
     type IDocument,
     Matrix4,
@@ -79,7 +80,7 @@ export abstract class MatrixConverter implements IConverter<Matrix4, string> {
             .split(",")
             .map(Number)
             .filter((x) => !isNaN(x));
-        if (values.length !== 3) return Result.err("invalid number of values");
+        if (values.length !== 3) return Result.err(I18n.translate("error.app.invalidNumberValues"));
         const newValue = {
             x: values[0],
             y: values[1],

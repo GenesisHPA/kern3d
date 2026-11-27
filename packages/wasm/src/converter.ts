@@ -7,6 +7,7 @@ import {
     type FolderNode,
     GroupNode,
     gc,
+    I18n,
     type IDisposable,
     type IDocument,
     type IShape,
@@ -26,13 +27,13 @@ import { shapesToStl } from "./stlWriter";
  */
 export function stlToShape(stl: Uint8Array): Result<IShape> {
     const node = wasm.Converter.convertFromStl(stl);
-    if (node === undefined) return Result.err("can not convert");
+    if (node === undefined) return Result.err(I18n.translate("error.kernel.canNotConvert"));
     try {
         const shape = node.shape;
-        if (shape === undefined) return Result.err("can not convert");
+        if (shape === undefined) return Result.err(I18n.translate("error.kernel.canNotConvert"));
         if (shape.isNull()) {
             shape.delete();
-            return Result.err("can not convert");
+            return Result.err(I18n.translate("error.kernel.canNotConvert"));
         }
         return Result.ok(OccShape.wrap(shape));
     } finally {
@@ -112,7 +113,7 @@ export class OccShapeConverter implements IShapeConverter {
         return gc((c) => {
             const node = converter(data);
             if (!node) {
-                return Result.err("can not convert");
+                return Result.err(I18n.translate("error.kernel.canNotConvert"));
             }
             const folder = new GroupNode({ document, name: "undefined" });
             this.addShapeNode(c, folder, node, node.getChildren(), getMaterialId);
@@ -139,13 +140,13 @@ export class OccShapeConverter implements IShapeConverter {
         if (shape instanceof OccShape) {
             return Result.ok(wasm.Converter.convertToBrep(shape.shape));
         }
-        return Result.err("Shape is not an OccShape");
+        return Result.err(I18n.translate("error.kernel.shapeNotOccShape"));
     }
 
     convertFromBrep(brep: string): Result<IShape> {
         const shape = wasm.Converter.convertFromBrep(brep);
         if (shape.isNull()) {
-            return Result.err("can not convert");
+            return Result.err(I18n.translate("error.kernel.canNotConvert"));
         }
         return Result.ok(OccShape.wrap(shape));
     }

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IMeshExporter, Result, type VisualNode } from "@chili3d/core";
+import { I18n, type IMeshExporter, Result, type VisualNode } from "@chili3d/core";
 import { Group, Mesh, Object3D } from "three";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { PLYExporter } from "three/examples/jsm/exporters/PLYExporter.js";
@@ -27,7 +27,7 @@ export class ThreeMeshExporter implements IMeshExporter {
         const blobPart = exporter.parse(group, () => {}, { binary: !asciiMode });
         this.disposeObject(group);
         if (!blobPart) {
-            return Result.err("can not export to ply");
+            return Result.err(I18n.translate("error.app.canNotExportPly"));
         }
         return Result.ok(blobPart);
     }

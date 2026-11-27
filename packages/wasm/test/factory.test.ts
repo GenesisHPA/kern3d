@@ -108,7 +108,7 @@ describe("ShapeFactory — curves & wires", () => {
         test("should return error when start and end are too close", () => {
             const result = factory.line(XYZ.zero, XYZ.zero);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The start and end points are too close.");
+            expect(result.error).toBe("error.kernel.startEndPointsAreTooClose");
         });
     });
 
@@ -498,7 +498,7 @@ describe("ShapeFactory — faces, shells & solids", () => {
         test("should return error when wire is empty", () => {
             const result = factory.face([]);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The wire is empty.");
+            expect(result.error).toBe("error.kernel.wireEmpty");
         });
     });
 
@@ -552,7 +552,7 @@ describe("ShapeFactory — faces, shells & solids", () => {
         test("should return error when wires are empty", () => {
             const result = factory.faceFromSurface([], sourceRect());
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The wire is empty.");
+            expect(result.error).toBe("error.kernel.wireEmpty");
         });
 
         test("should throw when the source face is not an OccShape", () => {
@@ -651,7 +651,7 @@ describe("ShapeFactory — faces, shells & solids", () => {
         test("should return error when edges are empty", () => {
             const result = factory.facesFromEdges([], plane);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The edges are empty.");
+            expect(result.error).toBe("error.kernel.edgesAreEmpty");
         });
     });
 
@@ -742,7 +742,7 @@ describe("ShapeFactory — operations", () => {
             const boxValue = factory.box(plane, 10, 10, 10).value;
             const result = factory.prism(boxValue, XYZ.zero);
             expect(result.isOk).toBe(false);
-            expect(result.error).toContain("vector length is 0");
+            expect(result.error).toContain("error.kernel.vectorLength0PrismCannotCreated");
         });
     });
 
@@ -930,7 +930,7 @@ describe("ShapeFactory — operations", () => {
             );
 
             expect(result.isOk).toBe(false);
-            expect(result.error).toContain("at least 2");
+            expect(result.error).toContain("error.kernel.failedCreateGordonSurfaceAtLeast");
         });
 
         test("should reject a non-positive tolerance", () => {
@@ -941,7 +941,7 @@ describe("ShapeFactory — operations", () => {
             );
 
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The tolerance must be positive.");
+            expect(result.error).toBe("error.kernel.toleranceMustPositive");
         });
 
         test("should throw when an edge is not an OccShape", () => {
@@ -1045,21 +1045,21 @@ describe("ShapeFactory — feature operations", () => {
             const boxValue = factory.box(plane, 10, 10, 10).value;
             const result = factory.fillet(boxValue, [0], 0);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The radius is too small.");
+            expect(result.error).toBe("error.kernel.radiusTooSmall");
         });
 
         test("should return error when edges is empty", () => {
             const boxValue = factory.box(plane, 10, 10, 10).value;
             const result = factory.fillet(boxValue, [], 5);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The edges is empty.");
+            expect(result.error).toBe("error.kernel.edgesEmpty");
         });
 
         test("should return error when shape is not OccShape", () => {
             const fakeShape = new MockShape({ shapeType: ShapeTypes.edge }) as unknown as IShape;
             const result = factory.fillet(fakeShape, [0], 5);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Not OccShape");
+            expect(result.error).toBe("error.kernel.notOccShape");
         });
 
         test("should catch WASM error on invalid edge index", () => {
@@ -1081,21 +1081,21 @@ describe("ShapeFactory — feature operations", () => {
             const boxValue = factory.box(plane, 10, 10, 10).value;
             const result = factory.chamfer(boxValue, [0], 0);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The distance is too small.");
+            expect(result.error).toBe("error.kernel.distanceTooSmall");
         });
 
         test("should return error when edges is empty", () => {
             const boxValue = factory.box(plane, 10, 10, 10).value;
             const result = factory.chamfer(boxValue, [], 5);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The edges is empty.");
+            expect(result.error).toBe("error.kernel.edgesEmpty");
         });
 
         test("should return error when shape is not OccShape", () => {
             const fakeShape = new MockShape({ shapeType: ShapeTypes.solid }) as unknown as IShape;
             const result = factory.chamfer(fakeShape, [0], 5);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Not OccShape");
+            expect(result.error).toBe("error.kernel.notOccShape");
         });
 
         test("should catch WASM error on invalid edge index", () => {
@@ -1184,7 +1184,7 @@ describe("ShapeFactory — feature operations", () => {
             const fakeShape = new MockShape({ shapeType: ShapeTypes.solid }) as unknown as IShape;
             const result = factory.removeFillet(fakeShape, []);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Not OccShape");
+            expect(result.error).toBe("error.kernel.notOccShape");
         });
 
         test("should remove fillet faces and restore the original box", () => {
@@ -1708,7 +1708,7 @@ describe("ShapeFactory — removeFeature", () => {
         const fakeShape = new MockShape({ shapeType: ShapeTypes.solid }) as unknown as IShape;
         const result = factory.removeFeature(fakeShape, []);
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Not OccShape");
+        expect(result.error).toBe("error.kernel.notOccShape");
     });
 
     test("should remove a fused boss and restore the base box", () => {
@@ -1832,7 +1832,7 @@ describe("ShapeFactory — 2D fillet & chamfer", () => {
             const edges = rect.findSubShapes(ShapeTypes.edge) as IEdge[];
             const result = factory.fillet2d(rect, edges[0], edges[1], 0);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The radius is too small.");
+            expect(result.error).toBe("error.kernel.radiusTooSmall");
         });
 
         test("should return error when edges don't share a common vertex", () => {
@@ -1858,7 +1858,7 @@ describe("ShapeFactory — 2D fillet & chamfer", () => {
             const edges = rect.findSubShapes(ShapeTypes.edge) as IEdge[];
             const result = factory.chamfer2d(rect, edges[0], edges[1], 0);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The distance is too small.");
+            expect(result.error).toBe("error.kernel.distanceTooSmall");
         });
 
         test("should return error when edges are from different faces", () => {
@@ -1891,7 +1891,7 @@ describe("ShapeFactory — 2D fillet & chamfer", () => {
             const edges = rectEdges();
             const result = factory.filletEdge2d(edges[0], edges[1], 0);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The radius is too small.");
+            expect(result.error).toBe("error.kernel.radiusTooSmall");
         });
 
         test("should fillet two disjoint but coplanar edges", () => {
@@ -2011,7 +2011,7 @@ describe("ShapeFactory — 2D fillet & chamfer", () => {
             const edges = rectEdges();
             const result = factory.chamferEdge2d(edges[0], edges[1], 0);
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("The distance is too small.");
+            expect(result.error).toBe("error.kernel.distanceTooSmall");
         });
 
         test("should return non-degenerate edges after chamfer", () => {

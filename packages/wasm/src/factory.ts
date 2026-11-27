@@ -4,6 +4,7 @@
 import {
     type Continuity,
     GeometryUtils,
+    I18n,
     type ICompound,
     type ICurve,
     type IEdge,
@@ -202,7 +203,15 @@ function seamError(shape: IShape, edges: readonly number[], operation: string): 
         try {
             const faces = edge.findAncestor(ShapeTypes.face, shape) as IFace[];
             if (faces.length >= 2 && faces.every((face) => face.isSame(faces[0]))) {
-                return `A ${operation} needs a dihedral to sit in: edge ${index} has the same face on both sides`;
+                return I18n.translate(
+                    "error.kernel.needsDihedralSitEdgeHasSame{0}{1}",
+                    I18n.translate(
+                        operation === "chamfer"
+                            ? "error.kernel.operation.chamfer"
+                            : "error.kernel.operation.fillet",
+                    ),
+                    index,
+                );
             }
         } catch {
             // Unreadable adjacency — leave it to the kernel.
@@ -217,9 +226,9 @@ function seamError(shape: IShape, edges: readonly number[], operation: string): 
  * than left to raise.
  */
 function validateVariableRadii(edges: readonly number[], radii: readonly number[]): string | undefined {
-    if (edges.length === 0) return "The edges is empty.";
-    if (radii.length !== edges.length * 2) return "The radii must be one (start, end) pair per edge.";
-    if (radii.some((r) => r < Precision.Distance)) return "The radius is too small.";
+    if (edges.length === 0) return I18n.translate("error.kernel.edgesEmpty");
+    if (radii.length !== edges.length * 2) return I18n.translate("error.kernel.radiiMustOneStartEndPair");
+    if (radii.some((r) => r < Precision.Distance)) return I18n.translate("error.kernel.radiusTooSmall");
     return undefined;
 }
 
@@ -234,9 +243,10 @@ function validateTwoDistChamfer(
     d2: number,
     faces: readonly number[],
 ): string | undefined {
-    if (d1 < Precision.Distance || d2 < Precision.Distance) return "The distance is too small.";
-    if (edges.length === 0) return "The edges is empty.";
-    if (faces.length !== edges.length) return "The faces must match the edges one-to-one.";
+    if (d1 < Precision.Distance || d2 < Precision.Distance)
+        return I18n.translate("error.kernel.distanceTooSmall");
+    if (edges.length === 0) return I18n.translate("error.kernel.edgesEmpty");
+    if (faces.length !== edges.length) return I18n.translate("error.kernel.facesMustMatchEdgesOneOne");
     return undefined;
 }
 
@@ -285,11 +295,11 @@ export class ShapeFactory implements IShapeFactory {
 
     fillet(shape: IShape, edges: number[], radius: number): Result<IShape> {
         if (radius < Precision.Distance) {
-            return Result.err("The radius is too small.");
+            return Result.err(I18n.translate("error.kernel.radiusTooSmall"));
         }
 
         if (edges.length === 0) {
-            return Result.err("The edges is empty.");
+            return Result.err(I18n.translate("error.kernel.edgesEmpty"));
         }
 
         if (shape instanceof OccShape) {
@@ -297,16 +307,16 @@ export class ShapeFactory implements IShapeFactory {
             if (seam !== undefined) return Result.err(seam);
             return convertShapeResult(wasm.ShapeFactory.fillet, [shape.shape, edges, radius], "Fillet Error");
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     chamfer(shape: IShape, edges: number[], distance: number): Result<IShape> {
         if (distance < Precision.Distance) {
-            return Result.err("The distance is too small.");
+            return Result.err(I18n.translate("error.kernel.distanceTooSmall"));
         }
 
         if (edges.length === 0) {
-            return Result.err("The edges is empty.");
+            return Result.err(I18n.translate("error.kernel.edgesEmpty"));
         }
 
         if (shape instanceof OccShape) {
@@ -318,16 +328,16 @@ export class ShapeFactory implements IShapeFactory {
                 "Chamfer Error",
             );
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     filletTracked(shape: IShape, edges: number[], radius: number): Result<TrackedShape> {
         if (radius < Precision.Distance) {
-            return Result.err("The radius is too small.");
+            return Result.err(I18n.translate("error.kernel.radiusTooSmall"));
         }
 
         if (edges.length === 0) {
-            return Result.err("The edges is empty.");
+            return Result.err(I18n.translate("error.kernel.edgesEmpty"));
         }
 
         if (shape instanceof OccShape) {
@@ -339,16 +349,16 @@ export class ShapeFactory implements IShapeFactory {
                 "Fillet Error",
             );
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     chamferTracked(shape: IShape, edges: number[], distance: number): Result<TrackedShape> {
         if (distance < Precision.Distance) {
-            return Result.err("The distance is too small.");
+            return Result.err(I18n.translate("error.kernel.distanceTooSmall"));
         }
 
         if (edges.length === 0) {
-            return Result.err("The edges is empty.");
+            return Result.err(I18n.translate("error.kernel.edgesEmpty"));
         }
 
         if (shape instanceof OccShape) {
@@ -360,7 +370,7 @@ export class ShapeFactory implements IShapeFactory {
                 "Chamfer Error",
             );
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     filletVariable(shape: IShape, edges: number[], radii: number[]): Result<IShape> {
@@ -376,7 +386,7 @@ export class ShapeFactory implements IShapeFactory {
                 "Fillet Error",
             );
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     filletVariableTracked(shape: IShape, edges: number[], radii: number[]): Result<TrackedShape> {
@@ -392,7 +402,7 @@ export class ShapeFactory implements IShapeFactory {
                 "Fillet Error",
             );
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     chamferTwoDist(shape: IShape, edges: number[], d1: number, d2: number, faces: number[]): Result<IShape> {
@@ -408,7 +418,7 @@ export class ShapeFactory implements IShapeFactory {
                 "Chamfer Error",
             );
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     chamferTwoDistTracked(
@@ -430,12 +440,12 @@ export class ShapeFactory implements IShapeFactory {
                 "Chamfer Error",
             );
         }
-        return Result.err("Not OccShape");
+        return Result.err(I18n.translate("error.kernel.notOccShape"));
     }
 
     fillet2d(face: IFace, edge1: IEdge, edge2: IEdge, radius: number): Result<IFace> {
         if (radius < Precision.Distance) {
-            return Result.err("The radius is too small.");
+            return Result.err(I18n.translate("error.kernel.radiusTooSmall"));
         }
 
         const [occFace, occEdge1, occEdge2] = ensureOccShape([face, edge1, edge2]);
@@ -448,7 +458,7 @@ export class ShapeFactory implements IShapeFactory {
 
     filletEdge2d(edge1: IEdge, edge2: IEdge, radius: number): Result<IEdge[]> {
         if (radius < Precision.Distance) {
-            return Result.err("The radius is too small.");
+            return Result.err(I18n.translate("error.kernel.radiusTooSmall"));
         }
 
         const [occEdge1, occEdge2] = ensureOccShape([edge1, edge2]);
@@ -461,7 +471,7 @@ export class ShapeFactory implements IShapeFactory {
 
     chamfer2d(face: IFace, edge1: IEdge, edge2: IEdge, distance: number): Result<IFace> {
         if (distance < Precision.Distance) {
-            return Result.err("The distance is too small.");
+            return Result.err(I18n.translate("error.kernel.distanceTooSmall"));
         }
 
         const [occFace, occEdge1, occEdge2] = ensureOccShape([face, edge1, edge2]);
@@ -474,7 +484,7 @@ export class ShapeFactory implements IShapeFactory {
 
     chamferEdge2d(edge1: IEdge, edge2: IEdge, distance: number): Result<IEdge[]> {
         if (distance < Precision.Distance) {
-            return Result.err("The distance is too small.");
+            return Result.err(I18n.translate("error.kernel.distanceTooSmall"));
         }
 
         const [occEdge1, occEdge2] = ensureOccShape([edge1, edge2]);
@@ -487,7 +497,7 @@ export class ShapeFactory implements IShapeFactory {
 
     removeFeature(shape: IShape, faces: IFace[]): Result<IShape> {
         if (!(shape instanceof OccShape)) {
-            return Result.err("Not OccShape");
+            return Result.err(I18n.translate("error.kernel.notOccShape"));
         }
         const occFaces = ensureOccShape(faces);
         const result = wasm.ShapeFactory.removeFeature(shape.shape, occFaces);
@@ -495,14 +505,14 @@ export class ShapeFactory implements IShapeFactory {
             return Result.err(result.error);
         }
         if (result.shape.isNull() || shape.shape.isEqual(result.shape)) {
-            return Result.err("Can not remove feature");
+            return Result.err(I18n.translate("error.kernel.canNotRemoveFeature"));
         }
         return Result.ok(OccShape.wrap(result.shape));
     }
 
     removeFillet(shape: IShape, faces: IFace[]) {
         if (!(shape instanceof OccShape)) {
-            return Result.err("Not OccShape");
+            return Result.err(I18n.translate("error.kernel.notOccShape"));
         }
         const occFaces = ensureOccShape(faces);
         const result = wasm.ShapeFactory.removeFillet(shape.shape, occFaces);
@@ -510,7 +520,7 @@ export class ShapeFactory implements IShapeFactory {
             return Result.err(result.error);
         }
         if (result.shape.isNull() || shape.shape.isEqual(result.shape)) {
-            return Result.err("Can not remove fillet");
+            return Result.err(I18n.translate("error.kernel.canNotRemoveFillet"));
         }
 
         return Result.ok({
@@ -542,7 +552,7 @@ export class ShapeFactory implements IShapeFactory {
 
     face(wire: IWire[]): Result<IFace> {
         if (wire.length === 0) {
-            return Result.err("The wire is empty.");
+            return Result.err(I18n.translate("error.kernel.wireEmpty"));
         }
         const normal = GeometryUtils.normal(wire[0]);
         for (let i = 1; i < wire.length; i++) {
@@ -555,7 +565,7 @@ export class ShapeFactory implements IShapeFactory {
     }
     faceFromSurface(wires: IWire[], sourceFace: IFace): Result<IFace> {
         if (wires.length === 0) {
-            return Result.err("The wire is empty.");
+            return Result.err(I18n.translate("error.kernel.wireEmpty"));
         }
         const normal = GeometryUtils.normal(wires[0]);
         for (let i = 1; i < wires.length; i++) {
@@ -573,7 +583,7 @@ export class ShapeFactory implements IShapeFactory {
     }
     facesFromEdges(edges: IEdge[], plane: Plane): Result<{ faces: IFace[]; sources: number[][] }> {
         if (edges.length === 0) {
-            return Result.err("The edges are empty.");
+            return Result.err(I18n.translate("error.kernel.edgesAreEmpty"));
         }
         const occEdges = ensureOccShape(edges);
         let result: RegionsResult;
@@ -584,7 +594,7 @@ export class ShapeFactory implements IShapeFactory {
                 xDirection: plane.xvec,
             });
         } catch (err) {
-            return Result.err(`FacesFromEdges Error: ${err}`);
+            return Result.err(I18n.translate("error.kernel.facesFromEdgesError{0}", err));
         }
 
         let res: Result<{ faces: IFace[]; sources: number[][] }, string>;
@@ -642,7 +652,7 @@ export class ShapeFactory implements IShapeFactory {
     }
     line(start: XYZLike, end: XYZLike): Result<IEdge> {
         if (MathUtils.allEqualZero(start.x - end.x, start.y - end.y, start.z - end.z)) {
-            return Result.err("The start and end points are too close.");
+            return Result.err(I18n.translate("error.kernel.startEndPointsAreTooClose"));
         }
 
         return convertShapeResult(wasm.ShapeFactory.line, [start, end], "Line Error") as Result<IEdge>;
@@ -768,14 +778,14 @@ export class ShapeFactory implements IShapeFactory {
     }
     prism(shape: IShape, vec: XYZ): Result<IShape> {
         if (vec.length() === 0) {
-            return Result.err(`The vector length is 0, the prism cannot be created.`);
+            return Result.err(I18n.translate("error.kernel.vectorLength0PrismCannotCreated"));
         }
         return convertShapeResult(wasm.ShapeFactory.prism, [ensureOccShape(shape)[0], vec], "Prism Error");
     }
 
     prismTracked(shape: IShape, vec: XYZ): Result<TrackedShape> {
         if (vec.length() === 0) {
-            return Result.err(`The vector length is 0, the prism cannot be created.`);
+            return Result.err(I18n.translate("error.kernel.vectorLength0PrismCannotCreated"));
         }
         return convertTrackedShapeResult(
             wasm.ShapeFactory.prismTracked,
@@ -791,7 +801,7 @@ export class ShapeFactory implements IShapeFactory {
         mode: "cut" | "join" | "new",
     ): Result<TrackedShape> {
         if (direction.length() === 0) {
-            return Result.err(`The vector length is 0, the prism cannot be created.`);
+            return Result.err(I18n.translate("error.kernel.vectorLength0PrismCannotCreated"));
         }
         // "new" has no base body; the kernel then reads only the limit face for its internal
         // length estimate, so it doubles as `sbase`.
@@ -805,7 +815,7 @@ export class ShapeFactory implements IShapeFactory {
     }
     pushPull(shape: IShape, face: IShape, vec: XYZ): Result<IShape> {
         if (vec.length() === 0) {
-            return Result.err(`The vector length is 0, the prism cannot be created.`);
+            return Result.err(I18n.translate("error.kernel.vectorLength0PrismCannotCreated"));
         }
         return convertShapeResult(
             wasm.ShapeFactory.pushPull,
@@ -1042,11 +1052,11 @@ export class ShapeFactory implements IShapeFactory {
         neutralPlane: Plane,
     ): Result<IShape> {
         if (faces.length === 0) {
-            return Result.err("The faces are empty.");
+            return Result.err(I18n.translate("error.kernel.facesAreEmpty"));
         }
         if (pullDirection.x === 0 && pullDirection.y === 0 && pullDirection.z === 0) {
             // `gp_Dir` raises on a null vector, and a raise aborts the whole module.
-            return Result.err("The pull direction is zero.");
+            return Result.err(I18n.translate("error.kernel.pullDirectionZero"));
         }
         return convertShapeResult(
             wasm.ShapeFactory.draft,
@@ -1073,10 +1083,10 @@ export class ShapeFactory implements IShapeFactory {
         neutralPlane: Plane,
     ): Result<TrackedShape> {
         if (faces.length === 0) {
-            return Result.err("The faces are empty.");
+            return Result.err(I18n.translate("error.kernel.facesAreEmpty"));
         }
         if (pullDirection.x === 0 && pullDirection.y === 0 && pullDirection.z === 0) {
-            return Result.err("The pull direction is zero.");
+            return Result.err(I18n.translate("error.kernel.pullDirectionZero"));
         }
         return convertTrackedShapeResult(
             wasm.ShapeFactory.draftTracked,
@@ -1187,18 +1197,16 @@ export class ShapeFactory implements IShapeFactory {
         approximate: boolean = false,
     ): Result<IFace> {
         if (profiles.length < 2 || guides.length < 2) {
-            return Result.err(
-                "Failed to create Gordon surface: at least 2 profile edges and 2 guide edges are required",
-            );
+            return Result.err(I18n.translate("error.kernel.failedCreateGordonSurfaceAtLeast"));
         }
         if (
             profiles.some((edge) => edge.shapeType !== ShapeTypes.edge) ||
             guides.some((edge) => edge.shapeType !== ShapeTypes.edge)
         ) {
-            return Result.err("Gordon surface inputs must be edges.");
+            return Result.err(I18n.translate("error.kernel.gordonSurfaceInputsMustEdges"));
         }
         if (!(tolerance > 0)) {
-            return Result.err("The tolerance must be positive.");
+            return Result.err(I18n.translate("error.kernel.toleranceMustPositive"));
         }
         return convertShapeResult(
             wasm.ShapeFactory.gordon,

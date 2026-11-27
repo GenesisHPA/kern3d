@@ -83,14 +83,14 @@ describe("BREP conversion", () => {
     test("convertFromBrep with invalid string returns error", () => {
         const result = converter.convertFromBrep("not a valid brep");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("can not convert");
+        expect(result.error).toBe("error.kernel.canNotConvert");
     });
 
     test("convertToBrep with non-OccShape returns error", () => {
         const fake = new MockShape({ shapeType: ShapeTypes.solid });
         const result = converter.convertToBrep(fake);
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Shape is not an OccShape");
+        expect(result.error).toBe("error.kernel.shapeNotOccShape");
     });
 });
 

@@ -49,7 +49,7 @@ describe("VariablesDataContent", () => {
         // Refusing the keystroke would make a new name impossible to type; the table carries
         // the error instead, and the bodies reading it keep their last good shape.
         expect(document.variables.items[0].expression).toBe("nope");
-        expect(content.evaluate().errors.get(id)).toBe("Unknown identifier: nope");
+        expect(content.evaluate().errors.get(id)).toBe("error.expression.unknownIdentifiernope");
     });
 
     test("appends a blank row and returns its id", () => {
@@ -72,7 +72,7 @@ describe("VariablesDataContent", () => {
     test("reorders rows, since a variable may reference the ones above it", () => {
         const { document, content } = contentWith([variable("v2", "h", "w * 2"), variable("v1", "w", "1")]);
         // `h` sits above `w`, so it cannot resolve; moving it below restores the order.
-        expect(content.evaluate().errors.get("v2")).toBe("Unknown identifier: w");
+        expect(content.evaluate().errors.get("v2")).toBe("error.expression.unknownIdentifierw");
 
         content.move("v2", 1);
 
@@ -94,7 +94,9 @@ describe("VariablesDataContent", () => {
             variable("v1", "a", "45", "angle"),
             variable("v2", "bad", "a", "length"),
         ]);
-        expect(content.evaluate().errors.get("v2")).toBe("Dimension mismatch: expected length, got angle");
+        expect(content.evaluate().errors.get("v2")).toBe(
+            "error.expression.dimensionMismatchExpectedGotlengthangle",
+        );
 
         content.setType("v2", "angle");
 

@@ -123,6 +123,6 @@ describe("ThreeMeshExporter", () => {
         const result = exporter.exportToPly([mockNode], true);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("can not export to ply");
+        expect(result.error).toBe("error.app.canNotExportPly");
     });
 });

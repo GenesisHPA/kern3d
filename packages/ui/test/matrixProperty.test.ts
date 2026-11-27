@@ -184,25 +184,25 @@ describe("MatrixConverter convertBack error handling", () => {
     test("should return error for insufficient values (only 2 numbers)", () => {
         const result = makeConv().convertBack("1, 2");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("invalid number of values");
+        expect(result.error).toBe("error.app.invalidNumberValues");
     });
 
     test("should return error for empty string", () => {
         const result = makeConv().convertBack("");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("invalid number of values");
+        expect(result.error).toBe("error.app.invalidNumberValues");
     });
 
     test("should return error for all non-numeric values", () => {
         const result = makeConv().convertBack("a, b, c");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("invalid number of values");
+        expect(result.error).toBe("error.app.invalidNumberValues");
     });
 
     test("should return error for mixed numeric/non-numeric values", () => {
         const result = makeConv().convertBack("1, two, 3");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("invalid number of values");
+        expect(result.error).toBe("error.app.invalidNumberValues");
     });
 
     test("should handle values with extra whitespace", () => {
@@ -214,12 +214,12 @@ describe("MatrixConverter convertBack error handling", () => {
     test("should return error for too many values (4 numbers)", () => {
         const result = makeConv().convertBack("1, 2, 3, 4");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("invalid number of values");
+        expect(result.error).toBe("error.app.invalidNumberValues");
     });
 
     test("should return error for just 1 value", () => {
         const result = makeConv().convertBack("42");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("invalid number of values");
+        expect(result.error).toBe("error.app.invalidNumberValues");
     });
 });
