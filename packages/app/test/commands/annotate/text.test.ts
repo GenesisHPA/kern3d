@@ -126,7 +126,7 @@ describe("TextAnnotationCommand", () => {
             const annotations = textAnnotations(doc);
             expect(annotations).toHaveLength(1);
             const note = annotations[0];
-            expect(note.content).toBe("Text");
+            expect(note.content).toBe("common.defaultText");
             expect(note.leaderPoint?.isEqualTo(leader())).toBe(true);
             // on the leader until the cursor says where the text belongs
             expect(note.position.isEqualTo(leader())).toBe(true);

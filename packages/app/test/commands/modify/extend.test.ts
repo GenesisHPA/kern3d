@@ -665,7 +665,9 @@ describe("ExtendCommand", () => {
                 expect(trims[0]).toEqual([[0, 0]]); // the empty window was attempted
                 expect(
                     pubsub.pubs.some(
-                        (args) => args[0] === "displayError" && String(args[1]).includes("shrink to a point"),
+                        (args) =>
+                            args[0] === "displayError" &&
+                            String(args[1]).includes("error.app.edgeWouldShrinkPoint"),
                     ),
                 ).toBe(true);
                 expect(parent.added).toHaveLength(0);

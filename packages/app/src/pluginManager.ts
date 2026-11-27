@@ -41,7 +41,7 @@ export class PluginManager implements IPluginManager {
         if (url.endsWith(".chiliplugin")) {
             const response = await fetch(url);
             if (!response.ok) {
-                alert(`Failed to fetch plugin from ${url}: ${response.statusText}`);
+                alert(I18n.translate("error.plugin.failedFetchPluginFrom{0}{1}", url, response.statusText));
                 return;
             }
 
@@ -99,7 +99,7 @@ export class PluginManager implements IPluginManager {
     private async readManifestFromZip(zip: JSZip) {
         const manifestFile = zip.file("manifest.json");
         if (!manifestFile) {
-            alert("manifest.json not found in plugin archive");
+            alert(I18n.translate("error.plugin.manifestJsonNotFoundPluginArchive"));
             return undefined;
         }
 
@@ -120,7 +120,7 @@ export class PluginManager implements IPluginManager {
     private async loadPluginFromZip(zip: JSZip, manifest: PluginManifest) {
         const codeFile = zip.file(manifest.main);
         if (!codeFile) {
-            alert(`${manifest.main} not found in plugin archive`);
+            alert(I18n.translate("error.plugin.notFoundPluginArchive{0}", manifest.main));
             return;
         }
 
@@ -220,7 +220,7 @@ export class PluginManager implements IPluginManager {
         }).catch((err) => {
             console.log(err);
 
-            alert(`Failed to load plugin ${name}: ${err}`);
+            alert(I18n.translate("error.plugin.failedLoadPlugin{0}{1}", name, err));
         });
     }
 
@@ -231,7 +231,7 @@ export class PluginManager implements IPluginManager {
             if (iconData?.type === "path") {
                 const codeFile = zip.file(iconData?.value);
                 if (!codeFile) {
-                    alert(`${iconData.value} not found in plugin archive`);
+                    alert(I18n.translate("error.plugin.notFoundPluginArchive{0}", iconData.value));
                     continue;
                 }
                 const icon = await codeFile.async("base64");
@@ -289,30 +289,37 @@ export class PluginManager implements IPluginManager {
 
     private validateManifest(manifest: PluginManifest) {
         if (this.manifests.has(manifest.name)) {
-            alert(`Plugin ${manifest.name} already loaded`);
+            alert(I18n.translate("error.plugin.pluginAlreadyLoaded{0}", manifest.name));
             return false;
         }
 
         const errors: string[] = [];
-        if (!manifest.name) errors.push("Missing required field: name");
-        if (!manifest.version) errors.push("Missing required field: version");
-        if (!manifest.main) errors.push("Missing required field: main");
+        if (!manifest.name) errors.push(I18n.translate("error.plugin.missingRequiredFieldName"));
+        if (!manifest.version) errors.push(I18n.translate("error.plugin.missingRequiredFieldVersion"));
+        if (!manifest.main) errors.push(I18n.translate("error.plugin.missingRequiredFieldMain"));
         if (manifest.version && !this.isValidSemver(manifest.version)) {
-            errors.push("Invalid version format (expected semver like 1.0.0)");
+            errors.push(I18n.translate("error.plugin.invalidVersionFormatExpectedSemverLike"));
         }
         if (manifest.engines?.chili3d) {
             const currentVersion = __APP_VERSION__;
             if (!this.satisfiesVersion(currentVersion, manifest.engines.chili3d)) {
-                errors.push(`Chili3D version ${currentVersion} does not satisfy ${manifest.engines.chili3d}`);
+                errors.push(
+                    I18n.translate(
+                        "error.plugin.chili3DVersionDoesNotSatisfy{0}{1}",
+                        currentVersion,
+                        manifest.engines.chili3d,
+                    ),
+                );
             }
         }
 
         if (errors.length > 0) {
             alert(
-                "Load plugin " +
-                    manifest.name +
-                    " failed:\n" +
+                I18n.translate(
+                    "error.plugin.loadFailed{0}{1}",
+                    manifest.name,
                     errors.map((x, i) => `${i + 1}. ${x}`).join("\n"),
+                ),
             );
             return false;
         }
@@ -427,7 +434,7 @@ export class PluginManager implements IPluginManager {
         for (const cssFile of files) {
             const file = zip.file(cssFile);
             if (!file) {
-                alert(`${cssFile} not found in plugin archive`);
+                alert(I18n.translate("error.plugin.notFoundPluginArchive{0}", cssFile));
                 continue;
             }
             const css = await file.async("text");
@@ -444,7 +451,7 @@ export class PluginManager implements IPluginManager {
             const fullUrl = baseUrl + cssFile;
             const response = await fetch(fullUrl);
             if (!response.ok) {
-                alert(`Failed to load CSS from ${fullUrl}: ${response.statusText}`);
+                alert(I18n.translate("error.plugin.failedLoadCSSFrom{0}{1}", fullUrl, response.statusText));
                 continue;
             }
             const css = await response.text();
@@ -460,7 +467,7 @@ export class PluginManager implements IPluginManager {
 
         const codeFile = zip.file(manifest.importmap);
         if (!codeFile) {
-            alert(`${manifest.main} not found in plugin archive`);
+            alert(I18n.translate("error.plugin.notFoundPluginArchive{0}", manifest.main));
             return undefined;
         }
 
@@ -469,7 +476,7 @@ export class PluginManager implements IPluginManager {
         for (const key in json.imports) {
             const importFile = zip.file(json.imports[key]);
             if (!importFile) {
-                alert(`${json.imports[key]} not found in plugin archive`);
+                alert(I18n.translate("error.plugin.notFoundPluginArchive{0}", json.imports[key]));
                 continue;
             }
             const importCode = await importFile.async("text");

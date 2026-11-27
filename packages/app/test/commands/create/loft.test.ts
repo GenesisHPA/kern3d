@@ -249,7 +249,7 @@ describe("LoftCommand", () => {
                 expect(pub).toHaveBeenCalledWith(
                     "showToast",
                     "error.default:{0}",
-                    "Loft requires at least 2 sections",
+                    "error.feature.loftRequiresAtLeast2Sections",
                 );
             } finally {
                 pub.mockRestore();

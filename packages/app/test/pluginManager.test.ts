@@ -140,7 +140,9 @@ describe("PluginManager", () => {
 
             await manager.loadFromFile(new File([], "plugin.zip"));
 
-            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("manifest.json not found"));
+            expect(alertSpy).toHaveBeenCalledWith(
+                expect.stringContaining("error.plugin.manifestJsonNotFoundPluginArchive"),
+            );
             expect(manager.getPlugins()).toEqual([]);
         });
 
@@ -155,7 +157,9 @@ describe("PluginManager", () => {
 
             await manager.loadFromFile(new File([], "plugin.zip"));
 
-            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Missing required field: version"));
+            expect(alertSpy).toHaveBeenCalledWith(
+                expect.stringContaining("error.plugin.missingRequiredFieldVersion"),
+            );
             expect(manager.getPlugins()).toEqual([]);
         });
 
@@ -169,7 +173,9 @@ describe("PluginManager", () => {
 
             await manager.loadFromFile(new File([], "plugin.zip"));
 
-            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("missing.js not found"));
+            expect(alertSpy).toHaveBeenCalledWith(
+                expect.stringContaining("error.plugin.notFoundPluginArchive"),
+            );
         });
 
         test("should alert when a duplicate plugin name is loaded", async () => {
@@ -185,7 +191,9 @@ describe("PluginManager", () => {
 
             await manager.loadFromFile(new File([], "plugin.zip"));
 
-            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("already loaded"));
+            expect(alertSpy).toHaveBeenCalledWith(
+                expect.stringContaining("error.plugin.pluginAlreadyLoaded"),
+            );
         });
 
         test("should load a valid archive by calling loadMainCode with a blob url", async () => {
@@ -583,7 +591,9 @@ describe("PluginManager", () => {
 
             await (manager as any).loadFromRemoteFile("https://cdn.example.com/plugin.chiliplugin");
 
-            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to fetch plugin"));
+            expect(alertSpy).toHaveBeenCalledWith(
+                expect.stringContaining("error.plugin.failedFetchPluginFrom"),
+            );
         });
     });
 

@@ -4,6 +4,7 @@
 import {
     command,
     EditableShapeNode,
+    I18n,
     type IFace,
     MultistepCommand,
     PubSub,
@@ -24,7 +25,11 @@ export class RemoveFaceCommand extends MultistepCommand {
     protected override executeMainTask() {
         const faces = this.stepDatas.at(-1)!.shapes.map((x) => x.shape as IFace);
         if (faces.length === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select at least one face to remove");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectAtLeastOneFaceRemove"),
+            );
             return;
         }
 

@@ -13,6 +13,7 @@ import {
     type FontOutline,
     type GeometryNode,
     GeometryUtils,
+    I18n,
     type I18nKeys,
     type IEdge,
     type IFace,
@@ -102,7 +103,7 @@ export class TextCommand extends CreateCommand {
 
     @property("text.content")
     get text(): string {
-        return this.getPrivateValue("text", "Text");
+        return this.getPrivateValue("text", I18n.translate("common.defaultText"));
     }
     set text(value: string) {
         this.setProperty("text", value);
@@ -154,7 +155,7 @@ export class TextCommand extends CreateCommand {
 
     protected override geometryNode(): GeometryNode {
         const font = this.font;
-        if (font === undefined) throw new Error("A font is needed before text can be drawn");
+        if (font === undefined) throw new Error(I18n.translate("error.app.fontNeededBeforeTextCanDrawn"));
 
         const size = this.resolveParameter(this.size, LENGTH_UNITS);
         if (!size.isOk) throw new Error(size.error);
@@ -305,7 +306,7 @@ export class TextCommand extends CreateCommand {
      */
     private previewShape(towards?: XYZ): Result<TextShape> {
         const font = this.font;
-        if (font === undefined) return Result.err("A font is needed before text can be drawn");
+        if (font === undefined) return Result.err(I18n.translate("error.app.fontNeededBeforeTextCanDrawn"));
 
         const size = this.resolveParameter(this.size, LENGTH_UNITS);
         if (!size.isOk) return Result.err(size.error);

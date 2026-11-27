@@ -4,6 +4,7 @@
 import {
     command,
     type GeometryNode,
+    I18n,
     type IEdge,
     type ILine,
     type IStep,
@@ -49,7 +50,11 @@ export class Revolve extends CreateFromSelectionCommand {
         if (axis !== undefined && profile.some((x) => isSameShapeData(x, axis))) {
             // A straight-edge profile is also a valid axis shape; revolving it about itself
             // is degenerate, so that pick is refused as well.
-            PubSub.default.pub("showToast", "error.default:{0}", "The profile cannot be its own axis");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.app.profileCannotOwnAxis"),
+            );
             return false;
         }
         if (
@@ -59,7 +64,11 @@ export class Revolve extends CreateFromSelectionCommand {
         ) {
             return true;
         }
-        PubSub.default.pub("showToast", "error.default:{0}", "Select a straight edge as the axis");
+        PubSub.default.pub(
+            "showToast",
+            "error.default:{0}",
+            I18n.translate("error.app.selectStraightEdgeAsAxis"),
+        );
         return false;
     }
 

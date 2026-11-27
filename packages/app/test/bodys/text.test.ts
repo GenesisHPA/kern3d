@@ -132,7 +132,7 @@ describe("TextNode", () => {
         const shape = node.shape;
 
         expect(shape.isOk).toBe(false);
-        expect(shape.error).toContain("no font");
+        expect(shape.error).toContain("error.app.thisTextHasNoFontSet");
     });
 
     test("reports an error when its outlines are not readable", () => {
@@ -141,7 +141,7 @@ describe("TextNode", () => {
         const shape = node.shape;
 
         expect(shape.isOk).toBe(false);
-        expect(shape.error).toContain("could not be read");
+        expect(shape.error).toContain("error.app.thisTextSOutlinesCouldNot");
     });
 
     test("reports an error when the text has nothing to draw", () => {
@@ -150,7 +150,7 @@ describe("TextNode", () => {
         const shape = node.shape;
 
         expect(shape.isOk).toBe(false);
-        expect(shape.error).toContain("no text");
+        expect(shape.error).toContain("error.text.thereNoTextPlace");
     });
 
     test("moving the location moves the plane the text lies on", () => {
@@ -190,6 +190,6 @@ describe("TextNode", () => {
         const done = await node.useFont({ name: "Mine.ttf", data: "not a data url" });
 
         expect(done.isOk).toBe(false);
-        expect(done.error).toContain("not readable");
+        expect(done.error).toContain("error.text.notReadable");
     });
 });

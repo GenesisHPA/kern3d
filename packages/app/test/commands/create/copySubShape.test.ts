@@ -108,7 +108,7 @@ describe("CopySubShapeCommand", () => {
                 (cmd as any).executeMainTask();
 
                 const model = (node.parent as any).insertedAfter[0].node;
-                expect(model.name).toBe("Edge");
+                expect(model.name).toBe("shapeType.edge");
             } finally {
                 restoreTx();
             }

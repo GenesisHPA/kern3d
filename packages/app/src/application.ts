@@ -207,8 +207,16 @@ export class Application extends Observable implements IApplication {
 
     async newDocument(name: string): Promise<IDocument> {
         const document = new Document(this, name);
-        const lightGray = new Material({ document, name: "LightGray", color: 0xdedede });
-        const deepGray = new Material({ document, name: "DeepGray", color: 0x898989 });
+        const lightGray = new Material({
+            document,
+            name: I18n.translate("material.name.lightGray"),
+            color: 0xdedede,
+        });
+        const deepGray = new Material({
+            document,
+            name: I18n.translate("material.name.deepGray"),
+            color: 0x898989,
+        });
         document.modelManager.materials.push(lightGray, deepGray);
         await this.createActiveView(document);
         return document;
@@ -224,12 +232,14 @@ export class Application extends Observable implements IApplication {
         return Promise.try(async () => {
             const filename = url.substring(url.lastIndexOf("/") + 1);
             if (!filename || !filename.includes(".")) {
-                throw new Error(`No file name in url: ${url}`);
+                throw new Error(I18n.translate("error.app.noFileNameUrl{0}", url));
             }
 
             const response = await fetch(url);
             if (!response.ok) {
-                throw new Error(`Failed to fetch model: ${url}, statusText: ${response.statusText}`);
+                throw new Error(
+                    I18n.translate("error.app.failedFetchModelStatusText{0}{1}", url, response.statusText),
+                );
             }
 
             const blob = await response.blob();

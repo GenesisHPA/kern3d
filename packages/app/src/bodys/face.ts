@@ -3,6 +3,7 @@
 
 import {
     GeometryUtils,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -100,7 +101,7 @@ export class FaceNode extends ParameterShapeNode {
     }
 
     override generateShape(): Result<IShape> {
-        if (this.shapes.length === 0) return Result.err("No shapes to create face");
+        if (this.shapes.length === 0) return Result.err(I18n.translate("error.app.noShapesCreateFace"));
 
         const wires = this.getWires();
         FaceNode.orientOuterWire(wires[0]);

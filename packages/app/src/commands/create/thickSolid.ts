@@ -83,7 +83,11 @@ export class ThickSolidCommand extends MultistepCommand {
         const plan = this.plan();
         const faces = this.pickedFaces();
         if (plan === undefined || faces.length === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid thickness");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidThickness"),
+            );
             return;
         }
 

@@ -9,6 +9,7 @@ import {
     type Continuity,
     command,
     EditableShapeNode,
+    I18n,
     type IEdge,
     type IFace,
     type IShape,
@@ -37,7 +38,7 @@ export class LoftCommand extends CancelableCommand {
     private visual: number | undefined = undefined;
     private readonly shapes: IShape[] = [];
     private readonly selectedDatas: SnapResult[] = [];
-    private shape: Result<IShape> = Result.err("None shape");
+    private shape: Result<IShape> = Result.err(I18n.translate("error.app.noneShape"));
     private readonly _continuity = Continuities[0];
 
     @property("option.command.isSolid")
@@ -116,7 +117,11 @@ export class LoftCommand extends CancelableCommand {
     private commitLoft(): void {
         if (!this.shape.isOk) {
             if (this.shapes.length < 2) {
-                PubSub.default.pub("showToast", "error.default:{0}", "Loft requires at least 2 sections");
+                PubSub.default.pub(
+                    "showToast",
+                    "error.default:{0}",
+                    I18n.translate("error.feature.loftRequiresAtLeast2Sections"),
+                );
             }
             return;
         }
@@ -148,7 +153,7 @@ export class LoftCommand extends CancelableCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Loft vertex sections must be first or last",
+                I18n.translate("error.command.loftVertexSectionsMustFirstLast"),
             );
             return false;
         }
@@ -177,11 +182,11 @@ export class LoftCommand extends CancelableCommand {
             try {
                 return Result.ok((picked.shape as unknown as IFace).outerWire());
             } catch {
-                return Result.err("A loft section face has no outer boundary");
+                return Result.err(I18n.translate("error.app.loftSectionFaceHasNoOuter"));
             }
         }
         if (picked.shape.shapeType === ShapeTypes.edge && !(picked.shape as IEdge).isClosed()) {
-            return Result.err("A loft section edge must be closed");
+            return Result.err(I18n.translate("error.command.loftSectionEdgeMustClosed"));
         }
         return Result.ok(picked.shape);
     }

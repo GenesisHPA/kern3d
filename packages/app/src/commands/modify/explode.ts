@@ -78,7 +78,7 @@ export class Explode extends MultistepCommand {
 
         let i = 1;
         for (const subShape of subShapes) {
-            const name = `${ShapeTypeUtils.stringValue(subShape.shapeType)} ${i++}`;
+            const name = `${ShapeTypeUtils.displayName(subShape.shapeType)} ${i++}`;
             const subShapeNode = new EditableShapeNode({
                 document: this.document,
                 name,

@@ -5,6 +5,7 @@ import {
     AsyncController,
     command,
     type GeometryNode,
+    I18n,
     type IEdge,
     type IShape,
     type IStep,
@@ -64,7 +65,11 @@ export class Sweep extends CreateFromSelectionCommand {
         this.pathWire = undefined;
         const path = this.stepDatas.at(1)?.shapes ?? [];
         if (path.length === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Sweep requires a path");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.app.sweepRequiresPath"),
+            );
             return false;
         }
         const wire = this.buildWire(path);
@@ -147,7 +152,7 @@ export class Sweep extends CreateFromSelectionCommand {
     /** The swept tool in world coordinates, built from the picks so far. */
     private buildTool(): Result<IShape> {
         const path = this.stepDatas.at(1)?.shapes ?? [];
-        if (path.length === 0) return Result.err("Sweep has no path");
+        if (path.length === 0) return Result.err(I18n.translate("error.command.sweepHasNoPath"));
         const wire = this.buildWire(path);
         if (!wire.isOk) return Result.err(wire.error);
 
@@ -164,7 +169,7 @@ export class Sweep extends CreateFromSelectionCommand {
     private buildWire(path: readonly VisualShapeData[]): Result<IWire> {
         const wires = path.filter((x) => x.shape.shapeType === ShapeTypes.wire);
         if (wires.length > 0) {
-            if (path.length !== 1) return Result.err("A sweep path is one wire or a chain of edges");
+            if (path.length !== 1) return Result.err(I18n.translate("error.app.sweepPathOneWireChainEdges"));
             return Result.ok(path[0].shape.transformedMul(path[0].transform) as IWire);
         }
         const edges = path.map((x) => x.shape.transformedMul(x.transform) as IEdge);

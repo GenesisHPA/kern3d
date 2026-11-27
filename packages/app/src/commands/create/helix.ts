@@ -4,6 +4,7 @@
 import {
     command,
     type GeometryNode,
+    I18n,
     type IStep,
     type LengthAtAxisSnapData,
     LengthAtAxisStep,
@@ -99,7 +100,11 @@ export class Helix extends CreateCommand {
     /** The swept angle divides by the pitch, and the coil degenerates at zero radius/length. */
     protected override canExecute(): boolean {
         if (!(Math.abs(this.pitch) > Precision.Distance)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "The pitch must be non-zero");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.app.pitchMustNonZero"),
+            );
             return false;
         }
         const plane = this.stepDatas[1]?.plane;
@@ -107,7 +112,11 @@ export class Helix extends CreateCommand {
         const radius = plane.projectDistance(this.stepDatas[0].point!, this.stepDatas[1].point!);
         const height = this.getHeight(plane, this.stepDatas[2].point!);
         if (radius > Precision.Distance && Math.abs(height) > Precision.Distance) return true;
-        PubSub.default.pub("showToast", "error.default:{0}", "Helix radius and length must be positive");
+        PubSub.default.pub(
+            "showToast",
+            "error.default:{0}",
+            I18n.translate("error.app.helixRadiusLengthMustPositive"),
+        );
         return false;
     }
 

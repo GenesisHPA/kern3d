@@ -5,6 +5,7 @@ import {
     command,
     Dimensions,
     getAnnotationAssociationResolver,
+    I18n,
     type IStep,
     isAttachedAnchor,
     MultistepCommand,
@@ -30,7 +31,7 @@ export class RefSegment extends MultistepCommand {
         Transaction.execute(this.document, "create RefSegmentAnnotation", () => {
             const annotation = new RefSegmentAnnotation({
                 document: this.document,
-                name: "RefSegmentAnnotation",
+                name: I18n.translate("node.name.refSegment"),
                 annotationType: "refSegment",
                 startPoint: this.stepDatas[0].point!,
                 endPoint: this.stepDatas[1].point!,

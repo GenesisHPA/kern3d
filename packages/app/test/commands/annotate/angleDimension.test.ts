@@ -56,7 +56,9 @@ function dimensionAnnotations(doc: TestDocument): DimensionAnnotation[] {
 }
 
 function annotationFolders(doc: TestDocument): INode[] {
-    return doc.modelManager.findNodes((node) => node instanceof FolderNode && node.name === "Annotations");
+    return doc.modelManager.findNodes(
+        (node) => node instanceof FolderNode && node.name === "node.name.annotations",
+    );
 }
 
 describe("AnnotateAngleDimension", () => {

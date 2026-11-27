@@ -13,6 +13,7 @@ import {
     command,
     Dimensions,
     GeometryNode,
+    I18n,
     type I18nKeys,
     type ICurve,
     type IEdge,
@@ -603,12 +604,12 @@ export class ArrayCommand extends MultistepCommand {
                     PubSub.default.pub("showToast", "toast.instance.groupUnsupported");
                 }
                 if (this.isGroup && !hasInstances) {
-                    const component = new Component({ name: "Array", nodes });
+                    const component = new Component({ name: I18n.translate("node.name.array"), nodes });
                     this.document.modelManager.components.push(component);
                     this.document.modelManager.addNode(
                         new ComponentNode({
                             document: this.document,
-                            name: "Array",
+                            name: I18n.translate("node.name.array"),
                             componentId: component.id,
                             insert: component.origin,
                         }),

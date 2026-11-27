@@ -24,7 +24,7 @@ export class CopySubShapeCommand extends MultistepCommand {
                 const subShape = x.shape.clone();
                 const model = new EditableShapeNode({
                     document: this.document,
-                    name: ShapeTypeUtils.stringValue(subShape.shapeType),
+                    name: ShapeTypeUtils.displayName(subShape.shapeType),
                     shape: subShape,
                 });
 

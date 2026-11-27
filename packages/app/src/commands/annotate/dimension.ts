@@ -7,6 +7,7 @@ import {
     Dimensions,
     formatMeasurement,
     getAnnotationAssociationResolver,
+    I18n,
     type IStep,
     type IView,
     isAttachedAnchor,
@@ -153,7 +154,7 @@ export class AnnotateDimension extends AnnotationCommandBase<DimensionAnnotation
         const p2 = this.stepDatas[1].point!;
         return new DimensionAnnotation({
             document: this.document,
-            name: "DimensionAnnotation",
+            name: I18n.translate("node.name.dimension"),
             annotationType: "dimension",
             dimensionType: "linear",
             startPoint: p1,

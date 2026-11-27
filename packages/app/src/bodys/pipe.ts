@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -84,10 +85,10 @@ export class PipeNode extends ParameterShapeNode {
 
     override generateShape(): Result<IShape> {
         const path = this.path;
-        if (!path) return Result.err("Path is null");
+        if (!path) return Result.err(I18n.translate("error.app.pathNull"));
 
         const edges = path.edgeLoop();
-        if (edges.length === 0) return Result.err("Path has no edges");
+        if (edges.length === 0) return Result.err(I18n.translate("error.app.pathHasNoEdges"));
 
         const { bendR, isNative } = this.resolveBendRadius();
         const pathForSweep = this.createFilletedPath(path, bendR);
@@ -137,7 +138,7 @@ export class PipeNode extends ParameterShapeNode {
         const dir = d1.vec.normalize();
 
         if (!dir) {
-            return Result.err("Invalid path direction");
+            return Result.err(I18n.translate("error.app.invalidPathDirection"));
         }
 
         let xVec = dir.cross(Plane.XY.normal).normalize();
@@ -170,7 +171,7 @@ export class PipeNode extends ParameterShapeNode {
         if (!solidResult.isOk) return solidResult;
 
         if (thickness >= this.radius) {
-            return Result.err("Thickness must be less than Radius");
+            return Result.err(I18n.translate("error.app.thicknessMustLessThanRadius"));
         }
 
         const innerRadius = this.radius - thickness;

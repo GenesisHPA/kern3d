@@ -209,7 +209,11 @@ describe("ShellCommand", () => {
             try {
                 (cmd as any).executeMainTask();
                 expect(parent.added).toHaveLength(0);
-                expect(pubSpy).toHaveBeenCalledWith("showToast", "error.default:{0}", "Invalid thickness");
+                expect(pubSpy).toHaveBeenCalledWith(
+                    "showToast",
+                    "error.default:{0}",
+                    "error.command.invalidThickness",
+                );
             } finally {
                 pubSpy.mockRestore();
             }

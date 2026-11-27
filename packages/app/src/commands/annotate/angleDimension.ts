@@ -12,6 +12,7 @@ import {
     Dimensions,
     formatMeasurement,
     getAnnotationAssociationResolver,
+    I18n,
     type IEdge,
     type IShapeFilter,
     type IStep,
@@ -114,7 +115,7 @@ export class AnnotateAngleDimension extends AnnotationCommandBase<DimensionAnnot
         const { vertex, p1, p2 } = this.angle!;
         return new DimensionAnnotation({
             document: this.document,
-            name: "DimensionAnnotation",
+            name: I18n.translate("node.name.dimension"),
             annotationType: "dimension",
             dimensionType: "angular",
             centerPoint: vertex,

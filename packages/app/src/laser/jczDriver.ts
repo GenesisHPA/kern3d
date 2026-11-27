@@ -6,6 +6,7 @@
 // the third packet, abort — follow the MIT-licensed MeerK40t balor controller and
 // galvoplotter (see THIRD_PARTY_NOTICES.md).
 
+import { I18n } from "@chili3d/core";
 import type { Pt } from "./geometry";
 import type { JobState } from "./grblController";
 import { GalvoMapper, jczLightHeader, jczLightRound, jczProgram } from "./jczProgram";
@@ -151,7 +152,7 @@ export class JczDriver implements LaserDriver {
     private exclusive<T>(fn: (transport: LmcTransport) => Promise<T>): Promise<T> {
         const run = this.queue.then(() => {
             const transport = this.transport;
-            if (transport === undefined) throw new Error("not connected");
+            if (transport === undefined) throw new Error(I18n.translate("error.app.notConnected"));
             return fn(transport);
         });
         this.queue = run.catch(() => {});

@@ -125,7 +125,10 @@ describe("Explode", () => {
             const folder = (parent.insertedAfter[0] as any).node;
             // GroupNode is a real FolderNode: check its child count via the public API.
             expect(folder.count).toBe(2);
-            expect(folder.children().map((c: any) => c.name)).toEqual(["Solid 1", "Face 2"]);
+            expect(folder.children().map((c: any) => c.name)).toEqual([
+                "shapeType.solid 1",
+                "shapeType.face 2",
+            ]);
             expect(parent.removed).toHaveLength(1);
         });
 

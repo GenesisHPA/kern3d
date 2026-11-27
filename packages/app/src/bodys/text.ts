@@ -6,6 +6,7 @@ import {
     cacheOfOutline,
     codePointsOf,
     type FontOutline,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -199,13 +200,13 @@ export class TextNode extends ParameterShapeNode {
      */
     private outlineOf(): Result<FontOutline> {
         if (this.outlines.length === 0) {
-            return Result.err("This text has no font — set one to draw it");
+            return Result.err(I18n.translate("error.app.thisTextHasNoFontSet"));
         }
 
         try {
             return Result.ok(outlineFromCache(JSON.parse(this.outlines)));
         } catch (error) {
-            return Result.err(`This text's outlines could not be read: ${error}`);
+            return Result.err(I18n.translate("error.app.thisTextSOutlinesCouldNot{0}", error));
         }
     }
 

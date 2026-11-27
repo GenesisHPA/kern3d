@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { I18n } from "@chili3d/core";
 import type { GrblTransport } from "./grblController";
 
 /** The part of the Web Serial API used here (Chrome/Edge, and the desktop app's Chromium). */
@@ -54,7 +55,7 @@ export class WebSerialConnection implements GrblTransport {
         onClose: () => void,
     ): Promise<WebSerialConnection> {
         const api = serialApi();
-        if (api === undefined) throw new Error("Web Serial is not available");
+        if (api === undefined) throw new Error(I18n.translate("error.app.webSerialNotAvailable"));
         const port = await api.requestPort();
         await port.open({ baudRate: baud, bufferSize: 4096 });
         const connection = new WebSerialConnection(port, onData, onClose);

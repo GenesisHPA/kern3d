@@ -5,6 +5,7 @@ import {
     command,
     Dimensions,
     getAnnotationAssociationResolver,
+    I18n,
     type IStep,
     isAttachedAnchor,
     Plane,
@@ -34,7 +35,7 @@ import { AnnotationCommandBase } from "./annotationCommandBase";
 export class TextAnnotationCommand extends AnnotationCommandBase<TextAnnotation> {
     @property("text.content")
     get content(): string {
-        return this.getPrivateValue("content", "Text");
+        return this.getPrivateValue("content", I18n.translate("common.defaultText"));
     }
     set content(value: string) {
         this.setProperty("content", value);
@@ -89,7 +90,7 @@ export class TextAnnotationCommand extends AnnotationCommandBase<TextAnnotation>
         const leaderPoint = this.stepDatas[0].point!;
         return new TextAnnotation({
             document: this.document,
-            name: "TextAnnotation",
+            name: I18n.translate("node.name.textAnnotation"),
             annotationType: "text",
             content: this.content,
             // On the leader's point until the cursor says where the text belongs.

@@ -6,6 +6,7 @@ import {
     command,
     debounce,
     EditableShapeNode,
+    I18n,
     type I18nKeys,
     type IFace,
     type JoinType,
@@ -59,14 +60,22 @@ export class ShellCommand extends MultistepCommand {
 
     protected override executeMainTask() {
         if (!(this.thickness > 0)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid thickness");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidThickness"),
+            );
             return;
         }
         const faces = this.stepDatas.at(-1)!.shapes.map((x) => x.shape as IFace);
         if (faces.length === 0) {
             // The kernel answers an empty closing set with the shrunken solid rather than a
             // hollow body, so a shell with nothing open is refused up front.
-            PubSub.default.pub("showToast", "error.default:{0}", "Select at least one face to open");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectAtLeastOneFaceOpen"),
+            );
             return;
         }
 

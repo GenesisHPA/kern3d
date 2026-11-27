@@ -5,6 +5,7 @@ import {
     CurveUtils,
     command,
     EditableShapeNode,
+    I18n,
     type ICircle,
     type ICurve,
     type IEdge,
@@ -78,7 +79,7 @@ function supportCurve(edge: IEdge): SupportCurve | undefined {
  */
 function lineIntersection(s1: SupportCurve, s2: SupportCurve): Result<Corner> {
     if (!CurveUtils.isLine(s1.curve) || !CurveUtils.isLine(s2.curve)) {
-        return Result.err("Edges must be straight lines or arcs");
+        return Result.err(I18n.translate("error.app.edgesMustStraightLinesArcs"));
     }
 
     const d1 = s1.curve.direction.normalize()!;
@@ -86,12 +87,12 @@ function lineIntersection(s1: SupportCurve, s2: SupportCurve): Result<Corner> {
     const normal = d1.cross(d2);
     const denom = normal.dot(normal);
     if (denom < Precision.Float) {
-        return Result.err("Edges must not be parallel");
+        return Result.err(I18n.translate("error.app.edgesMustNotParallel"));
     }
 
     const p12 = s2.value(s2.first).sub(s1.value(s1.first));
     if (Math.abs(p12.dot(normal)) > Precision.Distance * Math.sqrt(denom)) {
-        return Result.err("Edges must be coplanar");
+        return Result.err(I18n.translate("error.app.edgesMustCoplanar"));
     }
 
     return Result.ok({
@@ -192,7 +193,7 @@ function curveIntersection(
         // a maximal window is never empty by construction; treat a missing
         // extent as "no intersection" rather than crashing on undefined
         if (temp1 === undefined || temp2 === undefined) {
-            return Result.err("Edges do not intersect when extended");
+            return Result.err(I18n.translate("error.app.edgesDoNotIntersectWhenExtended"));
         }
         const candidates = temp1.intersect(temp2).flatMap((x): IntersectionCandidate[] => {
             const p2 = temp2.curve.parameter(x.point, Precision.Distance);
@@ -201,7 +202,7 @@ function curveIntersection(
                 : [{ point: x.point, p1: normalizeToRange(x.parameter, s1), p2: normalizeToRange(p2, s2) }];
         });
         if (candidates.length === 0) {
-            return Result.err("Edges do not intersect when extended");
+            return Result.err(I18n.translate("error.app.edgesDoNotIntersectWhenExtended"));
         }
 
         const missed = (c: IntersectionCandidate) =>
@@ -251,12 +252,14 @@ function edgeThroughParameter(
 
     const [first, last] = range.value;
     if (support.period > 0 && last - first >= support.period - Precision.Angle) {
-        return Result.err("Arc would become a full circle");
+        return Result.err(I18n.translate("error.app.arcWouldBecomeFullCircle"));
     }
 
     const trimmed = edge.trim(first, last);
     // a corner within tolerance of the anchored end leaves an empty window
-    return trimmed === undefined ? Result.err("Edge would shrink to a point") : Result.ok(trimmed);
+    return trimmed === undefined
+        ? Result.err(I18n.translate("error.app.edgeWouldShrinkPoint"))
+        : Result.ok(trimmed);
 }
 
 /** The range the edge moves to so it reaches p; the free ends decide which rule applies. */
@@ -277,7 +280,7 @@ function movedRange(
 /** When both ends are shared the range cannot change at all, so p must already land on the edge. */
 function anchoredRange(first: number, last: number, p: number, tol: number): Result<[number, number]> {
     if (p < first - tol || p > last + tol || (p > first + tol && p < last - tol)) {
-        return Result.err("The shared endpoint of a wire edge cannot move");
+        return Result.err(I18n.translate("error.app.sharedEndpointWireEdgeCannotMove"));
     }
     return Result.ok([first, last]);
 }
@@ -339,7 +342,7 @@ function extendEdgeToBoundary(
     const s1 = supportCurve(target);
     const s2 = supportCurve(boundary);
     if (s1 === undefined || s2 === undefined) {
-        return Result.err("Edges must be straight lines or arcs");
+        return Result.err(I18n.translate("error.app.edgesMustStraightLinesArcs"));
     }
 
     const end1 = pickedEnd(s1, point1);
@@ -491,11 +494,12 @@ export class ExtendCommand extends MultistepCommand {
         const edges = wire.findSubShapes(ShapeTypes.edge) as IEdge[];
         for (const [data, worldEdge] of replacements) {
             const index = edges.findIndex((x) => x.isEqual(data.shape as ISubEdgeShape));
-            if (index < 0) return Result.err("The edge must belong to the wire.");
+            if (index < 0) return Result.err(I18n.translate("error.app.edgeMustBelongWire"));
 
             // the wire is rebuilt in node-local space
             const inverse = data.transform.invert();
-            if (inverse === undefined) return Result.err("The node transform is not invertible.");
+            if (inverse === undefined)
+                return Result.err(I18n.translate("error.app.nodeTransformNotInvertible"));
             edges[index] = worldEdge.transformedMul(inverse) as IEdge;
         }
         return shapeFactory.wire(edges);

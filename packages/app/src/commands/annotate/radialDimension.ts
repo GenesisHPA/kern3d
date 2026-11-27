@@ -8,6 +8,7 @@ import {
     Dimensions,
     formatMeasurement,
     getAnnotationAssociationResolver,
+    I18n,
     type IEdge,
     type IShapeFilter,
     type IStep,
@@ -130,7 +131,7 @@ abstract class RadialDimensionCommand extends AnnotationCommandBase<DimensionAnn
         const { start, end } = this.endpoints(this.direction!);
         return new DimensionAnnotation({
             document: this.document,
-            name: "DimensionAnnotation",
+            name: I18n.translate("node.name.dimension"),
             annotationType: "dimension",
             dimensionType: this.dimensionType,
             startPoint: start,

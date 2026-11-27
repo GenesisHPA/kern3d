@@ -1,6 +1,7 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { I18n } from "@chili3d/core";
 import type { GrblTransport } from "../laser/grblController";
 import { toBytes } from "../laser/webSerial";
 import { type Axis, jogLine } from "./machineControl";
@@ -50,7 +51,11 @@ export class WebSocketConnection implements GrblTransport {
             };
             ws.onerror = () => {
                 clearTimeout(timer);
-                reject(new Error(`no connection to ${WebSocketConnection.address(address)}`));
+                reject(
+                    new Error(
+                        I18n.translate("error.app.noConnection{0}", WebSocketConnection.address(address)),
+                    ),
+                );
             };
         });
     }

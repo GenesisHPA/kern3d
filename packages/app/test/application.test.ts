@@ -257,8 +257,8 @@ describe("Application", () => {
             const materialNames = (doc.modelManager.materials as unknown as { name: string }[]).map(
                 (m) => m.name,
             );
-            expect(materialNames).toContain("LightGray");
-            expect(materialNames).toContain("DeepGray");
+            expect(materialNames).toContain("material.name.lightGray");
+            expect(materialNames).toContain("material.name.deepGray");
         });
 
         test("should set activeView to the created view", async () => {

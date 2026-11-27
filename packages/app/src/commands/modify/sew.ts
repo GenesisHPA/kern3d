@@ -5,6 +5,7 @@ import {
     command,
     EditableShapeNode,
     GetOrSelectShapeStep,
+    I18n,
     type IStep,
     instanceSourcesInUse,
     isReferenceGeometryNode,
@@ -35,7 +36,11 @@ export class Sew extends MultistepCommand {
 
     protected override executeMainTask() {
         if (!(this.tolerance > 0)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid tolerance");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidTolerance"),
+            );
             return;
         }
         // One sewed node replaces every input, so there is no successor to retarget.

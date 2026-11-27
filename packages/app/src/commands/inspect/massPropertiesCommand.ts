@@ -118,7 +118,10 @@ export class MassPropertiesCommand extends CancelableCommand {
         const rows = bodies.length > 1 ? bodies.flatMap((body) => this.bodyRows(body, true)) : [];
         this.#panel.set(
             I18n.translate("command.inspect.massProperties"),
-            panelRow(I18n.translate("inspect.density"), `${formatNumber(this.density, 3)} g/cm³`),
+            panelRow(
+                I18n.translate("inspect.density"),
+                `${formatNumber(this.density, 3)} ${I18n.translate("unit.gPerCm3")}`,
+            ),
             ...this.bodyRows(total, bodies.length > 1),
             ...rows,
         );

@@ -330,7 +330,7 @@ export abstract class EdgeCornerCommand extends MultistepCommand {
     private modifyWireCorner(wire: IShape, sub1: ISubEdgeShape, sub2: ISubEdgeShape): Result<IShape> {
         const allEdges = wire.findSubShapes(ShapeTypes.edge) as IEdge[];
         const corner = orderCornerEdges(allEdges, sub1, sub2);
-        if (corner === undefined) return Result.err("Edges must belong to the wire.");
+        if (corner === undefined) return Result.err(I18n.translate("error.app.edgesMustBelongWire"));
 
         const triple = this.applyToEdgePair(corner.edge1, corner.edge2);
         if (!triple.isOk) return triple.parse();

@@ -5,6 +5,7 @@ import {
     type Annotation,
     DIMENSION_TEXT_HEIGHT,
     FolderNode,
+    I18n,
     type IDocument,
     type INode,
     LENGTH_UNITS,
@@ -100,15 +101,17 @@ export abstract class AnnotationCommandBase<T extends Annotation> extends Multis
 
 /** All annotations live under one "Annotations" folder at the document root. */
 export function ensureAnnotationFolder(document: IDocument): FolderNode {
+    const folderName = I18n.translate("node.name.annotations");
     let node: INode | undefined = document.modelManager.rootNode.firstChild;
     while (node) {
-        if (node instanceof FolderNode && node.name === "Annotations") {
+        // "Annotations" is the name documents saved before the folder was named per language carry.
+        if (node instanceof FolderNode && (node.name === "Annotations" || node.name === folderName)) {
             return node;
         }
         node = node.nextSibling;
     }
 
-    const folder = new FolderNode({ document, name: "Annotations" });
+    const folder = new FolderNode({ document, name: folderName });
     document.modelManager.addNode(folder);
     return folder;
 }
