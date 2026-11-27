@@ -221,7 +221,7 @@ export class MillEditor {
                 this.setMode(m),
             );
             b.classList.add(style.icon);
-            b.setAttribute("data-icon", m === "prepare" ? "✎" : "⚙");
+            b.setAttribute("data-icon", m === "prepare" ? "✎" : "🕹");
             if (m === this.mode) b.classList.add(style.on);
             return b;
         };
@@ -265,7 +265,7 @@ export class MillEditor {
                 { className: style.group },
                 iconButton("▶", "mill.play", () => this.view.play()),
                 iconButton("⏸", "mill.pause", () => this.view.pause()),
-                iconButton("↺", "mill.restart", () => this.view.restart()),
+                iconButton("⏮", "mill.restart", () => this.view.restart()),
                 iconButton("⏭", "mill.finish", () => this.view.finish()),
                 el("span", { className: style.muted, textContent: t("mill.speed") }),
                 speed,

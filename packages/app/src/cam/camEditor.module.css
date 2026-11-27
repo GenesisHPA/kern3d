@@ -335,16 +335,26 @@
 
 .pair {
     display: flex;
-    align-items: center;
+    /* fields side by side: each name above its box, the boxes on one line */
+    align-items: flex-end;
     gap: 8px;
 
     & > label {
         flex: 1 1 0;
         min-width: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 3px;
     }
 
     & > label > span {
         width: auto;
+    }
+
+    & > label > input,
+    & > label > select {
+        width: 100%;
+        box-sizing: border-box;
     }
 
     & > select {
