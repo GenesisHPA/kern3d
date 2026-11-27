@@ -258,7 +258,7 @@ test("a dangling profile-role external ref surfaces as a warning on the consumin
     // feature (a foreign source can never be explained by this body's own timeline);
     // the reference-role one builds nothing and stays silent
     const profileItem = profileBody.featureItems().find((x) => x.id === "e-profile");
-    expect(profileItem?.warning).toBe("Sketch has unresolved external references");
+    expect(profileItem?.warning).toBe("body.sketchUnresolvedExternalRefs");
     expect(profileItem?.error).toBeUndefined();
     const referenceItem = referenceBody.featureItems().find((x) => x.id === "e-reference");
     expect(referenceItem?.warning).toBeUndefined();
@@ -356,7 +356,7 @@ test("a cut that consumes the referenced edge stays silent; an upstream loss sti
     });
     expect(body.shape.isOk).toBe(true);
     const after = body.featureItems().find((x) => x.id === "cut");
-    expect(after?.warning).toBe("Sketch has unresolved external references");
+    expect(after?.warning).toBe("body.sketchUnresolvedExternalRefs");
 });
 
 test("one line plus two referenced edges closing a triangle survives the cut", () => {
