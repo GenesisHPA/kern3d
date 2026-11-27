@@ -19,7 +19,9 @@ const SHAPE_KINDS = new Set(
  */
 export function shapeKindOf(node: INode): string | undefined {
     if (!(node instanceof ShapeNode)) return undefined;
-    const kind = node.shapeType.toLowerCase();
+    // The shape's own type, not the node's `shapeType` property: that one is worded for the user.
+    if (!node.shape.isOk) return undefined;
+    const kind = ShapeTypeUtils.stringValue(node.shape.value.shapeType).toLowerCase();
     return SHAPE_KINDS.has(kind) ? kind : undefined;
 }
 
