@@ -633,8 +633,18 @@ export async function rebuildPart(
             const surfaceNowOf = (shape: IShape) =>
                 surfaceFit(mesh, shape, eps, 3000, inPlaceTriangles(shape)).off;
             let surfaceNow = holes.length > 0 ? surfaceNowOf(bodyShape(model)!) : 1;
+            // the surface pass after may need the axis rebuilt with mesh pieces: its time is kept
+            // back from the holes (x_motor_cage: eight holes tried ate the budget, and the pieces
+            // that brought it to 1.3 % never ran)
+            const longestBuild = Math.max(0, ...buildMs.values());
+            const reserve =
+                surfaceNow > 0.02 && referenceFaces <= MAX_PIECES_FACES ? 2 * longestBuild + 30_000 : 0;
             for (const hole of holes.slice(0, MAX_HOLES)) {
                 if (!inTime()) break;
+                if (finishBy - Date.now() < reserve) {
+                    REBUILD_DEBUG?.(`holes stopped: ${reserve} ms kept for the surface pass`);
+                    break;
+                }
                 progress.throwIfCancelled();
                 const before = model.body.features;
                 const sketchesBefore = model.sketches.length;

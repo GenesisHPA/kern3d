@@ -69,6 +69,9 @@ export function setVerifyDebug(hook: ((line: string) => void) | undefined) {
 }
 
 /** Skewed nudges, mm: off every face of both parts, far below any feature. */
+/** A first cut slower than this is not retried nudged. */
+const SLOW_CUT_MS = 5000;
+
 const NUDGES: [number, number, number][] = [
     [1.3e-3, 0.7e-3, 1.1e-3],
     [-0.9e-3, 1.7e-3, -1.3e-3],
@@ -119,7 +122,11 @@ function checkedCut(
             (first.isOk ? ` v=${solidVolume(first.value).toFixed(1)} expected=${expected?.toFixed(1)}` : ""),
     );
     if (firstSound) return { cut: first, sound: true, broken: false };
-    for (const [x, y, z] of NUDGES) {
+    // a cut this slow is a hard one: a nudged copy is no easier and has run past three minutes
+    // (x_motor_cage: 10 s, then 211 s), with no way to stop a boolean once begun
+    const slow = Date.now() - t > SLOW_CUT_MS;
+    if (slow) VERIFY_DEBUG?.(`nudged cuts skipped: the first took over ${SLOW_CUT_MS} ms`);
+    for (const [x, y, z] of slow ? [] : NUDGES) {
         const moved = b.transformed(Matrix4.fromTranslation(x, y, z));
         try {
             t = Date.now();
