@@ -272,7 +272,7 @@ describe("ParametricBodyNode", () => {
         expect(body.featureItems()[0].error).toBeUndefined();
 
         doc.modelManager.addNode(body);
-        expect(body.featureItems()[0].error).toBe("Sketch not found");
+        expect(body.featureItems()[0].error).toBe("error.feature.sketchNotFound");
     });
 
     test("does not evaluate when a removed body is restored without upstream changes", () => {
@@ -468,7 +468,7 @@ describe("ParametricBodyNode", () => {
         });
         const body = bodyWith([extrudeFeature(sketch.id)]);
         expect(body.shape.isOk).toBe(true);
-        expect(body.featureItems()[0].warning).toBe("Sketch has unresolved external references");
+        expect(body.featureItems()[0].warning).toBe("body.sketchUnresolvedExternalRefs");
 
         // A failure in a later, unrelated feature must not wipe that warning.
         body.setFeaturesEmitShapeChanged([
@@ -477,16 +477,16 @@ describe("ParametricBodyNode", () => {
         ]);
 
         const items = body.featureItems();
-        expect(items[1].error).toBe("Sketch not found");
-        expect(items[0].warning).toBe("Sketch has unresolved external references");
+        expect(items[1].error).toBe("error.feature.sketchNotFound");
+        expect(items[0].warning).toBe("body.sketchUnresolvedExternalRefs");
     });
 
     test("fails when the referenced sketch is missing", () => {
         const body = bodyWith([extrudeFeature("no-such-sketch")]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Sketch not found");
-        expect(body.featureItems()[0].error).toBe("Sketch not found");
+        expect(body.shape.error).toBe("error.feature.sketchNotFound");
+        expect(body.featureItems()[0].error).toBe("error.feature.sketchNotFound");
     });
 
     test("a persisted failure is not re-evaluated on every shape read", () => {
@@ -577,8 +577,8 @@ describe("ParametricBodyNode", () => {
         doc.modelManager.addNode(body);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Unknown feature type: teleport");
-        expect(body.featureItems()[0].error).toBe("Unknown feature type: teleport");
+        expect(body.shape.error).toBe("error.feature.unknownFeatureTypeteleport");
+        expect(body.featureItems()[0].error).toBe("error.feature.unknownFeatureTypeteleport");
     });
 
     test("featureItems exposes localized display and parameters", () => {
@@ -872,7 +872,9 @@ describe("ParametricBodyNode", () => {
         // Fillet now runs first with no preceding shape; the failed rebuild keeps the
         // last good shape and surfaces the error in the feature panel instead.
         expect(body.shape.unchecked()).toBe(lastGood);
-        expect(body.featureItems()[0].error).toBe("fillet requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe(
+            "error.feature.requiresPrecedingFeaturecommand.modify.fillet",
+        );
     });
 
     test("moveFeature ignores out-of-range moves", () => {

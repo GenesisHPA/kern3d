@@ -453,7 +453,11 @@ abstract class ModifyCornerFeatureCommand extends MultistepCommand implements Pi
         // whole body and its downstream chain down. The preview already shows nothing for
         // it; the commit must refuse it too.
         if (resolved.value <= Precision.Float) {
-            PubSub.default.pub("showToast", "error.default:{0}", "The corner size must be greater than zero");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.cornerSizeMustGreaterThanZero"),
+            );
             return;
         }
         // A feature can be deleted from the panel while the pick is open — the panel is not modal

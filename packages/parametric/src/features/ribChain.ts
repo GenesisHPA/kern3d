@@ -1,7 +1,16 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IEdge, type IShape, type Plane, Precision, Result, ShapeTypes, type XYZ } from "@chili3d/core";
+import {
+    I18n,
+    type IEdge,
+    type IShape,
+    type Plane,
+    Precision,
+    Result,
+    ShapeTypes,
+    type XYZ,
+} from "@chili3d/core";
 import { shapeEntityIds } from "../sketch/sketchModel";
 import type { SketchNode } from "../sketch/sketchNode";
 import { samePoint } from "./profileSeeds";
@@ -43,7 +52,7 @@ export interface RibChain {
  */
 export function resolveChain(sketch: SketchNode, entityIds: readonly number[]): Result<RibChain> {
     const shape = sketch.shape;
-    if (!shape.isOk) return Result.err("The rib sketch has no geometry");
+    if (!shape.isOk) return Result.err(I18n.translate("error.feature.ribSketchHasNoGeometry"));
 
     const all = shape.value.findSubShapes(ShapeTypes.edge) as IEdge[];
     const ids = shapeEntityIds(sketch.data);
@@ -55,7 +64,7 @@ export function resolveChain(sketch: SketchNode, entityIds: readonly number[]): 
         edges.push(all[index]);
         labels.push(`ent${id}`);
     }
-    if (edges.length === 0) return Result.err("The rib chain has no entities left in the sketch");
+    if (edges.length === 0) return Result.err(I18n.translate("error.feature.ribChainHasNoEntitiesLeft"));
     return Result.ok({ edges, labels, owned: [] });
 }
 
@@ -73,13 +82,13 @@ export function resolveChain(sketch: SketchNode, entityIds: readonly number[]): 
 export function extendChain(chain: RibChain, plane: Plane, target: IShape): Result<RibChain> {
     const ends = freeEnds(chain.edges);
     if (ends.length !== 2) {
-        return Result.err("The rib chain must be one open run of edges");
+        return Result.err(I18n.translate("error.feature.ribChainMustOneOpenRun"));
     }
 
     const section = target.section(plane);
     try {
         const outline = section.findSubShapes(ShapeTypes.edge) as IEdge[];
-        if (outline.length === 0) return Result.err("The rib plane does not cross the body");
+        if (outline.length === 0) return Result.err(I18n.translate("error.feature.ribPlaneDoesNotCrossBody"));
         const reach = probeLength(target);
 
         const stubs: { edge: IEdge; label: string; atStart: boolean }[] = [];
@@ -159,7 +168,7 @@ function extendEnd(end: FreeEnd, outline: readonly IEdge[], reach: number): Resu
         return Result.ok(null);
     }
     const direction = outwardTangent(end);
-    if (direction === undefined) return Result.err("A rib chain end has no direction to extend in");
+    if (direction === undefined) return Result.err(I18n.translate("error.feature.ribChainEndHasNoDirection"));
     const probe = shapeFactory.line(end.point, end.point.add(direction.multiply(reach)));
     if (!probe.isOk) return Result.err(probe.error);
     try {
@@ -177,7 +186,7 @@ function extendEnd(end: FreeEnd, outline: readonly IEdge[], reach: number): Resu
             }
         }
         if (closest === undefined) {
-            return Result.err("A rib chain end does not reach the body");
+            return Result.err(I18n.translate("error.feature.ribChainEndDoesNotReach"));
         }
         const stretched = shapeFactory.line(end.point, end.point.add(direction.multiply(closest)));
         return stretched.isOk ? Result.ok(stretched.value) : Result.err(stretched.error);

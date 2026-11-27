@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { command, Dimensions, type IStep, Precision, PubSub, type XYZ } from "@chili3d/core";
+import { command, Dimensions, I18n, type IStep, Precision, PubSub, type XYZ } from "@chili3d/core";
 import type { TentativeEntity } from "../autoConstraints";
 import { arcAngles, rawArcSweep, toUV } from "../sketchModel";
 import { SketchMultistepCommand } from "./sketchMultistepCommand";
@@ -46,14 +46,14 @@ export class SketchArcCommand extends SketchMultistepCommand {
     protected executeMainTask(): void {
         const params = arcParams(this.uvOf(0), this.uvOf(1), this.uvOf(2));
         if (params === undefined) {
-            PubSub.default.pub("displayValidation", "Arc end point is too close to the center");
+            PubSub.default.pub("displayValidation", I18n.translate("error.sketch.arcEndPointTooCloseCenter"));
             return;
         }
         // an end on the start ray (within angular tolerance, end = start included)
         // fixes no sweep direction — the preview shows "no arc" there, so reject
         // with feedback instead of committing an arc generateShape would refuse
         if (Math.abs(rawArcSweep(params)) <= Precision.Angle) {
-            PubSub.default.pub("displayValidation", "Arc end point is on the start ray (zero sweep)");
+            PubSub.default.pub("displayValidation", I18n.translate("error.sketch.arcEndPointStartRayZero"));
             return;
         }
         this.commitNewEntity(this.editor.solver.addArc(...params));

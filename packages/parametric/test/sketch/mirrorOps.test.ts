@@ -456,8 +456,16 @@ describe("mirrorEntities", () => {
     });
 
     test.each([
-        ["an axis that is not a line", (solver: SketchSolver) => solver.addCircle(0, 5, 2), "a line"],
-        ["a degenerate axis", (solver: SketchSolver) => solver.addLine(1, 1, 1, 1), "too short"],
+        [
+            "an axis that is not a line",
+            (solver: SketchSolver) => solver.addCircle(0, 5, 2),
+            "error.sketch.mirrorLineMustLine",
+        ],
+        [
+            "a degenerate axis",
+            (solver: SketchSolver) => solver.addLine(1, 1, 1, 1),
+            "error.sketch.mirrorLineTooShortMirrorAbout",
+        ],
     ])("refuses %s", (_name, makeAxis, message) => {
         const solver = new SketchSolver(Plane.XY);
         try {

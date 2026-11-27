@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IEdge,
     type IFace,
     type IShape,
@@ -78,7 +79,7 @@ export function revolutionAxisOfFace(face: IFace): Result<RevolutionAxis> {
         const axis = revolutionOf(surface);
         const direction = axis?.direction.normalize();
         if (axis === undefined || direction === undefined) {
-            return Result.err("The face has no axis (pick a cylinder, cone, sphere or torus)");
+            return Result.err(I18n.translate("error.datum.faceHasNoAxisPickCylinder"));
         }
         return Result.ok({ ...axis, direction });
     } finally {
@@ -104,12 +105,13 @@ export function faceNormalAt(face: IFace, point: XYZ): Result<{ point: XYZ; norm
     const surface = face.surface();
     try {
         const nearest = surface.nearestPoint(point);
-        if (nearest === undefined) return Result.err("The point cannot be projected onto the face");
+        if (nearest === undefined)
+            return Result.err(I18n.translate("error.datum.pointCannotProjectedOntoFace"));
         const uv = surface.parameter(nearest[0], 1e-3);
-        if (uv === undefined) return Result.err("The point cannot be projected onto the face");
+        if (uv === undefined) return Result.err(I18n.translate("error.datum.pointCannotProjectedOntoFace"));
         const [foot, normal] = face.normal(uv.u, uv.v);
         const unit = normal.normalize();
-        if (unit === undefined) return Result.err("The face normal is degenerate there");
+        if (unit === undefined) return Result.err(I18n.translate("error.datum.faceNormalDegenerateThere"));
         return Result.ok({ point: foot, normal: unit });
     } finally {
         surface.dispose();

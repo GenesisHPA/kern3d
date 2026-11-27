@@ -172,11 +172,11 @@ describe("two-distance chamfer (real kernel)", () => {
     });
 
     test.each([
-        [{ mode: "bogus" }, "Invalid chamfer mode: bogus"],
-        [{ mode: "twoDistance" }, "A two-distance chamfer requires distance2"],
-        [{ mode: "distanceAngle" }, "A distance-angle chamfer requires an angle"],
-        [{ mode: "distanceAngle", angle: 95 }, "between 0° and 90°"],
-        [{ mode: "distanceAngle", angle: 0 }, "between 0° and 90°"],
+        [{ mode: "bogus" }, "error.feature.invalidChamferModebogus"],
+        [{ mode: "twoDistance" }, "error.feature.twoDistanceChamferRequiresDistance2"],
+        [{ mode: "distanceAngle" }, "error.feature.distanceAngleChamferRequiresAngle"],
+        [{ mode: "distanceAngle", angle: 95 }, "error.feature.distanceAngleChamferSAngleMust"],
+        [{ mode: "distanceAngle", angle: 0 }, "error.feature.distanceAngleChamferSAngleMust"],
     ] as const)("hand-edited data %o fails the feature rather than the kernel", (extra, message) => {
         const { body } = setup();
         const error = withChamfer(body, { id: "c1", ...(extra as object) } as never);

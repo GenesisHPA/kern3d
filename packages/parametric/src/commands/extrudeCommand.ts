@@ -8,6 +8,7 @@ import {
     BoundingBox,
     Combobox,
     command,
+    I18n,
     type I18nKeys,
     type IDocument,
     Id,
@@ -1225,7 +1226,7 @@ export class ExtrudeFeatureCommand
                 origin,
                 dir,
                 sweepStartOffset,
-                "Extrude",
+                I18n.translate("error.command.extrude"),
             );
             if (!depth.isOk) continue;
             reach = Math.max(reach ?? 0, depth.value);
@@ -1574,7 +1575,11 @@ export class ExtrudeFeatureCommand
         // infers its reach from the chain input, an up-to condition from its target.
         const condition = EXTRUDE_END_CONDITIONS[this.endCondition] ?? "blind";
         if (condition === "blind" && Math.abs(depth) < Precision.Float) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Blind extrude needs a non-zero depth");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.blindExtrudeNeedsNonZeroDepth"),
+            );
             return;
         }
         // A negative depth is a direction, not a length: fold its sign into the flip. The

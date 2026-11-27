@@ -226,7 +226,7 @@ describe("loft feature", () => {
         const body = bodyWith([loftFeature([profileSection(sketch1), missing])]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Extrude source body not found");
+        expect(body.featureItems()[0].error).toBe("error.feature.extrudeSourceBodyNotFound");
         expect(mocks.loftTracked).not.toHaveBeenCalled();
     });
 
@@ -245,7 +245,7 @@ describe("loft feature", () => {
         const body = bodyWith([loftFeature([profileSection(sketch2), triangle])]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Sketch profile not found after rebuild");
+        expect(body.featureItems()[0].error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
     });
 
     test("an invalid continuity surfaces as a feature error", () => {
@@ -253,7 +253,7 @@ describe("loft feature", () => {
         const body = bodyWith([loftFeature(sections, { continuity: "g3" as any })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Invalid continuity: g3");
+        expect(body.featureItems()[0].error).toBe("error.feature.invalidContinuityg3");
         expect(mocks.loftTracked).not.toHaveBeenCalled();
     });
 
@@ -261,7 +261,7 @@ describe("loft feature", () => {
         const body = bodyWith([loftFeature([profileSection(sketch1)])]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Loft requires at least 2 sections");
+        expect(body.featureItems()[0].error).toBe("error.feature.loftRequiresAtLeast2Sections");
     });
 
     describe("vertex sections", () => {
@@ -314,7 +314,7 @@ describe("loft feature", () => {
             const body = bodyWith([loftFeature([vertex, profileSection(sketch1)])]);
 
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Loft section vertex not found after rebuild");
+            expect(body.featureItems()[0].error).toBe("error.feature.loftSectionVertexNotFoundAfter");
         });
     });
 
@@ -327,15 +327,15 @@ describe("loft feature", () => {
         const profile: LoftSectionData = { kind: "profile", nodeId: "n", profile: { edges: [] } };
 
         test.each([
-            { sections: [] as LoftSectionData[], error: "Loft requires at least 2 sections" },
-            { sections: [profile] as LoftSectionData[], error: "Loft requires at least 2 sections" },
+            { sections: [] as LoftSectionData[], error: "error.feature.loftRequiresAtLeast2Sections" },
+            { sections: [profile] as LoftSectionData[], error: "error.feature.loftRequiresAtLeast2Sections" },
             {
                 sections: [vertex, vertex] as LoftSectionData[],
-                error: "Loft requires at least 1 wire section",
+                error: "error.feature.loftRequiresAtLeast1Wire",
             },
             {
                 sections: [profile, vertex, profile] as LoftSectionData[],
-                error: "Loft vertex sections must be first or last",
+                error: "error.command.loftVertexSectionsMustFirstLast",
             },
         ])("$error", ({ sections, error }) => {
             const result = validateLoftSections(sections);

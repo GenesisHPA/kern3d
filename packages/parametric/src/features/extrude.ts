@@ -4,6 +4,7 @@
 import {
     ANGLE_UNITS,
     type FeatureParameter,
+    I18n,
     type IDocument,
     type IShape,
     LENGTH_UNITS,
@@ -264,7 +265,7 @@ function combineWithInput(
     if (!built.isOk || feature.operation === undefined) return built;
     if (context.input === undefined) {
         built.value.dispose();
-        return Result.err("Extrude join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.extrudeJoinCutIntersectRequiresPreceding"));
     }
     const owned: IShape[] = [];
     try {
@@ -325,7 +326,7 @@ function resolveSketchProfiles(
 ): Result<{ sketch: SketchNode; profiles: ResolvedProfile[] }> {
     const sketch =
         feature.sketchId === undefined ? undefined : findSketch(context.document, feature.sketchId);
-    if (sketch === undefined) return Result.err("Sketch not found");
+    if (sketch === undefined) return Result.err(I18n.translate("error.feature.sketchNotFound"));
 
     const resolved = resolveProfiles(sketch, feature.profiles);
     if (!resolved.isOk) return Result.err(resolved.error);
@@ -419,7 +420,7 @@ function pressPullOperationTracked(
     const tracked = feature.operation === undefined ? undefined : trackedBoolean(feature.operation);
     if (tracking === undefined || tracked === undefined) return undefined;
     if (context.input === undefined) {
-        return Result.err("Extrude join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.extrudeJoinCutIntersectRequiresPreceding"));
     }
     const built = extrudeFromSourceFaces(feature, context, plan, draftAngle);
     if (!built.isOk) return Result.err(built.error);
@@ -467,7 +468,7 @@ function extrudeOperationTracked(
     }
     const input = context.input;
     if (input === undefined) {
-        return Result.err("Extrude join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.extrudeJoinCutIntersectRequiresPreceding"));
     }
     const resolved = resolveSketchProfiles(feature, context);
     if (!resolved.isOk) return Result.err(resolved.error);

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision, Result } from "@chili3d/core";
+import { I18n, Precision, Result } from "@chili3d/core";
 import { nurbsWeights, sampleEntity } from "./curveEval";
 import { isBroken } from "./entityEditOps";
 import { type SketchOperationResult, SketchSolveError } from "./sketchError";
@@ -278,7 +278,7 @@ function scalingProblem(entity: SketchEntityData, transform: SketchTransform): s
     // there is nothing in either to shrink
     if (entity.type === "line" || entity.type === "point") return undefined;
     if (entityExtent(entity) * transform.scale <= Precision.Distance) {
-        return "The scale would collapse the sketch geometry";
+        return I18n.translate("error.sketch.scaleWouldCollapseSketchGeometry");
     }
     return undefined;
 }
@@ -411,7 +411,9 @@ function reconcile(
     }
     if (isBroken(result) && !isBroken(baseline.result)) {
         solver.reset(snapshot);
-        return Result.err(new SketchSolveError(`The sketch could not solve after the transform (${result})`));
+        return Result.err(
+            new SketchSolveError(I18n.translate("error.sketch.sketchCouldNotSolveAfterTransform{0}", result)),
+        );
     }
     return Result.ok(dropped);
 }
@@ -448,10 +450,11 @@ export function transformEntities(
 ): SketchOperationResult<TransformOutcome> {
     // a negative scale is a reflection: its arcs would need the mirror's start/end swap,
     // so it is refused here rather than silently turning the geometry inside out
-    if (transform.scale <= Precision.Float) return Result.err("The scale must be positive");
-    if (isIdentityTransform(transform)) return Result.err("Nothing to transform");
+    if (transform.scale <= Precision.Float)
+        return Result.err(I18n.translate("error.sketch.scaleMustPositive"));
+    if (isIdentityTransform(transform)) return Result.err(I18n.translate("error.sketch.nothingTransform"));
     const sources = movableEntities(solver, ids);
-    if (sources.length === 0) return Result.err("Nothing to transform");
+    if (sources.length === 0) return Result.err(I18n.translate("error.sketch.nothingTransform"));
     for (const source of sources) {
         const problem = scalingProblem(source, transform);
         if (problem !== undefined) return Result.err(problem);

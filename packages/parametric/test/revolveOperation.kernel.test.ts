@@ -139,6 +139,6 @@ describe("a revolve carrying an operation (real kernel)", () => {
         doc.modelManager.addNode(body);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Revolve join/cut/intersect requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.feature.revolveJoinCutIntersectRequiresPreceding");
     });
 });

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision, Result } from "@chili3d/core";
+import { I18n, Precision, Result } from "@chili3d/core";
 import { curveControlPoints, nurbsSpec, nurbsWeights, subBezier, subConic, subNurbs } from "./curveEval";
 import { type CurveCrossing, entityEndIndices, farEnd } from "./curveGeometry";
 import { type SketchOperationResult, SketchSolveError } from "./sketchError";
@@ -71,7 +71,9 @@ export function guardedEdit<T>(
     if (isBroken(solved.result) && !isBroken(baseline)) {
         solver.reset(snapshot);
         return Result.err(
-            new SketchSolveError(`The sketch could not solve after ${label} (${solved.result})`),
+            new SketchSolveError(
+                I18n.translate("error.sketch.sketchCouldNotSolveAfter{0}{1}", label, solved.result),
+            ),
         );
     }
     return outcome;
@@ -363,7 +365,7 @@ function splitBezierEntity(
     const kept = cut(0, tKeep);
     const added = cut(tNew, 1);
     if (kept === undefined || added === undefined) {
-        return Result.err("The curve cannot be split there");
+        return Result.err(I18n.translate("error.sketch.curveCannotSplitThere"));
     }
     const flat = added.poles.flat();
     const newId =
@@ -387,7 +389,7 @@ function splitNurbsEntity(
     const kept = subNurbs(poles, weights, spec, spec.knots[spec.degree], tKeep);
     const added = subNurbs(poles, weights, spec, tNew, spec.knots[poles.length]);
     if (kept === undefined || added === undefined) {
-        return Result.err("The curve cannot be split there");
+        return Result.err(I18n.translate("error.sketch.curveCannotSplitThere"));
     }
     const newId = solver.addNurbs(added.poles.flat(), added.spec, added.weights);
     if (solver.isConstruction(entity.id)) solver.setConstruction(newId, true);
@@ -467,12 +469,12 @@ export function shortenCurveEntity(
             atOrigin ? tCut : spec.knots[spec.degree],
             atOrigin ? spec.knots[poles.length] : tCut,
         );
-        if (piece === undefined) return Result.err("The curve cannot be cut back there");
+        if (piece === undefined) return Result.err(I18n.translate("error.sketch.curveCannotCutBackThere"));
         return reshapeCurve(solver, entity, piece);
     }
     const piece =
         entity.type === "conic" ? subConic(poles, entity.params[6], from, to) : subBezier(poles, from, to);
-    if (piece === undefined) return Result.err("The curve cannot be cut back there");
+    if (piece === undefined) return Result.err(I18n.translate("error.sketch.curveCannotCutBackThere"));
     return reshapeBezierPiece(solver, entity, piece);
 }
 

@@ -240,7 +240,7 @@ describe("RibFeatureCommand commit", () => {
         const said = captureToasts(() => (cmd as any).executeMainTask());
 
         expect(body.features).toHaveLength(1);
-        expect(said()[0]).toContain("The rib does not reach the body");
+        expect(said()[0]).toContain("error.feature.ribDoesNotReachBody");
     });
 
     test("a thickness that does not resolve refuses the commit instead of raising a zero wall", () => {
@@ -299,6 +299,6 @@ describe("RibFeatureCommand extend to part", () => {
         // Exactly one refusal, and it names the missing part rather than the generic
         // "does not reach a body" — the two mean different things to the user.
         expect(said()).toHaveLength(1);
-        expect(said()[0]).toContain("Select the body to extend the profile to");
+        expect(said()[0]).toContain("error.command.selectBodyExtendProfile");
     });
 });

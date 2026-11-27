@@ -4,6 +4,7 @@
 import {
     Combobox,
     command,
+    I18n,
     type I18nKeys,
     Id,
     type IFace,
@@ -216,7 +217,11 @@ export class ShellFeatureCommand extends MultistepCommand {
         // hollowing by zero.
         const resolved = this.resolveParameter(this.thickness, LENGTH_UNITS);
         if (!resolved.isOk || !(resolved.value > 0)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid thickness");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidThickness"),
+            );
             return;
         }
         const body = this.stepDatas[0].nodes?.[0];
@@ -224,7 +229,11 @@ export class ShellFeatureCommand extends MultistepCommand {
         if (!(body instanceof ParametricBodyNode) || picked.length === 0) {
             // A shell with nothing open is not one: the kernel answers an empty closing set with
             // the shrunken solid rather than a hollow body, so it is refused up front.
-            PubSub.default.pub("showToast", "error.default:{0}", "Select at least one face to open");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectAtLeastOneFaceOpen"),
+            );
             return;
         }
 

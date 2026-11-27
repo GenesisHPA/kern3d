@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IShape, LENGTH_UNITS, Result, resolveUnitSpec, ShapeTypes } from "@chili3d/core";
+import { I18n, type IShape, LENGTH_UNITS, Result, resolveUnitSpec, ShapeTypes } from "@chili3d/core";
 import { type FeatureContext, type FeatureHandler, registerFeature, type SewFeatureData } from "./feature";
 
 /**
@@ -36,9 +36,10 @@ const sewHandler: FeatureHandler<SewFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Sew requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.sewRequiresPrecedingFeature"));
         if (input.shapeType === ShapeTypes.solid || input.shapeType === ShapeTypes.compoundSolid) {
-            return Result.err("Sew expects faces or shells — there is nothing to sew on a solid");
+            return Result.err(I18n.translate("error.feature.sewExpectsFacesShellsThereNothing"));
         }
         let tolerance = 1e-7;
         if (feature.tolerance !== undefined) {
@@ -46,7 +47,7 @@ const sewHandler: FeatureHandler<SewFeatureData> = {
             if (!resolved.isOk) return Result.err(resolved.error);
             tolerance = resolved.value;
         }
-        if (!(tolerance > 0)) return Result.err("Sew requires a positive tolerance");
+        if (!(tolerance > 0)) return Result.err(I18n.translate("error.feature.sewRequiresPositiveTolerance"));
 
         const sewn = shapeFactory.sewing([input]);
         if (!sewn.isOk) return Result.err(sewn.error);

@@ -3,6 +3,7 @@
 
 import {
     command,
+    I18n,
     Id,
     type IStep,
     LENGTH_UNITS,
@@ -215,7 +216,7 @@ export class HelixFeatureCommand extends MultistepCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Helix radius and length must be positive, and the pitch non-zero",
+                I18n.translate("error.command.helixRadiusLengthMustPositivePitch"),
             );
         }
         return valid;

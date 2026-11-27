@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IFace, type IShape, LENGTH_UNITS, Result, resolveUnitSpec } from "@chili3d/core";
+import { I18n, type IFace, type IShape, LENGTH_UNITS, Result, resolveUnitSpec } from "@chili3d/core";
 import { trackedBoolean } from "./boolean";
 import {
     type FeatureContext,
@@ -226,7 +226,7 @@ function combineWithInput(
     const input = context.input;
     if (input === undefined) {
         built.shape.dispose();
-        return Result.err("Thicken join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.thickenJoinCutIntersectRequiresPreceding"));
     }
     const tracked = trackedBoolean(operation);
     const tracking = context.tracking;
@@ -252,7 +252,7 @@ function combinePlain(
     const input = context.input;
     if (input === undefined) {
         built.shape.dispose();
-        return Result.err("Thicken join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.thickenJoinCutIntersectRequiresPreceding"));
     }
     const owned: IShape[] = [];
     try {

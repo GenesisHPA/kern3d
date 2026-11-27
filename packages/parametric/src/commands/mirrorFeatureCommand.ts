@@ -4,6 +4,7 @@
 import {
     command,
     GetOrSelectNodeStep,
+    I18n,
     Id,
     type INode,
     type IStep,
@@ -53,12 +54,20 @@ export class MirrorFeatureCommand extends MultistepCommand {
     protected override executeMainTask(): void {
         const body = this.stepDatas[0].nodes?.[0];
         if (!(body instanceof ParametricBodyNode)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a parametric body");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectParametricBody"),
+            );
             return;
         }
         const plane = this.plane;
         if (plane === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a mirror plane");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectMirrorPlane"),
+            );
             return;
         }
 

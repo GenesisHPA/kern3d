@@ -4,6 +4,7 @@
 import {
     type Continuity,
     type FeatureParameter,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -1321,7 +1322,8 @@ export function featureHandler(type: string): FeatureHandler | undefined {
 
 export function evaluateFeature(feature: FeatureData, context: FeatureContext): Result<IShape> {
     const handler = handlers.get(feature.type);
-    if (handler === undefined) return Result.err(`Unknown feature type: ${feature.type}`);
+    if (handler === undefined)
+        return Result.err(I18n.translate("error.feature.unknownFeatureType{0}", feature.type));
     return handler.evaluate(feature, context);
 }
 

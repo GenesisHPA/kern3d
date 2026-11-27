@@ -1,7 +1,16 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { CurveUtils, type IDocument, type IEdge, Result, ShapeNode, XYZ, type XYZLike } from "@chili3d/core";
+import {
+    CurveUtils,
+    I18n,
+    type IDocument,
+    type IEdge,
+    Result,
+    ShapeNode,
+    XYZ,
+    type XYZLike,
+} from "@chili3d/core";
 import { type NeutralPlaneRef, planeRefNodeId } from "../features/feature";
 import type { EdgeSourceRef, PointRef } from "../plane/planeDefinition";
 import { resolvePlaneSourceInWorld } from "../plane/planeSource";
@@ -99,7 +108,7 @@ export function resolveAxisDefinition(
     try {
         line = resolveLine(definition, document, visited);
     } catch (error) {
-        return Result.err(`Axis definition could not be resolved: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.axisDefinitionCouldNotResolved{0}", String(error)));
     }
     if (!line.isOk) return Result.err(line.error);
     return Result.ok(axisValue(line.value, definition.flip === true));
@@ -132,7 +141,12 @@ function resolveLine(
         case "fixed":
             return fixedLine(definition);
         default:
-            return Result.err(`Unknown axis definition: ${String((definition as { kind?: string }).kind)}`);
+            return Result.err(
+                I18n.translate(
+                    "error.datum.unknownAxisDefinition{0}",
+                    String((definition as { kind?: string }).kind),
+                ),
+            );
     }
 }
 
@@ -161,14 +175,15 @@ function lineOfEdge(edge: IEdge): Result<AxisLine> {
     const basis = edge.curve.basisCurve;
     if (CurveUtils.isCircle(basis)) {
         const direction = basis.axis.normalize();
-        if (direction === undefined) return Result.err("Circle axis is degenerate");
+        if (direction === undefined) return Result.err(I18n.translate("error.datum.circleAxisDegenerate"));
         return Result.ok({ point: basis.center, direction, span: undefined });
     }
-    if (!CurveUtils.isLine(basis)) return Result.err("Axis requires a straight or circular edge");
+    if (!CurveUtils.isLine(basis))
+        return Result.err(I18n.translate("error.datum.axisRequiresStraightCircularEdge"));
     const start = edge.startPoint();
     const chord = edge.endPoint().sub(start);
     const direction = chord.normalize();
-    if (direction === undefined) return Result.err("Axis edge is degenerate");
+    if (direction === undefined) return Result.err(I18n.translate("error.datum.axisEdgeDegenerate"));
     return Result.ok({ point: start, direction, span: { min: 0, max: chord.length() } });
 }
 
@@ -188,7 +203,8 @@ function twoPointLine(
     if (!second.isOk) return Result.err(second.error);
     const chord = second.value.sub(first.value);
     const direction = chord.normalize();
-    if (direction === undefined || chord.length() < 1e-9) return Result.err("The two points coincide");
+    if (direction === undefined || chord.length() < 1e-9)
+        return Result.err(I18n.translate("error.datum.twoPointsCoincide"));
     return Result.ok({ point: first.value, direction, span: { min: 0, max: chord.length() } });
 }
 
@@ -197,7 +213,7 @@ function twoPlaneLine(
     document: IDocument,
     visited: ReadonlySet<string> | undefined,
 ): Result<AxisLine> {
-    const options = { label: "Axis", visited };
+    const options = { label: I18n.translate("error.datum.axis"), visited };
     const first = resolvePlaneSourceInWorld(document, definition.first, definition.anchors, options);
     if (!first.isOk) return Result.err(first.error);
     const second = resolvePlaneSourceInWorld(document, definition.second, definition.anchors, options);
@@ -228,7 +244,7 @@ export function planeIntersection(
 ): Result<AxisLine> {
     const direction = first.normal.cross(second.normal).normalize();
     if (direction === undefined || first.normal.cross(second.normal).length() < 1e-9) {
-        return Result.err("The two planes are parallel");
+        return Result.err(I18n.translate("error.datum.twoPlanesAreParallel"));
     }
     // The three planes (the two, plus the one through `near` normal to the line) meet in one point.
     const point = threePlanePoint(
@@ -236,7 +252,7 @@ export function planeIntersection(
         [second.normal, second.normal.dot(second.origin)],
         [direction, direction.dot(near)],
     );
-    if (point === undefined) return Result.err("The two planes are parallel");
+    if (point === undefined) return Result.err(I18n.translate("error.datum.twoPlanesAreParallel"));
     return Result.ok({ point, direction });
 }
 
@@ -318,12 +334,12 @@ function pointPlaneLine(
     const point = resolvePoint(document, definition.point, definition.anchors, "Axis", visited);
     if (!point.isOk) return Result.err(point.error);
     const plane = resolvePlaneSourceInWorld(document, definition.plane, definition.anchors, {
-        label: "Axis",
+        label: I18n.translate("error.datum.axis"),
         visited,
     });
     if (!plane.isOk) return Result.err(plane.error);
     const direction = plane.value.normal.normalize();
-    if (direction === undefined) return Result.err("Plane normal is degenerate");
+    if (direction === undefined) return Result.err(I18n.translate("error.datum.planeNormalDegenerate"));
     // The segment runs from the plane to the point (the foot is at t = -height).
     const height = point.value.sub(plane.value.origin).dot(direction);
     const span =
@@ -334,7 +350,7 @@ function pointPlaneLine(
 /** The world axis plus the drawn segment: the span widened by a margin, or a default length. */
 function fixedLine(definition: Extract<AxisDefinition, { kind: "fixed" }>): Result<AxisLine> {
     const direction = new XYZ(definition.direction).normalize();
-    if (direction === undefined) return Result.err("Axis direction is degenerate");
+    if (direction === undefined) return Result.err(I18n.translate("error.datum.axisDirectionDegenerate"));
     return Result.ok({ point: new XYZ(definition.point), direction, span: definition.span });
 }
 

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type I18nKeys,
     type IEdge,
     type IFace,
@@ -162,16 +163,18 @@ function resolveProfileMode(
     profiles: readonly SweepProfile[],
 ): Result<SweepOrientation> {
     const mode = feature.profileControl ?? "frenet";
-    if (!SweepProfileModes.includes(mode)) return Result.err(`Invalid sweep profile control: ${mode}`);
+    if (!SweepProfileModes.includes(mode))
+        return Result.err(I18n.translate("error.feature.invalidSweepProfileControl{0}", mode));
     if (mode !== "fixed") return Result.ok({ mode });
     const face = profiles[0]?.face;
-    if (face === undefined) return Result.err("Sweep requires at least one profile");
+    if (face === undefined) return Result.err(I18n.translate("error.feature.sweepRequiresAtLeastOneProfile"));
     try {
         const binormal = fixedBinormal(face.normal(0, 0)[1]);
-        if (binormal === undefined) return Result.err("The sweep profile has no defined plane normal");
+        if (binormal === undefined)
+            return Result.err(I18n.translate("error.feature.sweepProfileHasNoDefinedPlane"));
         return Result.ok({ mode, fixedDirection: binormal });
     } catch {
-        return Result.err("The sweep profile has no defined plane normal");
+        return Result.err(I18n.translate("error.feature.sweepProfileHasNoDefinedPlane"));
     }
 }
 
@@ -201,7 +204,9 @@ function sweepPlain(
 ): Result<IShape> {
     if (orientation.mode === "frenet" || shapeFactory.sweepWithMode === undefined) {
         if (orientation.mode !== "frenet") {
-            return Result.err(`The kernel does not support ${orientation.mode} sweep profile control`);
+            return Result.err(
+                I18n.translate("error.feature.kernelDoesNotSupportSweepProfile{0}", orientation.mode),
+            );
         }
         return shapeFactory.sweep(
             profiles.map(({ face }) => face),
@@ -266,7 +271,7 @@ function resolveSweepProfiles(
     if (feature.source !== undefined) return resolveSourceProfiles(feature.source, context, owned);
     const sketch =
         feature.sketchId === undefined ? undefined : findSketch(context.document, feature.sketchId);
-    if (sketch === undefined) return Result.err("Sketch not found");
+    if (sketch === undefined) return Result.err(I18n.translate("error.feature.sketchNotFound"));
     const resolved = resolveProfiles(sketch, feature.profiles);
     if (!resolved.isOk) return Result.err(resolved.error);
     const { profiles, missing, refIndexes } = resolved.value;
@@ -386,7 +391,7 @@ function sweepWithOperation(
     orientation: SweepOrientation,
 ): Result<IShape> {
     if (context.input === undefined) {
-        return Result.err("Sweep join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.sweepJoinCutIntersectRequiresPreceding"));
     }
     const tracking = context.tracking;
     const tracked = trackedBoolean(operation);
@@ -483,7 +488,7 @@ function sweepProfileTracked(
             : byMode === undefined
               ? undefined
               : () => byMode(profile.face, path, orientation.mode, isRoundCorner, orientation.fixedDirection);
-    if (call === undefined) return Result.err("Sweep tracking is unavailable");
+    if (call === undefined) return Result.err(I18n.translate("error.feature.sweepTrackingUnavailable"));
     const result = call();
     if (!result.isOk) return Result.err(result.error);
     const faceEdges = profile.face.findSubShapes(ShapeTypes.edge) as IEdge[];
@@ -518,7 +523,8 @@ function resolvePathWire(
     owned: IShape[],
 ): Result<{ wire: IWire; anchors: EdgeRef[] }> {
     const node = context.document.modelManager.findNode((n) => n.id === feature.path.nodeId);
-    if (!(node instanceof ShapeNode) || !node.shape.isOk) return Result.err("Sweep path body not found");
+    if (!(node instanceof ShapeNode) || !node.shape.isOk)
+        return Result.err(I18n.translate("error.feature.sweepPathBodyNotFound"));
     const shape = node.shape.value;
     const shapeEdges = shape.findSubShapes(ShapeTypes.edge) as IEdge[];
     const edgeIds = isBodyTrackingNode(node) ? shapeEdges.map((_, i) => node.edgeIdAt(i)) : [];

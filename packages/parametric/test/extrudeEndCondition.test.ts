@@ -295,21 +295,21 @@ describe("extrude end conditions", () => {
         const body = bodyWith([extrude({ symmetric: true, depth2: 3 })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Extrude cannot be both symmetric and have a second depth");
+        expect(body.shape.error).toBe("error.feature.extrudeCannotBothSymmetricHaveSecond");
     });
 
     test("a non-positive second depth is a rebuild error", () => {
         const body = bodyWith([extrude({ depth2: 0 })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Extrude depth2 must be positive");
+        expect(body.shape.error).toBe("error.feature.extrudeDepth2MustPositive");
     });
 
     test("through-all requires a preceding feature", () => {
         const body = bodyWith([extrude({ endCondition: "throughAll" })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Extrude through-all requires a preceding feature");
+        expect(body.shape.error).toBe("error.feature.extrudeThroughAllRequiresPrecedingFeature");
     });
 
     test("through-all sweeps past the chain input's far side, plus the margin", () => {
@@ -372,7 +372,7 @@ describe("extrude end conditions", () => {
         ]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Extrude target lies on or crosses the start plane");
+        expect(body.shape.error).toBe("error.feature.extrudeTargetLiesCrossesStartPlane");
     });
 
     test("offsets that pull an up-to end behind the start plane are a rebuild error", () => {
@@ -385,7 +385,7 @@ describe("extrude end conditions", () => {
         ]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Extrude offsets place the end behind the start plane");
+        expect(body.shape.error).toBe("error.feature.extrudeOffsetsPlaceEndBehindStart");
     });
 
     test("up-to-face: a lost node's frozen fingerprint drives the depth when it is parallel", () => {
@@ -534,7 +534,7 @@ describe("extrude end conditions", () => {
         ]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Extrude direction is parallel to the profile plane");
+        expect(body.shape.error).toBe("error.feature.extrudeDirectionParallelProfilePlane");
     });
 
     test("a lost direction keeps building from the frozen fingerprint and reports the loss", () => {
@@ -780,14 +780,14 @@ describe("revolve two-sided angles", () => {
         const body = bodyWith([revolveFeature({ symmetric: true, angle2: 30 })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Revolve cannot be both symmetric and have a second angle");
+        expect(body.shape.error).toBe("error.feature.revolveCannotBothSymmetricHaveSecond");
     });
 
     test.each([0, -30])("a non-positive second angle (%s) is a rebuild error", (angle2) => {
         const body = bodyWith([revolveFeature({ angle2 })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Revolve angle2 must be positive");
+        expect(body.shape.error).toBe("error.feature.revolveAngle2MustPositive");
     });
 
     test("symmetric sweeps half the total angle to each side of the profile plane", () => {

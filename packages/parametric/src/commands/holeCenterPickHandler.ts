@@ -5,6 +5,7 @@ import {
     type AsyncController,
     Config,
     CurveUtils,
+    I18n,
     type IDocument,
     type IEdge,
     type IFace,
@@ -317,7 +318,7 @@ export class HoleCenterPickHandler extends ShapeSelectionHandler {
                 PubSub.default.pub(
                     "showToast",
                     "error.default:{0}",
-                    "Hole centers must come from one sketch",
+                    I18n.translate("error.command.holeCentersMustComeFromOne"),
                 );
                 return;
             }

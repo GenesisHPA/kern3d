@@ -7,6 +7,7 @@ import {
     CurveUtils,
     Dimensions,
     debounce,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -970,7 +971,11 @@ function verifiedPatternPath(picked: readonly VisualShapeData[]): PatternPathSou
     if (picked.length === 0) return undefined;
     const source = capturePatternPathSource(picked);
     if (source === undefined) {
-        PubSub.default.pub("showToast", "error.default:{0}", "Select the path edges on one body");
+        PubSub.default.pub(
+            "showToast",
+            "error.default:{0}",
+            I18n.translate("error.command.selectPathEdgesOneBody"),
+        );
         return undefined;
     }
     const chained = orderPathEdges(picked.map((shape) => shape.shape as unknown as IEdge));
@@ -1214,7 +1219,7 @@ export class HolePointsReselectSession {
                 PubSub.default.pub(
                     "showToast",
                     "error.default:{0}",
-                    resolved.isOk ? "Hole face not found" : resolved.error,
+                    resolved.isOk ? I18n.translate("error.command.holeFaceNotFound") : resolved.error,
                 );
                 return undefined;
             }

@@ -487,7 +487,11 @@ describe("LoftFeatureCommand solid-face sections", () => {
         try {
             await cmd.execute(app);
 
-            expect(pub).toHaveBeenCalledWith("showToast", "error.default:{0}", "Unsupported loft section");
+            expect(pub).toHaveBeenCalledWith(
+                "showToast",
+                "error.default:{0}",
+                "error.command.unsupportedLoftSection",
+            );
             // The rejected pick was not recorded — the two faces are the whole section list.
             expect(committedFeature().sections).toHaveLength(2);
         } finally {
@@ -506,7 +510,7 @@ describe("LoftFeatureCommand solid-face sections", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Loft requires at least 2 sections",
+                "error.feature.loftRequiresAtLeast2Sections",
             );
             expect(committed()).toBeUndefined();
         } finally {

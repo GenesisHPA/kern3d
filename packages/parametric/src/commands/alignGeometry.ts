@@ -4,6 +4,7 @@
 import {
     BoundingBox,
     CurveUtils,
+    I18n,
     type IEdge,
     type IFace,
     type IShape,
@@ -59,7 +60,7 @@ export function alignFrameOf(pick: AlignPick, snapToCenter: boolean): Result<Ali
         case ShapeTypes.face:
             return faceFrame(pick.shape as IFace, pick.transform, pick.point, snapToCenter);
         default:
-            return Result.err("Pick a face, an edge or a vertex");
+            return Result.err(I18n.translate("error.command.pickFaceEdgeVertex"));
     }
 }
 
@@ -107,7 +108,7 @@ function faceFrame(
             const point = origin.add(direction.multiply(direction.dot(anchor.sub(origin))));
             return Result.ok({ kind: "line", point, direction });
         }
-        return Result.err("Only planar and cylindrical faces can be aligned");
+        return Result.err(I18n.translate("error.command.onlyPlanarCylindricalFacesCanAligned"));
     } finally {
         surface.dispose();
     }

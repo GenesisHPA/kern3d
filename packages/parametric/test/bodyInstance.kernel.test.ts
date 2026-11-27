@@ -283,7 +283,7 @@ describe("BodyInstanceNode", () => {
         const instance = body.cloneForCopy(Matrix4.identity()) as BodyInstanceNode;
         expect(body.shape.isOk).toBe(true);
 
-        expect(body.shapeType).toBe("Solid");
+        expect(body.shapeType).toBe("shapeType.solid");
         expect(instance.shapeType).toBe(body.shapeType);
     });
 

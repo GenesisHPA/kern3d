@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IFace, type IShape, Result, ShapeTypes } from "@chili3d/core";
+import { I18n, type IFace, type IShape, Result, ShapeTypes } from "@chili3d/core";
 import {
     type FeatureContext,
     type FeatureHandler,
@@ -39,7 +39,8 @@ const removeFeatureHandler: FeatureHandler<RemoveFeatureFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Remove feature requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.removeFeatureRequiresPrecedingFeature"));
         const faces = input.findSubShapes(ShapeTypes.face) as IFace[];
         const faceIds = context.tracking?.inputFaceIds;
         const matched = matchSourceFaceIndexes(faces, faceIds, feature.faces);
@@ -47,7 +48,7 @@ const removeFeatureHandler: FeatureHandler<RemoveFeatureFeatureData> = {
         // Every pick gone is an error — the feature would otherwise rebuild to the input
         // and pretend a removal happened. SOME picks gone costs only those removals.
         if (matched.value.indexes.length === 0) {
-            return Result.err("Remove feature: none of the faces it names exist anymore");
+            return Result.err(I18n.translate("error.feature.removeFeatureNoneFacesNamesExist"));
         }
         if (context.tracking !== undefined) {
             context.tracking.resolvedProfiles = matched.value.indexes.map((faceIndex, k) =>

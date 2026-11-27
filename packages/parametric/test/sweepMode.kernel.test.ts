@@ -267,6 +267,6 @@ describe("sweep profileControl through the feature (real kernel)", () => {
         // shows the error instead of the shape.
         expect(body.shape.isOk).toBe(false);
         const errors = body.featureItems().map((x) => x.error);
-        expect(errors[0]).toContain("Invalid sweep profile control: spiral");
+        expect(errors[0]).toContain("error.feature.invalidSweepProfileControlspiral");
     });
 });

@@ -372,7 +372,7 @@ describe("HoleFeatureCommand step flow", () => {
             expect(await (command as any).executeSteps()).toBe(true);
 
             expect(calls).toBe(2);
-            expect(toasts.some((t) => t.includes("Pick at least one hole center"))).toBe(true);
+            expect(toasts.some((t) => t.includes("error.command.pickAtLeastOneHoleCenter"))).toBe(true);
             expect((command as any).boundCenters).toHaveLength(1);
         } finally {
             restore();
@@ -416,7 +416,7 @@ describe("HoleFeatureCommand step flow", () => {
             (command as any).executeMainTask();
 
             expect(pickCalls).toBe(2);
-            expect(toasts.some((t) => t.includes("No coplanar face found"))).toBe(true);
+            expect(toasts.some((t) => t.includes("error.command.noCoplanarFaceFoundClickHole"))).toBe(true);
             expect(written).toHaveLength(1);
             const feature = written[0][0] as HoleFeatureData;
             expect(feature.face.offset).toBeCloseTo(20, 9);

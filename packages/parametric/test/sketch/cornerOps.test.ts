@@ -736,7 +736,7 @@ describe("a rectangle carrying the gaps between its edges", () => {
             const found = findCorners(solver, [left, top], TOLERANCE, "fillet");
             expect(found.isOk).toBe(false);
             expect(found.isOk ? "" : found.error).toBe(
-                "The corner carries a P2LDistance constraint that the trim would break",
+                "error.sketch.cornerCarriesConstraintThatTrimWouldP2LDistance",
             );
         } finally {
             solver.dispose();

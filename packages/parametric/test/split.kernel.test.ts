@@ -96,7 +96,7 @@ describe("split feature", () => {
         // The whole box sits on the datum's positive side; the negative half is empty.
         // The failed feature keeps the last good shape and reports on the row.
         const { body } = setup({ keepSide: "negative" }, Matrix4.fromTranslation(0, 100, 0));
-        expect(body.featureItems()[1].error).toContain("nothing remains on the kept side");
+        expect(body.featureItems()[1].error).toContain("error.feature.splitNothingRemainsKeptSidePlane");
     });
 
     test("the split reports no tracked ids — references degrade to geometric matching", () => {
@@ -112,7 +112,7 @@ describe("split feature", () => {
 
     test("a hand-written invalid keepSide is a rebuild error", () => {
         const { body } = setup({ keepSide: "sideways" as never });
-        expect(body.featureItems()[1].error).toBe("Invalid keep side: sideways");
+        expect(body.featureItems()[1].error).toBe("error.feature.invalidKeepSidesideways");
     });
 
     test("split as the first feature requires a preceding feature", () => {
@@ -126,6 +126,6 @@ describe("split feature", () => {
         doc.modelManager.addNode(body);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Split requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.feature.splitRequiresPrecedingFeature");
     });
 });

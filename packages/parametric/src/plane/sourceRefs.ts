@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IDocument,
     type IEdge,
     type IFace,
@@ -82,8 +83,10 @@ export function resolveSourceShape(
 ): Result<ResolvedSourceShape> {
     try {
         const source = resolveTimelineSource(document, nodeId, anchors?.[nodeId]);
-        if (source === ROLLED_BACK_SOURCE) return Result.err(`${label} source is rolled back`);
-        if (source === SOURCE_UNAVAILABLE) return Result.err(`${label} source not found`);
+        if (source === ROLLED_BACK_SOURCE)
+            return Result.err(I18n.translate("error.datum.sourceRolledBack{0}", label));
+        if (source === SOURCE_UNAVAILABLE)
+            return Result.err(I18n.translate("error.datum.sourceNotFound{0}", label));
         const base = shapeSourceOf(document, source.node, source.shape);
         return Result.ok({
             local: base.shape,
@@ -92,7 +95,7 @@ export function resolveSourceShape(
             faceIds: faceIdsOf(source),
         });
     } catch (error) {
-        return Result.err(`${label} source could not be read: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.sourceCouldNotRead{0}{1}", label, String(error)));
     }
 }
 
@@ -131,10 +134,11 @@ export function resolvePoint(
 ): Result<XYZ> {
     const datum = findNode(document, ref.nodeId);
     if (isDatumPointNode(datum)) {
-        if (visited?.has(datum.id) === true) return Result.err(`${label} point reference is cyclic`);
+        if (visited?.has(datum.id) === true)
+            return Result.err(I18n.translate("error.datum.pointReferenceCyclic{0}", label));
         const point = datum.worldPoint(visited);
         return point === undefined
-            ? Result.err(`${label} point reference is not available`)
+            ? Result.err(I18n.translate("error.datum.pointReferenceNotAvailable{0}", label))
             : Result.ok(point);
     }
     const source = resolveSourceShape(document, ref.nodeId, anchors, label);
@@ -147,10 +151,10 @@ export function resolvePoint(
         if (anchored !== undefined) return Result.ok(source.value.transform.ofPoint(anchored));
         const vertex = matchVertex(source.value.local, ref.vertex);
         return vertex === undefined
-            ? Result.err(`${label} point not found after rebuild`)
+            ? Result.err(I18n.translate("error.datum.pointNotFoundAfterRebuild{0}", label))
             : Result.ok(source.value.transform.ofPoint(vertex.point()));
     } catch (error) {
-        return Result.err(`${label} point could not be read: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.pointCouldNotRead{0}{1}", label, String(error)));
     }
 }
 
@@ -167,9 +171,11 @@ function datumAxisEdge(
 ): Result<IEdge> | undefined {
     const datum = findNode(document, nodeId);
     if (!isDatumAxisNode(datum)) return undefined;
-    if (visited?.has(datum.id) === true) return Result.err(`${label} axis reference is cyclic`);
+    if (visited?.has(datum.id) === true)
+        return Result.err(I18n.translate("error.datum.axisReferenceCyclic{0}", label));
     const axis = datum.worldAxis(visited);
-    if (axis === undefined) return Result.err(`${label} axis reference is not available`);
+    if (axis === undefined)
+        return Result.err(I18n.translate("error.datum.axisReferenceNotAvailable{0}", label));
     const edge = shapeFactory.line(axis.start, axis.end);
     return edge.isOk ? Result.ok(edge.value) : Result.err(edge.error);
 }
@@ -190,18 +196,19 @@ export function withEdge<T>(
         // The ref lives in the source's LOCAL frame, so a moved source still matches by
         // id/fingerprint; only the matched edge is carried into world coordinates.
         const indexes = matchEdgeIndexesIn(source.value.local, source.value.edgeIds, ref);
-        if (!indexes.isOk) return Result.err(`${label} edge not found after rebuild`);
+        if (!indexes.isOk)
+            return Result.err(I18n.translate("error.datum.edgeNotFoundAfterRebuild{0}", label));
         const edges = source.value.local.findSubShapes(ShapeTypes.edge) as IEdge[];
         const worldEdge = worldEdgeOf(edges[indexes.value[0]], source.value.transform);
         try {
             return use(worldEdge, source.value.transform);
         } catch (error) {
-            return Result.err(`${label} edge could not be read: ${String(error)}`);
+            return Result.err(I18n.translate("error.datum.edgeCouldNotRead{0}{1}", label, String(error)));
         } finally {
             if (worldEdge !== edges[indexes.value[0]]) worldEdge.dispose();
         }
     } catch (error) {
-        return Result.err(`${label} edge could not be read: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.edgeCouldNotRead{0}{1}", label, String(error)));
     }
 }
 
@@ -210,7 +217,7 @@ function withOwnedEdge<T>(edge: Result<IEdge>, label: string, use: (edge: IEdge)
     try {
         return use(edge.value);
     } catch (error) {
-        return Result.err(`${label} edge could not be read: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.edgeCouldNotRead{0}{1}", label, String(error)));
     } finally {
         edge.value.dispose();
     }
@@ -242,7 +249,8 @@ export function withNearestCurve<T>(
     const owned: IEdge[] = [];
     try {
         const indexes = matchEdgeIndexesIn(source.value.local, source.value.edgeIds, ref);
-        if (!indexes.isOk) return Result.err(`${label} curve not found after rebuild`);
+        if (!indexes.isOk)
+            return Result.err(I18n.translate("error.datum.curveNotFoundAfterRebuild{0}", label));
         const edges = source.value.local.findSubShapes(ShapeTypes.edge) as IEdge[];
         let nearest: { edge: IEdge; distance: number } | undefined;
         for (const index of indexes.value) {
@@ -253,10 +261,11 @@ export function withNearestCurve<T>(
                 nearest = { edge, distance: candidate.distance };
             }
         }
-        if (nearest === undefined) return Result.err(`${label} curve not found after rebuild`);
+        if (nearest === undefined)
+            return Result.err(I18n.translate("error.datum.curveNotFoundAfterRebuild{0}", label));
         return use(nearest.edge);
     } catch (error) {
-        return Result.err(`${label} curve could not be read: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.curveCouldNotRead{0}{1}", label, String(error)));
     } finally {
         for (const edge of owned) edge.dispose();
     }
@@ -280,7 +289,7 @@ export function withFace<T>(
         const faces = source.value.local.findSubShapes(ShapeTypes.face) as IFace[];
         const matched = matchSourceFaceIndexes(faces, source.value.faceIds, [ref.face]);
         if (!matched.isOk || matched.value.indexes.length === 0) {
-            return Result.err(`${label} face not found after rebuild`);
+            return Result.err(I18n.translate("error.datum.faceNotFoundAfterRebuild{0}", label));
         }
         const local = faces[matched.value.indexes[0]];
         const transform = source.value.transform;
@@ -292,7 +301,7 @@ export function withFace<T>(
             if (!identity) world.dispose();
         }
     } catch (error) {
-        return Result.err(`${label} face could not be read: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.faceCouldNotRead{0}{1}", label, String(error)));
     }
 }
 

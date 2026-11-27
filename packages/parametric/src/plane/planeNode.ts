@@ -4,6 +4,7 @@
 import {
     ANGLE_UNITS,
     BoundingBox,
+    I18n,
     type I18nKeys,
     type IDocument,
     type INode,
@@ -337,7 +338,7 @@ export class PlaneNode extends ParameterShapeNode implements IPlaneNode {
             const fallback = this.plane;
             const inverse = this.worldTransform().invert();
             return fallback === undefined || inverse === undefined
-                ? Result.err("Plane is already resolving")
+                ? Result.err(I18n.translate("error.datum.planeAlreadyResolving"))
                 : this.buildRect(fallback.transformed(inverse), fallback);
         }
 
@@ -352,7 +353,8 @@ export class PlaneNode extends ParameterShapeNode implements IPlaneNode {
             if (world === undefined) return Result.err(resolved.error);
 
             const inverse = this.worldTransform().invert();
-            if (inverse === undefined) return Result.err("Plane node transform is not invertible");
+            if (inverse === undefined)
+                return Result.err(I18n.translate("error.datum.planeNodeTransformNotInvertible"));
             const local = world.transformed(inverse);
             this.rememberPlane(world);
             return this.buildRect(local, world);

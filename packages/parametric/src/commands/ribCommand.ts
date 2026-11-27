@@ -6,6 +6,7 @@ import {
     BoundingBox,
     Combobox,
     command,
+    I18n,
     Id,
     type INode,
     type IShape,
@@ -41,8 +42,6 @@ import {
 import { FORM_FEATURE_OPERATIONS } from "./extrudeCommand";
 
 const OPERATION_JOIN = "option.command.operation.join";
-const NO_EXTEND_TARGET = "Select the body to extend the profile to";
-const INVALID_PARAMS = "Invalid rib parameters";
 
 /**
  * What `plan()` works out: the rib, where it goes, and the parameters behind both — or the reason
@@ -199,7 +198,8 @@ export class RibFeatureCommand extends MultistepCommand {
     private plan(): Planned {
         const chain = this.pickedChain();
         const params = this.params();
-        if (chain === undefined || params === undefined) return { ok: false, reason: INVALID_PARAMS };
+        if (chain === undefined || params === undefined)
+            return { ok: false, reason: I18n.translate("error.command.invalidRibParameters") };
         this.disposeOwned();
 
         const box = this.chainBox();
@@ -211,10 +211,16 @@ export class RibFeatureCommand extends MultistepCommand {
         }
         const targets = resolveTargetBodies(this.document, box, this.targets);
         if (targets.length === 0) {
-            return { ok: false, reason: this.extend ? NO_EXTEND_TARGET : "The rib does not reach a body" };
+            return {
+                ok: false,
+                reason: this.extend
+                    ? I18n.translate("error.command.selectBodyExtendProfile")
+                    : I18n.translate("error.command.ribDoesNotReachBody"),
+            };
         }
         const body = this.targetInWorld(targets[0]);
-        if (body === undefined) return { ok: false, reason: INVALID_PARAMS };
+        if (body === undefined)
+            return { ok: false, reason: I18n.translate("error.command.invalidRibParameters") };
 
         const built = ribTool(chain.sketch, chain.entityIds, params, body);
         if (!built.isOk) return { ok: false, reason: built.error };
@@ -282,7 +288,7 @@ export class RibFeatureCommand extends MultistepCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                planned.ok ? INVALID_PARAMS : planned.reason,
+                planned.ok ? I18n.translate("error.command.invalidRibParameters") : planned.reason,
             );
             return;
         }

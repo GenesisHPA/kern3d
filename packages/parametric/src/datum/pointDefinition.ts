@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { CurveUtils, type IDocument, type IEdge, Result, XYZ, type XYZLike } from "@chili3d/core";
+import { CurveUtils, I18n, type IDocument, type IEdge, Result, XYZ, type XYZLike } from "@chili3d/core";
 import { type NeutralPlaneRef, planeRefNodeId } from "../features/feature";
 import type { EdgeSourceRef, PointRef } from "../plane/planeDefinition";
 import { resolvePlaneSourceInWorld } from "../plane/planeSource";
@@ -57,7 +57,7 @@ export function resolvePointDefinition(
     try {
         return resolve(definition, document, visited);
     } catch (error) {
-        return Result.err(`Point definition could not be resolved: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.pointDefinitionCouldNotResolved{0}", String(error)));
     }
 }
 
@@ -77,7 +77,12 @@ function resolve(definition: PointDefinition, document: IDocument, visited: Read
         case "fixed":
             return Result.ok(new XYZ(definition.point));
         default:
-            return Result.err(`Unknown point definition: ${String((definition as { kind?: string }).kind)}`);
+            return Result.err(
+                I18n.translate(
+                    "error.datum.unknownPointDefinition{0}",
+                    String((definition as { kind?: string }).kind),
+                ),
+            );
     }
 }
 
@@ -96,7 +101,7 @@ function centerPoint(
                 const basis = edge.curve.basisCurve;
                 const center = CurveUtils.isConic(basis) ? (basis as { center?: XYZ }).center : undefined;
                 return center === undefined
-                    ? Result.err("Centre point requires a circular or elliptical edge")
+                    ? Result.err(I18n.translate("error.datum.centrePointRequiresCircularEllipticalEdge"))
                     : Result.ok(new XYZ(center));
             },
             visited,
@@ -106,12 +111,12 @@ function centerPoint(
         return withFace(document, definition.face, definition.anchors, "Point", (face) => {
             const axis = revolutionAxisOfFace(face);
             if (!axis.isOk || (axis.value.kind !== "sphere" && axis.value.kind !== "torus")) {
-                return Result.err("Centre point requires a spherical or toroidal face");
+                return Result.err(I18n.translate("error.datum.centrePointRequiresSphericalToroidalFace"));
             }
             return Result.ok(axis.value.point);
         });
     }
-    return Result.err("Centre point has no reference");
+    return Result.err(I18n.translate("error.datum.centrePointHasNoReference"));
 }
 
 function edgePlanePoint(
@@ -120,7 +125,7 @@ function edgePlanePoint(
     visited: ReadonlySet<string> | undefined,
 ): Result<XYZ> {
     const plane = resolvePlaneSourceInWorld(document, definition.plane, definition.anchors, {
-        label: "Point",
+        label: I18n.translate("error.datum.point"),
         visited,
     });
     if (!plane.isOk) return Result.err(plane.error);
@@ -142,17 +147,17 @@ function edgePlanePoint(
  */
 export function edgePlaneCrossing(edge: IEdge, origin: XYZ, normal: XYZ, near: XYZ | undefined): Result<XYZ> {
     const n = normal.normalize();
-    if (n === undefined) return Result.err("Plane normal is degenerate");
+    if (n === undefined) return Result.err(I18n.translate("error.datum.planeNormalDegenerate"));
     const height = (point: XYZ) => point.sub(origin).dot(n);
     if (CurveUtils.isLine(edge.curve.basisCurve)) {
         const start = edge.startPoint();
         const direction = edge.endPoint().sub(start);
         const rate = direction.dot(n);
-        if (Math.abs(rate) < 1e-12) return Result.err("The edge is parallel to the plane");
+        if (Math.abs(rate) < 1e-12) return Result.err(I18n.translate("error.datum.edgeParallelPlane"));
         return Result.ok(start.add(direction.multiply(-height(start) / rate)));
     }
     const crossings = sampledCrossings(edge, height);
-    if (crossings.length === 0) return Result.err("The edge does not cross the plane");
+    if (crossings.length === 0) return Result.err(I18n.translate("error.datum.edgeDoesNotCrossPlane"));
     if (near === undefined) return Result.ok(crossings[0]);
     return Result.ok(crossings.reduce((best, p) => (p.distanceTo(near) < best.distanceTo(near) ? p : best)));
 }
@@ -209,14 +214,16 @@ function threePlanesPoint(
     const rows: [XYZ, number][] = [];
     for (const ref of definition.planes) {
         const plane = resolvePlaneSourceInWorld(document, ref, definition.anchors, {
-            label: "Point",
+            label: I18n.translate("error.datum.point"),
             visited,
         });
         if (!plane.isOk) return Result.err(plane.error);
         rows.push([plane.value.normal, plane.value.normal.dot(plane.value.origin)]);
     }
     const point = threePlanePoint(rows[0], rows[1], rows[2]);
-    return point === undefined ? Result.err("The three planes do not meet in one point") : Result.ok(point);
+    return point === undefined
+        ? Result.err(I18n.translate("error.datum.threePlanesDoNotMeetOne"))
+        : Result.ok(point);
 }
 
 function onEdgePoint(
@@ -224,7 +231,8 @@ function onEdgePoint(
     document: IDocument,
     visited: ReadonlySet<string> | undefined,
 ): Result<XYZ> {
-    if (!Number.isFinite(definition.ratio)) return Result.err("Point ratio is not a finite number");
+    if (!Number.isFinite(definition.ratio))
+        return Result.err(I18n.translate("error.datum.pointRatioNotFiniteNumber"));
     return withEdge(
         document,
         definition.edge,

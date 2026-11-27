@@ -108,12 +108,8 @@ describe("breakEntity a line", () => {
         const solver = new SketchSolver(Plane.XY);
         try {
             const line = solver.addLine(0, 0, 10, 0);
-            expect(refusal(solver, line, [[0, 0]])).toBe(
-                "Pick a point along the entity, not one of its ends",
-            );
-            expect(refusal(solver, line, [[10, 0]])).toBe(
-                "Pick a point along the entity, not one of its ends",
-            );
+            expect(refusal(solver, line, [[0, 0]])).toBe("error.sketch.pickPointAlongEntityNotOne");
+            expect(refusal(solver, line, [[10, 0]])).toBe("error.sketch.pickPointAlongEntityNotOne");
             expect(entityOf(solver, line).params).toEqual([0, 0, 10, 0]);
         } finally {
             solver.dispose();
@@ -124,7 +120,7 @@ describe("breakEntity a line", () => {
         const solver = new SketchSolver(Plane.XY);
         try {
             const line = solver.addLine(0, 0, 10, 0);
-            expect(refusal(solver, -2, [[5, 0]])).toBe("The datum and external references cannot be broken");
+            expect(refusal(solver, -2, [[5, 0]])).toBe("error.sketch.datumExternalReferencesCannotBroken");
             expect(entityOf(solver, line).params).toEqual([0, 0, 10, 0]);
         } finally {
             solver.dispose();
@@ -212,7 +208,9 @@ describe("breakEntity constraints", () => {
             try {
                 const error = refusal(solver, line, [[4, 0]]);
                 expect(error).toBeInstanceOf(SketchSolveError);
-                expect(String(error)).toMatch(/could not solve after the break/);
+                expect(String(error)).toMatch(
+                    /error\.sketch\.sketchCouldNotSolveAfter\{0\}\{1\}|error\.sketch\.sketchCouldNotSolveAftererror\.sketch\.edit\.break/,
+                );
             } finally {
                 spy.mockRestore();
             }
@@ -361,7 +359,7 @@ describe("breakEntity a circle", () => {
         const solver = new SketchSolver(Plane.XY);
         try {
             const circle = solver.addCircle(0, 0, 5);
-            expect(refusal(solver, circle, [[5, 0]])).toBe("A circle needs a second point to break at");
+            expect(refusal(solver, circle, [[5, 0]])).toBe("error.sketch.circleNeedsSecondPointBreakAt");
         } finally {
             solver.dispose();
         }
@@ -376,7 +374,7 @@ describe("breakEntity a circle", () => {
                     [5, 0],
                     [5, 1e-9],
                 ]),
-            ).toBe("Pick two points further apart along the circle");
+            ).toBe("error.sketch.pickTwoPointsFurtherApartAlong");
             expect(entityOf(solver, circle).type).toBe("circle");
         } finally {
             solver.dispose();

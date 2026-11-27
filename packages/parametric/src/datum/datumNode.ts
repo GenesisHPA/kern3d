@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type I18nKeys,
     type INode,
     type IShape,
@@ -161,7 +162,7 @@ export abstract class DatumNode<D extends { readonly kind: string }, V> extends 
     private displayOf(value: V | undefined, error: string): Result<IShape> {
         const inverse = this.worldTransform().invert();
         if (value === undefined || inverse === undefined) {
-            return Result.err(error || "Datum has no value");
+            return Result.err(error || I18n.translate("error.datum.datumHasNoValue"));
         }
         return this.buildDisplay(value, inverse);
     }

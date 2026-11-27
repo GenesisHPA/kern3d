@@ -8,6 +8,7 @@ import {
     flattenContour,
     type GlyphOutline,
     glyphFaces,
+    I18n,
     Logger,
     layoutLine,
     type Plane,
@@ -82,7 +83,7 @@ export async function fusedTextContours(
     sizeMm: number,
 ): Promise<Result<Contour2D[]>> {
     const layout = layoutLine(font, text, sizeMm);
-    if (layout.glyphs.length === 0) return Result.err("There is no text to place");
+    if (layout.glyphs.length === 0) return Result.err(I18n.translate("error.text.thereNoTextPlace"));
     if (layout.missing.length > 0) {
         const characters = layout.missing.map((codePoint) => String.fromCodePoint(codePoint)).join("");
         Logger.warn(`The font has no glyph for "${characters}"`);
@@ -101,7 +102,9 @@ export async function fusedTextContours(
         });
         contours.push(...fusedGlyphContours(fuseGlyphPieces(pieces)));
     }
-    return contours.length === 0 ? Result.err("The text has no glyphs to place") : Result.ok(contours);
+    return contours.length === 0
+        ? Result.err(I18n.translate("error.sketch.textHasNoGlyphsPlace"))
+        : Result.ok(contours);
 }
 
 /** One placed glyph's contours in anchor-relative millimetres — the transform both layout paths share. */

@@ -1,10 +1,10 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IEdge, type IFace, Matrix4, Result, ShapeNode, ShapeTypes } from "@chili3d/core";
+import { I18n, type IEdge, type IFace, Matrix4, Result, ShapeNode, ShapeTypes } from "@chili3d/core";
 import { isBodyTimelineNode, isBodyTrackingNode } from "./bodyTracking";
 import type { ExtrudeFeatureData, FeatureContext } from "./feature";
-import { matchProfilesTolerant, PROFILE_AMBIGUOUS, PROFILE_NOT_FOUND } from "./profileMatcher";
+import { matchProfilesTolerant, profileAmbiguous, profileNotFound } from "./profileMatcher";
 import { type ProfileRef, profileScore } from "./profileRef";
 import { MATCH_TOLERANCE } from "./refGeometry";
 import { indexesOfOverlappingId } from "./trackedId";
@@ -54,10 +54,10 @@ export function matchSourceFaceIndexes(
         // feature, so those faces still get swept and the geometric refs are the loss;
         // with none adopted either, there is no face left to build from and the feature
         // fails the way it always did.
-        if (matched.error === PROFILE_NOT_FOUND && adopted.length > 0) {
+        if (matched.error === profileNotFound() && adopted.length > 0) {
             return Result.ok({ indexes: adopted, refIndexes: adoptedBy, missing: [...fingerprintRefs] });
         }
-        return Result.err(SOURCE_FACE_ERRORS[matched.error] ?? matched.error);
+        return Result.err(sourceFaceError(matched.error));
     }
 
     const { indexes, pickedAt, missingAt } = matched.value;
@@ -195,10 +195,11 @@ function entitySegment(id: string): string {
  * press-pull ref names a solid face, so "Sketch profile …" misleads (the fallback
  * shared with sketch profiles is an implementation detail).
  */
-const SOURCE_FACE_ERRORS: Record<string, string> = {
-    [PROFILE_AMBIGUOUS]: "Face match is ambiguous after rebuild",
-    [PROFILE_NOT_FOUND]: "Face not found after rebuild",
-};
+function sourceFaceError(error: string): string {
+    if (error === profileAmbiguous()) return I18n.translate("error.feature.faceMatchAmbiguousAfterRebuild");
+    if (error === profileNotFound()) return I18n.translate("error.feature.faceNotFoundAfterRebuild");
+    return error;
+}
 
 /**
  * Several id hits are the pieces of a face split since the pick (or of a re-split merge) — the
@@ -222,7 +223,7 @@ function narrowToPickedPiece(faces: IFace[], ref: ProfileRef, hits: number[]): R
     );
     if (exact.length === 1) return Result.ok(exact);
     if (ref.splitPiece !== true) return Result.ok(hits);
-    if (exact.length > 1) return Result.err("Face match is ambiguous after rebuild");
+    if (exact.length > 1) return Result.err(I18n.translate("error.feature.faceMatchAmbiguousAfterRebuild"));
     const scored = hits
         .map((index) => ({ index, score: profileScore(faces[index], ref) }))
         .sort((a, b) => a.score - b.score);
@@ -235,7 +236,7 @@ function narrowToPickedPiece(faces: IFace[], ref: ProfileRef, hits: number[]): R
     ) {
         return Result.ok([best.index]);
     }
-    return Result.err("Face match is ambiguous after rebuild");
+    return Result.err(I18n.translate("error.feature.faceMatchAmbiguousAfterRebuild"));
 }
 
 /**
@@ -329,7 +330,7 @@ function faceEdgeIds(
 /** The feature's own input faces, used when the source is the host body itself. */
 function hostInputFaces(context: FeatureContext): Result<SourceFaceGeometry> {
     if (context.input === undefined) {
-        return Result.err("Extrude source face requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.extrudeSourceFaceRequiresPrecedingFeature"));
     }
     const faces = context.input.findSubShapes(ShapeTypes.face) as IFace[];
     const trackedFaces = context.tracking?.inputFaceIds;
@@ -351,7 +352,7 @@ function hostInputFaces(context: FeatureContext): Result<SourceFaceGeometry> {
 function sourceNodeFaces(nodeId: string, context: FeatureContext): Result<SourceFaceGeometry> {
     const node = context.document.modelManager.findNode((n) => n.id === nodeId);
     if (!(node instanceof ShapeNode)) {
-        return Result.err("Extrude source body not found");
+        return Result.err(I18n.translate("error.feature.extrudeSourceBodyNotFound"));
     }
     // A rolled-back source shows a transient session-preview shape lacking every
     // face born from a hidden feature: matching against it would re-anchor (and
@@ -360,7 +361,7 @@ function sourceNodeFaces(nodeId: string, context: FeatureContext): Result<Source
     // once the source restores (the sketch-side refs guard the same way, see
     // SketchNode.handlePlaneRefNodeChanged).
     if (isBodyTimelineNode(node) && node.rollbackIndex !== undefined) {
-        return Result.err("Extrude source body is rolled back for a sketch session");
+        return Result.err(I18n.translate("error.feature.extrudeSourceBodyRolledBackSketch"));
     }
     // When the source body later CONSUMED this host (a fuse whose tool is the host), the
     // source's final shape already contains the geometry this press-pull builds out of it:
@@ -378,7 +379,7 @@ function sourceNodeFaces(nodeId: string, context: FeatureContext): Result<Source
     const consumed = consumedFaces(node, context);
     if (consumed !== undefined) return Result.ok(consumed);
     if (!node.shape.isOk) {
-        return Result.err("Extrude source body not found");
+        return Result.err(I18n.translate("error.feature.extrudeSourceBodyNotFound"));
     }
     const faces = node.shape.value.findSubShapes(ShapeTypes.face) as IFace[];
     const tracked = isBodyTrackingNode(node) ? node : undefined;

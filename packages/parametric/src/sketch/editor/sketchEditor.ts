@@ -1646,17 +1646,17 @@ function arrayCountFloor(field: ArrayField): number {
  */
 function resolveArrayCount(input: ParameterValue, floor: number): Result<number> {
     if (typeof input !== "number" || !Number.isInteger(input)) {
-        return Result.err("The count must be a whole number");
+        return Result.err(I18n.translate("error.sketch.countMustWholeNumber"));
     }
     if (input < floor) {
         return Result.err(
             floor < 2
-                ? "An array direction needs at least one instance"
-                : "An array needs at least two instances",
+                ? I18n.translate("error.sketch.arrayDirectionNeedsAtLeastOne")
+                : I18n.translate("error.sketch.arrayNeedsAtLeastTwoInstances"),
         );
     }
     if (input > MAX_ARRAY_COUNT) {
-        return Result.err(`An array holds at most ${MAX_ARRAY_COUNT} instances`);
+        return Result.err(I18n.translate("error.sketch.arrayHoldsAtMostInstances{0}", MAX_ARRAY_COUNT));
     }
     return Result.ok(input);
 }

@@ -243,10 +243,7 @@ describe("SketchArcCommand", () => {
         try {
             runCommand(new SketchArcCommand(), editor, [[0, 0], [10, 0], end]);
 
-            expect(pub).toHaveBeenCalledWith(
-                "displayValidation",
-                "Arc end point is on the start ray (zero sweep)",
-            );
+            expect(pub).toHaveBeenCalledWith("displayValidation", "error.sketch.arcEndPointStartRayZero");
             expect(editor.solver.entities()).toEqual([]);
             expect(editor.commit).not.toHaveBeenCalled();
         } finally {

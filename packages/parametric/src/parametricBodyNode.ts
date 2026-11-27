@@ -271,7 +271,7 @@ export class ParametricBodyNode
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Only rigid transforms (move, rotate, mirror) are supported",
+                I18n.translate("error.feature.onlyRigidTransformsMoveRotateMirror"),
             );
             return false;
         }
@@ -1670,7 +1670,7 @@ export class ParametricBodyNode
             // The feature's own lost picks are the more specific fault and keep the row:
             // a sketch-level note does not replace "one of your picks is gone".
             if (dangling && !this._featureUnresolved.has(feature.id)) {
-                this._featureWarnings.set(feature.id, "Sketch has unresolved external references");
+                this._featureWarnings.set(feature.id, I18n.translate("body.sketchUnresolvedExternalRefs"));
             }
         }
     }

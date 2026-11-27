@@ -5,6 +5,7 @@ import {
     ANGLE_UNITS,
     CurveUtils,
     type FeatureParameter,
+    I18n,
     type I18nKeys,
     type IEdge,
     type IShape,
@@ -152,7 +153,8 @@ const patternHandler: FeatureHandler<PatternFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Pattern requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.patternRequiresPrecedingFeature"));
         const plan = resolveInstances(feature, context);
         if (!plan.isOk) return Result.err(plan.error);
         const { instances, anchors, lostKey } = plan.value;
@@ -348,8 +350,9 @@ function resolveInstances(feature: PatternFeatureData, context: FeatureContext):
 function resolveCount(count: ParameterValue, scope: Scope): Result<number> {
     const resolved = resolveUnitSpec(count, scope, UNITLESS);
     if (!resolved.isOk) return Result.err(resolved.error);
-    if (!Number.isInteger(resolved.value)) return Result.err("Pattern count must be a whole number");
-    if (resolved.value < 2) return Result.err("Pattern count must be at least 2");
+    if (!Number.isInteger(resolved.value))
+        return Result.err(I18n.translate("error.feature.patternCountMustWholeNumber"));
+    if (resolved.value < 2) return Result.err(I18n.translate("error.feature.patternCountMustAtLeast2"));
     return Result.ok(resolved.value);
 }
 
@@ -357,7 +360,7 @@ function resolveCount(count: ParameterValue, scope: Scope): Result<number> {
 function resolveSpacing(spacing: ParameterValue, scope: Scope): Result<number> {
     const resolved = resolveUnitSpec(spacing, scope, LENGTH_UNITS);
     if (!resolved.isOk) return Result.err(resolved.error);
-    if (resolved.value === 0) return Result.err("Pattern spacing must be non-zero");
+    if (resolved.value === 0) return Result.err(I18n.translate("error.feature.patternSpacingMustNonZero"));
     return Result.ok(resolved.value);
 }
 
@@ -366,9 +369,14 @@ function planLinear(
     count: number,
     context: FeatureContext,
 ): Result<PatternPlan> {
-    const first = resolvePatternLine(feature.direction, context, "Pattern direction");
+    const first = resolvePatternLine(
+        feature.direction,
+        context,
+        I18n.translate("error.feature.patternDirection"),
+    );
     if (!first.isOk) return Result.err(first.error);
-    if (first.value.line === undefined) return Result.err("Pattern direction edge not found");
+    if (first.value.line === undefined)
+        return Result.err(I18n.translate("error.feature.patternDirectionEdgeNotFound"));
     const spacing = resolveSpacing(feature.spacing, context.scope);
     if (!spacing.isOk) return Result.err(spacing.error);
 
@@ -377,9 +385,14 @@ function planLinear(
     let step2: XYZ | undefined;
     let count2 = 1;
     if (feature.direction2 !== undefined) {
-        const second = resolvePatternLine(feature.direction2, context, "Pattern direction 2");
+        const second = resolvePatternLine(
+            feature.direction2,
+            context,
+            I18n.translate("error.feature.patternDirection2"),
+        );
         if (!second.isOk) return Result.err(second.error);
-        if (second.value.line === undefined) return Result.err("Pattern direction 2 edge not found");
+        if (second.value.line === undefined)
+            return Result.err(I18n.translate("error.feature.patternDirection2EdgeNotFound"));
         anchors.push(second.value.anchor);
         lostKey ??= second.value.lost ? "direction2" : undefined;
         const count2Resolved = resolveCount(feature.count2 ?? 2, context.scope);
@@ -441,12 +454,13 @@ function planCircular(
     count: number,
     context: FeatureContext,
 ): Result<PatternPlan> {
-    const axis = resolvePatternLine(feature.axis, context, "Pattern axis");
+    const axis = resolvePatternLine(feature.axis, context, I18n.translate("error.feature.patternAxis"));
     if (!axis.isOk) return Result.err(axis.error);
-    if (axis.value.line === undefined) return Result.err("Pattern axis edge not found");
+    if (axis.value.line === undefined)
+        return Result.err(I18n.translate("error.feature.patternAxisEdgeNotFound"));
     const angle = resolveUnitSpec(feature.angle ?? 360, context.scope, ANGLE_UNITS);
     if (!angle.isOk) return Result.err(angle.error);
-    if (angle.value === 0) return Result.err("Pattern angle must be non-zero");
+    if (angle.value === 0) return Result.err(I18n.translate("error.feature.patternAngleMustNonZero"));
 
     // The flat index is the placement's position in the enumeration (copy k carries k−1).
     const instances = circularPlacements(
@@ -482,13 +496,13 @@ export function curvePlacements(
     orientation: PatternOrientation,
 ): Result<Matrix4[]> {
     const start = frames.at(0);
-    if (start === undefined) return Result.err("Pattern path has no start");
+    if (start === undefined) return Result.err(I18n.translate("error.feature.patternPathHasNoStart"));
     const step = instanceStep(frames, count, spacing, equalSpacing);
     if (!step.isOk) return Result.err(step.error);
     const matrices: Matrix4[] = [];
     for (let i = 1; i < count; i++) {
         const frame = frames.at(step.value * i);
-        if (frame === undefined) return Result.err("Pattern path has no frame at an instance");
+        if (frame === undefined) return Result.err(I18n.translate("error.feature.patternPathHasNoFrameAt"));
         matrices.push(instanceMatrix(start, frame, orientation));
     }
     return Result.ok(matrices);
@@ -508,9 +522,9 @@ function instanceStep(
     if (equalSpacing) {
         return Result.ok(frames.closed ? frames.length / count : frames.length / (count - 1));
     }
-    if (spacing <= 0) return Result.err("Pattern spacing must be positive");
+    if (spacing <= 0) return Result.err(I18n.translate("error.feature.patternSpacingMustPositive"));
     if ((count - 1) * spacing > frames.length + Precision.Distance) {
-        return Result.err("Pattern path is too short for the count and spacing");
+        return Result.err(I18n.translate("error.command.patternPathTooShortCountSpacing"));
     }
     return Result.ok(spacing);
 }
@@ -599,7 +613,8 @@ function resolvePatternPath(source: PatternPathSource, context: FeatureContext):
 
 function pathFromInput(source: PatternPathSource, context: FeatureContext): Result<ResolvedPatternPath> {
     const input = context.input;
-    if (input === undefined) return Result.err("Pattern path requires a preceding feature");
+    if (input === undefined)
+        return Result.err(I18n.translate("error.feature.patternPathRequiresPrecedingFeature"));
     const edges = input.findSubShapes(ShapeTypes.edge) as IEdge[];
     const tracked = context.tracking?.inputEdgeIds;
     const ids = tracked !== undefined && tracked.length === edges.length ? tracked : [];
@@ -610,10 +625,11 @@ function pathFromInput(source: PatternPathSource, context: FeatureContext): Resu
 
 function pathFromSourceNode(source: PatternPathSource, context: FeatureContext): Result<ResolvedPatternPath> {
     const hostInverse = context.host.worldTransform().invert();
-    if (hostInverse === undefined) return Result.err("Pattern path cannot be mapped into the body");
+    if (hostInverse === undefined)
+        return Result.err(I18n.translate("error.command.patternPathCannotMappedIntoBody"));
     const node = context.document.modelManager.findNode((n) => n.id === source.nodeId);
     if (!(node instanceof ShapeNode) || !node.shape.isOk) {
-        return Result.err("Pattern path body not found");
+        return Result.err(I18n.translate("error.feature.patternPathBodyNotFound"));
     }
     const shape = node.shape.value;
     const edges = shape.findSubShapes(ShapeTypes.edge) as IEdge[];
@@ -764,7 +780,8 @@ function lineFromSourceNode(
     // Resolved up front so the frozen-fallback branches below can never stand a source-frame line
     // in for a host one when the body's transform is singular (see the contract above).
     const hostInverse = context.host.worldTransform().invert();
-    if (hostInverse === undefined) return Result.err(`${label} cannot be mapped into the body`);
+    if (hostInverse === undefined)
+        return Result.err(I18n.translate("error.feature.cannotMappedIntoBody{0}", label));
     const node = context.document.modelManager.findNode((n) => n.id === source.nodeId);
     // A construction axis resolves through its own definition (see `resolveAxis` in revolve.ts).
     if (isDatumAxisNode(node)) {

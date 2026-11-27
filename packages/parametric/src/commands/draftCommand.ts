@@ -5,6 +5,7 @@ import {
     ANGLE_UNITS,
     type AsyncController,
     command,
+    I18n,
     type IDocument,
     Id,
     type IFace,
@@ -196,7 +197,7 @@ export class DraftFeatureCommand extends MultistepCommand {
         const faces = node.shape.value.findSubShapes(ShapeTypes.face) as IFace[];
         const indexes = this.matchTaperFaces(node, faces, state.faces);
         if (indexes === undefined || indexes.length === 0) return undefined;
-        const plane = neutralPlaneInHost(neutral.plane, node, "Draft");
+        const plane = neutralPlaneInHost(neutral.plane, node, I18n.translate("error.command.draft"));
         if (!plane.isOk) return undefined;
         const result = shapeFactory.draft(
             node.shape.value,
@@ -242,18 +243,30 @@ export class DraftFeatureCommand extends MultistepCommand {
         // typed, and one that no longer resolves fails the next rebuild rather than silently
         // tapering by nothing.
         if (this.angleNumber === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid draft angle");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidDraftAngle"),
+            );
             return;
         }
         const body = this.stepDatas[1].nodes?.[0];
         const picked = this.stepDatas[1].shapes.filter((x) => x.shape.shapeType === ShapeTypes.face);
         if (!(body instanceof ParametricBodyNode) || picked.length === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select at least one face to draft");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectAtLeastOneFaceDraft"),
+            );
             return;
         }
         const neutral = this.neutral;
         if (neutral === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a neutral plane");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectNeutralPlane"),
+            );
             return;
         }
 

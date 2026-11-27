@@ -122,13 +122,13 @@ describe("helix feature", () => {
     test("fewer than two of the coil trio is a rebuild error", () => {
         const { body } = setup({ radius: 5, pitch: 2 });
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Helix needs two of length, pitch, turns");
+        expect(body.featureItems()[0].error).toBe("error.feature.helixNeedsTwoLengthPitchTurns");
     });
 
     test("a non-positive stored value is a rebuild error", () => {
         const { body } = setup({ radius: 0, pitch: 2, length: 10 });
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Helix radius must be positive");
+        expect(body.featureItems()[0].error).toBe("error.feature.helixRadiusMustPositive");
     });
 
     test("an edited pitch rebuilds the coil, and the surviving segments keep their ids", () => {

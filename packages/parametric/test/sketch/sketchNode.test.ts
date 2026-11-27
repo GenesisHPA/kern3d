@@ -213,8 +213,8 @@ describe("SketchNode", () => {
             data: { entities: [{ id: 1, type: "arc", params: [0, 0, 10, 0, 20, 0] }], constraints: [] },
         });
 
-        expect(tinyRadius.generateShape().error).toBe("Arc radius is too small");
-        expect(zeroSweep.generateShape().error).toBe("Arc is degenerate (zero sweep)");
+        expect(tinyRadius.generateShape().error).toBe("error.sketch.arcRadiusTooSmall");
+        expect(zeroSweep.generateShape().error).toBe("error.sketch.arcDegenerateZeroSweep");
         expect(arc).not.toHaveBeenCalled();
     });
 
@@ -257,7 +257,7 @@ describe("SketchNode", () => {
             },
         });
 
-        expect(node.generateShape().error).toBe("Arc is degenerate (zero sweep)");
+        expect(node.generateShape().error).toBe("error.sketch.arcDegenerateZeroSweep");
         expect(arc).not.toHaveBeenCalled();
     });
 

@@ -4,6 +4,7 @@
 import {
     type AsyncController,
     command,
+    I18n,
     type IDocument,
     Id,
     type IFace,
@@ -190,13 +191,21 @@ export class OffsetFaceFeatureCommand extends MultistepCommand implements PickSe
         // The same refusal the other features make: the feature keeps the expression the user
         // typed, and one that resolves to nothing moves nothing rather than failing later.
         if (this.distanceNumber === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Enter a distance other than 0");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.enterDistanceOtherThan0"),
+            );
             return;
         }
         const body = this.stepDatas[0].nodes?.[0];
         const picked = this.stepDatas[0].shapes.filter((x) => x.shape.shapeType === ShapeTypes.face);
         if (!(body instanceof ParametricBodyNode) || picked.length === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select at least one face to move");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectAtLeastOneFaceMove"),
+            );
             return;
         }
 

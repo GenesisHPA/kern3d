@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IEdge, type IShape, Result, ShapeTypes } from "@chili3d/core";
+import { I18n, type IEdge, type IShape, Result, ShapeTypes } from "@chili3d/core";
 import {
     captureEdgeRef,
     type EdgeRef,
@@ -150,7 +150,7 @@ function recoverByFingerprint(
     inputEdgeIds: readonly (string | undefined)[],
     resolved: Set<number>,
 ): Result<Map<number, EdgeRef>> {
-    if (edges.length === 0) return Result.err("Shape has no edges");
+    if (edges.length === 0) return Result.err(I18n.translate("error.feature.shapeHasNoEdges"));
     // Captured once: every remaining ref is scored against every capturable
     // edge; each entry keeps its edge's original index.
     const captured = captureEdgeRefs(edges);
@@ -163,7 +163,8 @@ function recoverByFingerprint(
     const anchors = new Map<number, EdgeRef>();
     for (const [k, refIndex] of remaining.entries()) {
         const edgeIndex = perRef.value[k];
-        if (resolved.has(edgeIndex)) return Result.err("Edge match is ambiguous after rebuild");
+        if (resolved.has(edgeIndex))
+            return Result.err(I18n.translate("error.feature.edgeMatchAmbiguousAfterRebuild"));
         resolved.add(edgeIndex);
         anchors.set(
             refIndex,
@@ -259,7 +260,7 @@ function adoptHits(hits: number[], edges: IEdge[], ref: EdgeRef, resolved: Set<n
     const adopted = singleExactHit(hits, edges, ref);
     if (!adopted.isOk) return Result.err(adopted.error);
     if (adopted.value.some((index) => resolved.has(index))) {
-        return Result.err("Edge match is ambiguous after rebuild");
+        return Result.err(I18n.translate("error.feature.edgeMatchAmbiguousAfterRebuild"));
     }
     return Result.ok(adopted.value);
 }
@@ -325,7 +326,7 @@ function singleExactHit(hits: number[], edges: IEdge[], ref: EdgeRef): Result<nu
         scored.sort((a, b) => a.score - b.score);
         if (isClearWinner(scored[0].score, scored[1]?.score)) return Result.ok([scored[0].index]);
     }
-    return Result.err("Edge match is ambiguous after rebuild");
+    return Result.err(I18n.translate("error.feature.edgeMatchAmbiguousAfterRebuild"));
 }
 
 /**
@@ -359,7 +360,7 @@ export function matchEdgesInEdges(edges: readonly IEdge[], refs: EdgeRef[]): Res
  * matcher instead of once per ref.
  */
 export function edgeListMatcher(edges: readonly IEdge[]): (refs: EdgeRef[]) => Result<number[]> {
-    if (edges.length === 0) return () => Result.err("Shape has no edges");
+    if (edges.length === 0) return () => Result.err(I18n.translate("error.feature.shapeHasNoEdges"));
     // Captured once up front: scoring a live edge per (ref, edge) pair would pay
     // several kernel queries each. A degenerate edge fails the capture and is
     // skipped — it never matches.
@@ -378,15 +379,16 @@ function matchCapturedRefs(captured: CapturedEdgeRef[], refs: EdgeRef[]): Result
     const perRef: number[] = [];
     for (const ref of refs) {
         const [best, second] = bestTwo(captured, ref);
-        if (best === undefined) return Result.err("Edge not found after rebuild");
+        if (best === undefined) return Result.err(I18n.translate("error.feature.edgeNotFoundAfterRebuild"));
         if (best.score <= MATCH_TOLERANCE) {
             if (second !== undefined && second.score - best.score < MATCH_TOLERANCE) {
-                return Result.err("Edge match is ambiguous after rebuild");
+                return Result.err(I18n.translate("error.feature.edgeMatchAmbiguousAfterRebuild"));
             }
         } else if (!isClearWinner(best.score, second?.score)) {
-            return Result.err("Edge not found after rebuild");
+            return Result.err(I18n.translate("error.feature.edgeNotFoundAfterRebuild"));
         }
-        if (perRef.includes(best.index)) return Result.err("Edge match is ambiguous after rebuild");
+        if (perRef.includes(best.index))
+            return Result.err(I18n.translate("error.feature.edgeMatchAmbiguousAfterRebuild"));
         perRef.push(best.index);
     }
     return Result.ok(perRef);

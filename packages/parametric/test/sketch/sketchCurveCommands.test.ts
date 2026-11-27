@@ -491,7 +491,7 @@ describe("SketchEllipseCommand", () => {
 
             expect(pub).toHaveBeenCalledWith(
                 "displayValidation",
-                "Ellipse axis point is too close to the center",
+                "error.sketch.ellipseAxisPointTooCloseCenter",
             );
             expect(editor.solver.entities()).toEqual([]);
             expect(editor.commit).not.toHaveBeenCalled();
@@ -632,7 +632,7 @@ describe("SketchEllipseArcCommand", () => {
 
             expect(pub).toHaveBeenCalledWith(
                 "displayValidation",
-                "Ellipse axis point is too close to the center",
+                "error.sketch.ellipseAxisPointTooCloseCenter",
             );
             expect(editor.solver.entities()).toEqual([]);
             expect(editor.commit).not.toHaveBeenCalled();
@@ -657,7 +657,7 @@ describe("SketchEllipseArcCommand", () => {
 
             expect(pub).toHaveBeenCalledWith(
                 "displayValidation",
-                "EllipseArc end point is on the start ray (zero sweep)",
+                "error.sketch.ellipseArcEndPointStartRayZero",
             );
             expect(editor.solver.entities()).toEqual([]);
             expect(editor.commit).not.toHaveBeenCalled();

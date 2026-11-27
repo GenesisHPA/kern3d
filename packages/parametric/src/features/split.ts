@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { BoundingBox, type IShape, type Plane, Result, ShapeTypes } from "@chili3d/core";
+import { BoundingBox, I18n, type IShape, type Plane, Result, ShapeTypes } from "@chili3d/core";
 import {
     type FeatureContext,
     type FeatureHandler,
@@ -50,12 +50,13 @@ const splitHandler: FeatureHandler<SplitFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Split requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.splitRequiresPrecedingFeature"));
         const keepSide = feature.keepSide ?? "both";
         if (!["both", "positive", "negative"].includes(keepSide)) {
-            return Result.err(`Invalid keep side: ${keepSide}`);
+            return Result.err(I18n.translate("error.feature.invalidKeepSide{0}", keepSide));
         }
-        const plane = resolveNeutralPlane(feature.tool, context, "Split");
+        const plane = resolveNeutralPlane(feature.tool, context, I18n.translate("error.feature.split"));
         if (!plane.isOk) return Result.err(plane.error);
 
         const tool = splitTool(plane.value, input);
@@ -99,7 +100,7 @@ function pickSide(split: IShape, plane: Plane, keepSide: "both" | "positive" | "
     });
     // A piece ON the plane (a zero-thickness sliver the cut shaved off) lands in neither side.
     if (kept.length === 0)
-        return Result.err("Split: nothing remains on the kept side — the plane misses the input");
+        return Result.err(I18n.translate("error.feature.splitNothingRemainsKeptSidePlane"));
     if (kept.length === 1) return Result.ok(kept[0]);
     const combined = shapeFactory.combine(kept);
     return combined.isOk ? Result.ok(combined.value) : Result.err(combined.error);

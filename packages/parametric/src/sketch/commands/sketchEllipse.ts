@@ -4,6 +4,7 @@
 import {
     command,
     Dimensions,
+    I18n,
     type IStep,
     Precision,
     PubSub,
@@ -62,7 +63,10 @@ export class SketchEllipseCommand extends SketchMultistepCommand {
     protected executeMainTask(): void {
         const params = ellipseParams(this.uvOf(0), this.uvOf(1), this.uvOf(2));
         if (params === undefined) {
-            PubSub.default.pub("displayValidation", "Ellipse axis point is too close to the center");
+            PubSub.default.pub(
+                "displayValidation",
+                I18n.translate("error.sketch.ellipseAxisPointTooCloseCenter"),
+            );
             return;
         }
         this.commitNewEntity(this.editor.solver.addEllipse(...params));

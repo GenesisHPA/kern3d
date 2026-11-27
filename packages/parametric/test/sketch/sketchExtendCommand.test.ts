@@ -184,7 +184,7 @@ describe("SketchExtendCommand", () => {
 
                 expect(pub).toHaveBeenCalledWith(
                     "displayValidation",
-                    "The two entities do not meet when extended",
+                    "error.sketch.twoEntitiesDoNotMeetWhen",
                 );
                 expect(editor.commit).not.toHaveBeenCalled();
             } finally {

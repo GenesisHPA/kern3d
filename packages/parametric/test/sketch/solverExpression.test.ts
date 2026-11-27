@@ -68,7 +68,7 @@ describe("datum unit conversion", () => {
     test("an expression of the wrong unit is rejected", () => {
         const result = resolveDatumSource(ConstraintKind.Angle, "w", scopeOf({ w: length(5) }));
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Dimension mismatch: expected angle, got length");
+        expect(result.error).toBe("error.expression.dimensionMismatchExpectedGotanglelength");
     });
 });
 
@@ -118,7 +118,7 @@ describe("SketchSolver expression datums", () => {
     test("an expression that resolves against nothing is reported and keeps the geometry", () => {
         const { solver, id, line } = dimensionedLine(scopeOf({}), "nope");
         solver.solve(true);
-        expect(solver.datumErrors.get(id)).toBe("Unknown identifier: nope");
+        expect(solver.datumErrors.get(id)).toBe("error.expression.unknownIdentifiernope");
         // The sketch stays usable: the dimension falls back to the measured geometry.
         expect(measuredLength(solver, line)).toBeCloseTo(10);
     });
@@ -126,7 +126,7 @@ describe("SketchSolver expression datums", () => {
     test("an expression of the wrong unit is reported too", () => {
         const { solver, id } = dimensionedLine(scopeOf({ a: angle(30) }), "a");
         solver.solve(true);
-        expect(solver.datumErrors.get(id)).toBe("Dimension mismatch: expected length, got angle");
+        expect(solver.datumErrors.get(id)).toBe("error.expression.dimensionMismatchExpectedGotlengthangle");
     });
 
     test("setScope re-drives the datums, and reports whether anything moved", () => {
@@ -174,7 +174,7 @@ describe("SketchSolver expression datums", () => {
         expect(solver.datumErrors.size).toBe(0);
 
         solver.setScope(scopeOf({}));
-        expect(solver.datumErrors.get(id)).toBe("Unknown identifier: w");
+        expect(solver.datumErrors.get(id)).toBe("error.expression.unknownIdentifierw");
     });
 
     test("setDatumSource stores what the user typed and pushes its value", () => {
@@ -194,7 +194,7 @@ describe("SketchSolver expression datums", () => {
 
         const result = solver.setDatumSource(id, "nope");
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Unknown identifier: nope");
+        expect(result.error).toBe("error.expression.unknownIdentifiernope");
         expect(solver.toData().constraints.find((x) => x.id === id)?.datum).toBeCloseTo(10);
         expect(measuredLength(solver, line)).toBeCloseTo(10);
     });

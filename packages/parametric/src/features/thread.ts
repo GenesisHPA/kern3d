@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IFace,
     type IShape,
     LENGTH_UNITS,
@@ -97,7 +98,8 @@ const threadHandler: FeatureHandler<ThreadFeatureData> = {
         const spec = resolveThreadSpec(feature, context.scope);
         if (!spec.isOk) return Result.err(spec.error);
         const input = context.input;
-        if (input === undefined) return Result.err("Thread requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.threadRequiresPrecedingFeature"));
         const face = resolveThreadFace(feature, context, input);
         if (!face.isOk) return Result.err(face.error);
         const plan = threadPlanOn(face.value, spec.value);
@@ -127,7 +129,8 @@ export type ThreadSpecFields = Pick<
 export function resolveThreadSpec(feature: ThreadSpecFields, scope: Scope): Result<ThreadSpec> {
     // The panel's dropdown cannot write a bad form; this keeps a hand-edited file from reaching
     // geometry that would read it wrong.
-    if (!THREAD_FORMS.includes(feature.form)) return Result.err(`Invalid thread form: ${feature.form}`);
+    if (!THREAD_FORMS.includes(feature.form))
+        return Result.err(I18n.translate("error.feature.invalidThreadForm{0}", feature.form));
     const fields = [feature.diameter, feature.pitch, feature.offset, feature.clearance, feature.length];
     const values: (number | undefined)[] = [];
     for (const value of fields) {
@@ -137,7 +140,7 @@ export function resolveThreadSpec(feature: ThreadSpecFields, scope: Scope): Resu
     }
     const [diameter, pitch, offset, clearance, length] = values;
     if (diameter === undefined || pitch === undefined)
-        return Result.err("Thread needs a diameter and a pitch");
+        return Result.err(I18n.translate("error.feature.threadNeedsDiameterPitch"));
     return Result.ok({
         form: feature.form,
         diameter,
@@ -172,7 +175,8 @@ function resolveThreadFace(
     const matched = matchSourceFaceIndexes(faces, faceIds, [feature.face]);
     if (!matched.isOk) return Result.err(matched.error);
     const index = matched.value.indexes[0];
-    if (index === undefined) return Result.err("Thread face not found after rebuild");
+    if (index === undefined)
+        return Result.err(I18n.translate("error.feature.threadFaceNotFoundAfterRebuild"));
     if (context.tracking !== undefined) {
         context.tracking.resolvedProfiles = [
             captureProfileRef(faces[index], faceIds?.[index], feature.face.splitPiece),
@@ -213,7 +217,7 @@ export function cutThread(
             tracked === undefined || tracking === undefined
                 ? shapeFactory.booleanCut([input], [tool.value.shape])
                 : applyTrackedOperation(input, tracking, tracked, tool.value);
-        if (!cut.isOk) return Result.err(`Thread cut failed: ${cut.error}`);
+        if (!cut.isOk) return Result.err(I18n.translate("error.feature.threadCutFailed{0}", cut.error));
         const checked = checkThreadedBody(input, cut.value);
         if (!checked.isOk) cut.value.dispose();
         return checked;

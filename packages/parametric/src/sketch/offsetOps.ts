@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision, pointLineSignedDistance, Result } from "@chili3d/core";
+import { I18n, Precision, pointLineSignedDistance, Result } from "@chili3d/core";
 import {
     type CurveEntity,
     entityDomain,
@@ -175,7 +175,8 @@ function offsetParams(entity: SketchEntityData, d: number): Result<OffsetGeometr
     if (entity.type === "line") {
         const [x1, y1, x2, y2] = entity.params;
         const length = Math.hypot(x2 - x1, y2 - y1);
-        if (length <= Precision.Distance) return Result.err("The picked line is too short to offset");
+        if (length <= Precision.Distance)
+            return Result.err(I18n.translate("error.sketch.pickedLineTooShortOffset"));
         const nx = -(y2 - y1) / length;
         const ny = (x2 - x1) / length;
         return Result.ok({ type: "line", params: [x1 + d * nx, y1 + d * ny, x2 + d * nx, y2 + d * ny] });
@@ -183,9 +184,11 @@ function offsetParams(entity: SketchEntityData, d: number): Result<OffsetGeometr
     if (entity.type === "circle" || entity.type === "arc") {
         const [cx, cy] = entity.params;
         const radius = entityRadius(entity);
-        if (radius <= Precision.Distance) return Result.err("The picked circle has no radius to offset");
+        if (radius <= Precision.Distance)
+            return Result.err(I18n.translate("error.sketch.pickedCircleHasNoRadiusOffset"));
         const shifted = entity.type === "circle" ? radius + d : radius - d;
-        if (shifted <= Precision.Distance) return Result.err("The offset distance is more than the radius");
+        if (shifted <= Precision.Distance)
+            return Result.err(I18n.translate("error.sketch.offsetDistanceMoreThanRadius"));
         if (entity.type === "circle") return Result.ok({ type: "circle", params: [cx, cy, shifted] });
 
         // an arc keeps its angular span: both ends ride the radius out
@@ -232,7 +235,7 @@ const OFFSET_LANDS_FRACTION = 0.9;
  */
 function offsetCurveGeometry(entity: SketchEntityData, d: number): Result<OffsetGeometry> {
     if (offsetFolds(entity, d)) {
-        return Result.err("The offset distance is larger than the geometry it comes from");
+        return Result.err(I18n.translate("error.sketch.offsetDistanceLargerThanGeometryComes"));
     }
     return Result.ok({
         type: "offsetCurve",
@@ -752,7 +755,7 @@ function planOffset(
     tolerance: number,
 ): Result<OffsetPlan> {
     const sources = offsettableSources(solver, sourceIds);
-    if (sources.length === 0) return Result.err("Nothing to offset");
+    if (sources.length === 0) return Result.err(I18n.translate("error.sketch.nothingOffset"));
 
     const joints = findJoints(solver, sources, tolerance);
     const copies = plannedCopies(solver, sources, orientEntities(sources, joints), distance);
@@ -930,7 +933,7 @@ function validateCopy(copy: OffsetCopy): string | undefined {
         const [x1, y1, x2, y2] = copy.source.params;
         const [a1, b1, a2, b2] = copy.params;
         const dot = (x2 - x1) * (a2 - a1) + (y2 - y1) * (b2 - b1);
-        if (dot <= 0) return "The offset distance is larger than the geometry it comes from";
+        if (dot <= 0) return I18n.translate("error.sketch.offsetDistanceLargerThanGeometryComes");
         return undefined;
     }
     if (copy.source.type === "arc") {
@@ -939,7 +942,7 @@ function validateCopy(copy: OffsetCopy): string | undefined {
         // (an arc always sweeps counter-clockwise, so a negative raw sweep is not one)
         const [, , sx, sy, ex, ey] = copy.params;
         if (Math.hypot(ex - sx, ey - sy) <= Precision.Float) {
-            return "The offset distance is larger than the geometry it comes from";
+            return I18n.translate("error.sketch.offsetDistanceLargerThanGeometryComes");
         }
     }
     return undefined;
@@ -985,7 +988,7 @@ function findDuplicate(copies: readonly OffsetCopy[], solver: SketchSolver): str
                       ),
                   )
                 : landsOnGeometry(copy, present);
-        if (duplicate) return "The offset lands on existing geometry";
+        if (duplicate) return I18n.translate("error.sketch.offsetLandsExistingGeometry");
         if (copy.offset === undefined) {
             present.push({ type: copy.source.type, params: copy.params, nurbs: copy.nurbs });
         } else {
@@ -1072,7 +1075,7 @@ export function offsetEntities(
 ): SketchOperationResult<OffsetOutcome> {
     const tol = Math.max(tolerance, 1e-6);
     if (Math.abs(distance) <= Precision.Distance) {
-        return Result.err("The offset distance is too small");
+        return Result.err(I18n.translate("error.sketch.offsetDistanceTooSmall"));
     }
 
     const plan = planOffset(solver, sourceIds, distance, tol);
@@ -1098,7 +1101,9 @@ export function offsetEntities(
     if (outcome.result === "Conflicting" || outcome.result === "Diverged" || outcome.result === "Stalled") {
         solver.reset(snapshot);
         return Result.err(
-            new SketchSolveError(`The sketch could not solve after the offset (${outcome.result})`),
+            new SketchSolveError(
+                I18n.translate("error.sketch.sketchCouldNotSolveAfterOffset{0}", outcome.result),
+            ),
         );
     }
     return Result.ok({
@@ -1158,7 +1163,7 @@ function tieLine(
         solver.pointOf(line[1]),
     );
     if (reading <= Precision.Distance) {
-        return Result.err("The offset distance is too small");
+        return Result.err(I18n.translate("error.sketch.offsetDistanceTooSmall"));
     }
     const constraintId = solver.addConstraint({
         kind: ConstraintKind.P2LDistance,

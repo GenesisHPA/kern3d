@@ -734,7 +734,7 @@ describe("resolveProfiles", () => {
             const result = resolveProfiles(sketchWith([...a, ...b]), [refB, refB]);
 
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Sketch profile match is ambiguous after rebuild");
+            expect(result.error).toBe("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
         } finally {
             restore();
         }
@@ -788,7 +788,7 @@ describe("resolveProfiles", () => {
             const result = resolveProfiles(sketchWith(triangle), [ref]);
 
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Sketch profile not found after rebuild");
+            expect(result.error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
         } finally {
             restore();
         }

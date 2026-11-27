@@ -145,7 +145,7 @@ describe("removeFeature feature", () => {
         // A failed feature keeps the last good shape; the row carries the error.
         expect(body.shape.isOk).toBe(true);
         expect(body.shape.unchecked()!).toBe(before);
-        expect(body.featureItems()[2].error).toBe("Face not found after rebuild");
+        expect(body.featureItems()[2].error).toBe("error.feature.faceNotFoundAfterRebuild");
     });
 
     test("the feature requires a preceding feature", () => {
@@ -159,6 +159,6 @@ describe("removeFeature feature", () => {
         doc.modelManager.addNode(body);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Remove feature requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.feature.removeFeatureRequiresPrecedingFeature");
     });
 });

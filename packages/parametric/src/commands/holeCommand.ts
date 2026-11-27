@@ -11,6 +11,7 @@ import {
     Dimensions,
     type EdgeMeshData,
     formatMeasurement,
+    I18n,
     type I18nKeys,
     type ICommandPanelProvider,
     type ICurve,
@@ -290,7 +291,11 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                     return (await this.pickDiameter()) && (await this.pickDepth());
                 }
                 if (this.centerPicks.length === 0) {
-                    PubSub.default.pub("showToast", "error.default:{0}", "Pick at least one hole center");
+                    PubSub.default.pub(
+                        "showToast",
+                        "error.default:{0}",
+                        I18n.translate("error.command.pickAtLeastOneHoleCenter"),
+                    );
                     continue;
                 }
                 const deduced = deduceHoleFace(
@@ -302,7 +307,7 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                     PubSub.default.pub(
                         "showToast",
                         "error.default:{0}",
-                        "No coplanar face found — click the hole face",
+                        I18n.translate("error.command.noCoplanarFaceFoundClickHole"),
                     );
                     continue;
                 }
@@ -624,7 +629,11 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
     protected override executeMainTask(): void {
         const picked = this.picked;
         if (picked === undefined || (this.stepDatas.length === 0 && this.boundCenters.length === 0)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Pick at least one hole center");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.pickAtLeastOneHoleCenter"),
+            );
             return;
         }
         if (!this.validateParams()) return;
@@ -663,22 +672,24 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
             return false;
         };
         const diameter = this.resolveParameter(this.diameter, LENGTH_UNITS);
-        if (!diameter.isOk || diameter.value <= 0) return invalid("Invalid hole diameter");
+        if (!diameter.isOk || diameter.value <= 0)
+            return invalid(I18n.translate("error.command.invalidHoleDiameter"));
         if (this.depth !== "") {
             const depth = this.resolveParameter(this.depth, LENGTH_UNITS);
-            if (!depth.isOk || depth.value <= 0) return invalid("Invalid hole depth");
+            if (!depth.isOk || depth.value <= 0)
+                return invalid(I18n.translate("error.command.invalidHoleDepth"));
         }
         if (this.tip !== TIP_FLAT) {
             const drillAngle = this.resolveParameter(this.drillAngle, ANGLE_UNITS);
             if (!drillAngle.isOk || drillAngle.value <= 0 || drillAngle.value >= 180) {
-                return invalid("Invalid drill angle — choose a flat end for a flat bottom");
+                return invalid(I18n.translate("error.command.invalidDrillAngleChooseFlatEnd"));
             }
         }
         if (this.style === STYLE_COUNTERBORE) {
             const diameter2 = this.resolveParameter(this.counterboreDiameter, LENGTH_UNITS);
             const depth2 = this.resolveParameter(this.counterboreDepth, LENGTH_UNITS);
             if (!diameter2.isOk || diameter2.value <= 0 || !depth2.isOk || depth2.value <= 0) {
-                return invalid("Invalid counterbore");
+                return invalid(I18n.translate("error.command.invalidCounterbore"));
             }
         }
         if (this.style === STYLE_COUNTERSINK) {
@@ -691,7 +702,7 @@ export class HoleFeatureCommand extends MultistepCommand implements ICommandPane
                 angle2.value <= 0 ||
                 angle2.value >= 180
             ) {
-                return invalid("Invalid countersink");
+                return invalid(I18n.translate("error.command.invalidCountersink"));
             }
         }
         return true;

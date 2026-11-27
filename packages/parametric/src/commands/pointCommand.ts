@@ -6,6 +6,7 @@ import {
     Combobox,
     CurveUtils,
     command,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -151,31 +152,32 @@ export class PointCommand extends MultistepCommand {
 
     buildDefinition(): Result<PointDefinition> {
         const refs = this._refs;
-        if (refs === undefined) return Result.err("Pick the point geometry first");
+        if (refs === undefined) return Result.err(I18n.translate("error.command.pickPointGeometryFirst"));
         const base = { anchors: refs.anchors, anchor: refs.anchor };
         switch (this.kind) {
             // made by «Подогнать по области» from numbers, never from this command's picks
             case "fixed":
-                return Result.err("A fixed datum is not built from picks");
+                return Result.err(I18n.translate("error.command.fixedDatumNotBuiltFromPicks"));
             case "vertex":
                 return refs.point === undefined
-                    ? Result.err("Pick a vertex")
+                    ? Result.err(I18n.translate("error.command.pickVertex"))
                     : Result.ok({ kind: "vertex", point: refs.point, ...base });
             case "center":
                 return refs.edge === undefined && refs.face === undefined
-                    ? Result.err("Pick a circular edge or a spherical face")
+                    ? Result.err(I18n.translate("error.command.pickCircularEdgeSphericalFace"))
                     : Result.ok({ kind: "center", edge: refs.edge, face: refs.face, ...base });
             case "edgePlane":
                 return refs.edge === undefined || refs.planes?.[0] === undefined
-                    ? Result.err("Pick an edge and a plane")
+                    ? Result.err(I18n.translate("error.command.pickEdgePlane"))
                     : Result.ok({ kind: "edgePlane", edge: refs.edge, plane: refs.planes[0], ...base });
             case "threePlanes": {
                 const planes = refs.planes;
-                if (planes === undefined || planes.length < 3) return Result.err("Pick three planes");
+                if (planes === undefined || planes.length < 3)
+                    return Result.err(I18n.translate("error.command.pickThreePlanes"));
                 return Result.ok({ kind: "threePlanes", planes: [planes[0], planes[1], planes[2]], ...base });
             }
             case "onEdge": {
-                if (refs.edge === undefined) return Result.err("Pick an edge");
+                if (refs.edge === undefined) return Result.err(I18n.translate("error.command.pickEdge"));
                 const ratio = this.resolveParameter(this.ratio, UNITLESS);
                 if (!ratio.isOk) return Result.err(ratio.error);
                 return Result.ok({

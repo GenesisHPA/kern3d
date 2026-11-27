@@ -878,7 +878,7 @@ describe("offsetEntities on the numeric curve families", () => {
             const folded = offsetEntities(solver, [ellipse], -2, TOLERANCE);
             expect(folded.isOk).toBe(false);
             if (folded.isOk) throw new Error("unreachable");
-            expect(folded.error).toBe("The offset distance is larger than the geometry it comes from");
+            expect(folded.error).toBe("error.sketch.offsetDistanceLargerThanGeometryComes");
 
             const gentle = offsetEntities(solver, [ellipse], -1, TOLERANCE);
             expect(gentle.isOk).toBe(true);

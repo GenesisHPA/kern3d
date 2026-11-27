@@ -147,7 +147,7 @@ describe("a feature that lost one of its picks", () => {
         };
         body.setFeaturesEmitShapeChanged([...body.features, broken] as FeatureData[]);
 
-        expect(body.featureItems()[1].error).toBe("Sketch not found");
+        expect(body.featureItems()[1].error).toBe("error.feature.sketchNotFound");
         expect(warnings(body)).toEqual([I18n.translate("body.missingInputs{0}", 1), undefined]);
         expect(missingOf(body)).toEqual([
             { key: "profiles", refIndex: 1, label: I18n.translate("body.missingPick{0}", 2) },
@@ -283,7 +283,7 @@ describe("a feature whose two picks name one region", () => {
         // Two picks naming one region cannot both hold under one-claim-per-ref. Building
         // one and calling the other "missing" would claim the user lost a region that is
         // still on screen, so the answer is the feature's own error.
-        expect(errors(body)).toEqual(["Sketch profile match is ambiguous after rebuild"]);
+        expect(errors(body)).toEqual(["error.feature.sketchProfileMatchAmbiguousAfterRebuild"]);
         expect(missingOf(body)).toEqual([]);
     });
 });

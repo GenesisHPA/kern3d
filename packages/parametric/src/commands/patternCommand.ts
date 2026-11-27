@@ -8,6 +8,7 @@ import {
     Combobox,
     command,
     GetOrSelectNodeStep,
+    I18n,
     type I18nKeys,
     type IDisposable,
     type IDocument,
@@ -242,7 +243,11 @@ abstract class PatternFeatureCommand extends MultistepCommand {
     protected override executeMainTask(): void {
         const body = this.stepDatas[0].nodes?.[0];
         if (!(body instanceof ParametricBodyNode)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a parametric body");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectParametricBody"),
+            );
             return;
         }
         const feature = this.buildFeature(body);
@@ -265,7 +270,11 @@ abstract class PatternFeatureCommand extends MultistepCommand {
     protected lineSourceOrToast(): PatternLineSource | undefined {
         const source = this.lineSource(1);
         if (source === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a line edge");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectLineEdge"),
+            );
         }
         return source;
     }
@@ -281,7 +290,7 @@ abstract class PatternFeatureCommand extends MultistepCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Pattern count must be a whole number of at least 2",
+                I18n.translate("error.command.patternCountMustWholeNumberAt"),
             );
             return false;
         }
@@ -654,7 +663,11 @@ export class LinearPatternFeatureCommand extends PatternFeatureCommand {
         if (this.spacing !== "") {
             const spacing = this.resolveParameter(this.spacing, LENGTH_UNITS);
             if (!spacing.isOk || spacing.value === 0) {
-                PubSub.default.pub("showToast", "error.default:{0}", "Invalid pattern spacing");
+                PubSub.default.pub(
+                    "showToast",
+                    "error.default:{0}",
+                    I18n.translate("error.command.invalidPatternSpacing"),
+                );
                 return false;
             }
         }
@@ -669,14 +682,18 @@ export class LinearPatternFeatureCommand extends PatternFeatureCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Pattern count 2 must be a whole number of at least 2",
+                I18n.translate("error.command.patternCount2MustWholeNumber"),
             );
             return false;
         }
         if (this.spacing2 !== "") {
             const spacing2 = this.resolveParameter(this.spacing2, LENGTH_UNITS);
             if (!spacing2.isOk || spacing2.value === 0) {
-                PubSub.default.pub("showToast", "error.default:{0}", "Invalid pattern spacing 2");
+                PubSub.default.pub(
+                    "showToast",
+                    "error.default:{0}",
+                    I18n.translate("error.command.invalidPatternSpacing2"),
+                );
                 return false;
             }
         }
@@ -686,7 +703,7 @@ export class LinearPatternFeatureCommand extends PatternFeatureCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Direction 2 must not be parallel to direction 1",
+                I18n.translate("error.command.direction2MustNotParallelDirection"),
             );
             return false;
         }
@@ -818,7 +835,11 @@ export class CircularPatternFeatureCommand extends PatternFeatureCommand {
         if (!super.validateParams()) return false;
         const angle = this.resolveParameter(this.angle, ANGLE_UNITS);
         if (!angle.isOk || angle.value === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid pattern angle");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidPatternAngle"),
+            );
             return false;
         }
         return true;
@@ -1053,7 +1074,11 @@ export class CurvePatternFeatureCommand extends PatternFeatureCommand {
     private distanceIsValid(frames: Result<PatternPathFrames> | undefined): boolean {
         const spacing = this.resolveParameter(this.spacing, LENGTH_UNITS);
         if (!spacing.isOk || spacing.value <= 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid pattern spacing");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidPatternSpacing"),
+            );
             return false;
         }
         const count = this.resolveParameter(this.count, UNITLESS);
@@ -1065,7 +1090,7 @@ export class CurvePatternFeatureCommand extends PatternFeatureCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Pattern path is too short for the count and spacing",
+                I18n.translate("error.command.patternPathTooShortCountSpacing"),
             );
             return false;
         }
@@ -1083,7 +1108,11 @@ export class CurvePatternFeatureCommand extends PatternFeatureCommand {
     protected buildFeature(_body: ParametricBodyNode): PatternFeatureData | undefined {
         const source = capturePatternPathSource(this.stepDatas[1]?.shapes ?? []);
         if (source === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select the path edges on one body");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectPathEdgesOneBody"),
+            );
             return undefined;
         }
         return {

@@ -992,7 +992,7 @@ describe("matchSourceFaceIndexes (press-pull face claiming)", () => {
         const matched = matchSourceFaceIndexes(faces, ["top"], [pieceRef(0, 10, "gone")]);
 
         expect(matched.isOk).toBe(false);
-        expect(matched.error).toBe("Face not found after rebuild");
+        expect(matched.error).toBe("error.feature.faceNotFoundAfterRebuild");
     });
 
     test("a flagged ref narrows to the one piece matching the fingerprint", () => {
@@ -1012,7 +1012,7 @@ describe("matchSourceFaceIndexes (press-pull face claiming)", () => {
         const ref: ProfileRef = { ...pieceRef(0, 10, "top"), splitPiece: true };
         const result = matchSourceFaceIndexes(faces, ["top", "top"], [ref]);
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Face match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.faceMatchAmbiguousAfterRebuild");
     });
 
     test("a flagged ref with an evenly mirrored stale fingerprint fails ambiguous", () => {
@@ -1022,7 +1022,7 @@ describe("matchSourceFaceIndexes (press-pull face claiming)", () => {
         const ref: ProfileRef = { ...pieceRef(10, 20, "top"), splitPiece: true };
         const result = matchSourceFaceIndexes(faces, ["top", "top"], [ref]);
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Face match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.faceMatchAmbiguousAfterRebuild");
     });
 
     test("applyResolvedRefs keeps the flag on the re-anchored source profiles", () => {

@@ -2507,7 +2507,7 @@ describe("ExtrudeFeatureCommand end condition commit", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Blind extrude needs a non-zero depth",
+                "error.command.blindExtrudeNeedsNonZeroDepth",
             );
             expect(doc.modelManager.findNode((node) => node instanceof ParametricBodyNode)).toBeUndefined();
         } finally {

@@ -254,7 +254,10 @@ describe("linear pattern", () => {
         body.transform = Matrix4.fromScale(0, 1, 1);
         withPattern(body, { mode: "linear", direction, count: 2, spacing: 30 });
 
-        expect(errors(body)).toEqual([undefined, "Pattern direction cannot be mapped into the body"]);
+        expect(errors(body)).toEqual([
+            undefined,
+            "error.feature.cannotMappedIntoBodyerror.feature.patternDirection",
+        ]);
     });
 
     test("the direction ref re-matches through an edit of its own source body", () => {

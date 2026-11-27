@@ -292,13 +292,23 @@ describe("thread feature (real kernel)", () => {
     });
 
     test.each([
-        ["a size far too big for the rod", "M20", {}, "too small"],
-        ["a size far too small for the rod", "M3", {}, "too large"],
-        ["an offset past the end of the face", "M8", { offset: 25 }, "does not fit"],
-        ["a length longer than the face", "M8", { length: 30 }, "does not fit"],
-        ["a span shorter than one section", "M8", { length: 1 }, "too short"],
-        ["a pitch larger than the radius", "M8", { pitch: 5 }, "pitch is too large"],
-        ["a clearance beyond 0.3 pitch", "M8", { clearance: 1 }, "clearance"],
+        ["a size far too big for the rod", "M20", {}, "error.feature.threadFaceTooSmall"],
+        ["a size far too small for the rod", "M3", {}, "error.feature.threadFaceTooLarge"],
+        [
+            "an offset past the end of the face",
+            "M8",
+            { offset: 25 },
+            "error.feature.threadDoesNotFitFaceLong",
+        ],
+        ["a length longer than the face", "M8", { length: 30 }, "error.feature.threadDoesNotFitFaceLong"],
+        ["a span shorter than one section", "M8", { length: 1 }, "error.feature.threadTooShortPitch"],
+        ["a pitch larger than the radius", "M8", { pitch: 5 }, "error.feature.threadPitchTooLargeDiameter"],
+        [
+            "a clearance beyond 0.3 pitch",
+            "M8",
+            { clearance: 1 },
+            "error.feature.threadClearanceMustBetween00",
+        ],
     ] as const)("refuses %s before any kernel call", (_name, size, patch, message) => {
         const node = threaded(body([rod(4, 20)]), 4, size, patch);
         expect(errors(node)[1]).toContain(message);
@@ -322,7 +332,7 @@ describe("thread feature (real kernel)", () => {
                 modeled: true,
             } satisfies ThreadFeatureData,
         ]);
-        expect(errors(node)[1]).toContain("cylindrical face");
+        expect(errors(node)[1]).toContain("error.feature.threadNeedsCylindricalFace");
     });
 
     test("the rod's own faces keep their ids through the cut, and the groove's faces get names", () => {

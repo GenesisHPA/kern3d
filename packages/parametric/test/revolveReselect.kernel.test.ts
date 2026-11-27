@@ -633,7 +633,7 @@ describe("revolve reselect (kernel)", () => {
             ],
             constraints: [],
         });
-        expect(errors(body)).toEqual(["Sketch profile match is ambiguous after rebuild"]);
+        expect(errors(body)).toEqual(["error.feature.sketchProfileMatchAmbiguousAfterRebuild"]);
 
         const faces = sketchFaces(sketch);
         expect(faces.length).toBe(2);

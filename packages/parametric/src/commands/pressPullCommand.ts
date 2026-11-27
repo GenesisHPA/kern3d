@@ -5,6 +5,7 @@ import {
     CancelableCommand,
     CommandStore,
     command,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IStep,
@@ -301,7 +302,11 @@ export class PressPullCommand extends MultistepCommand {
         const dragged = this.stepDatas[0]?.distance;
         const size = this.resolveParameter(dragged ?? this.distance, LENGTH_UNITS);
         if (!size.isOk) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Invalid distance");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.invalidDistance"),
+            );
             return;
         }
         const opening = openingOf(this.document, picked, size.value, this.stepDatas[0]?.plane, (value) => {

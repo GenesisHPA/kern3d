@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type ICurve, type IEdge, type Matrix4, Precision, Result, type XYZ } from "@chili3d/core";
+import { I18n, type ICurve, type IEdge, type Matrix4, Precision, Result, type XYZ } from "@chili3d/core";
 
 /**
  * The path a curve pattern runs along: an unordered set of fingerprinted edges turned into one
@@ -63,17 +63,17 @@ interface EdgeSamples {
  * path to invent.
  */
 export function orderPathEdges(edges: readonly IEdge[]): Result<OrderedPathEdge[]> {
-    if (edges.length === 0) return Result.err("Pattern path has no edges");
+    if (edges.length === 0) return Result.err(I18n.translate("error.feature.patternPathHasNoEdges"));
     const ends = pathEnds(edges);
     if (ends.some((end) => endpointDegree(ends, end) > 1)) {
-        return Result.err("Pattern path branches; its edges must form a single chain");
+        return Result.err(I18n.translate("error.feature.patternPathBranchesEdgesMustForm"));
     }
     // A chain end shares its point with no other edge; a fully closed set has no end, so the
     // walk starts from the first edge as given.
     const start = ends.find((end) => endpointDegree(ends, end) === 0) ?? ends[0];
     const ordered = walkChain(edges, ends, start);
     return ordered === undefined
-        ? Result.err("Pattern path edges must connect end to end")
+        ? Result.err(I18n.translate("error.feature.patternPathEdgesMustConnectEnd"))
         : Result.ok(ordered);
 }
 
@@ -141,13 +141,14 @@ export function measuredPath(
     edges: readonly OrderedPathEdge[],
     transform?: Matrix4,
 ): Result<PatternPathFrames> {
-    if (edges.length === 0) return Result.err("Pattern path has no edges");
+    if (edges.length === 0) return Result.err(I18n.translate("error.feature.patternPathHasNoEdges"));
     const lengths = edges.map(({ edge }) => edge.length());
     if (lengths.some((length) => length <= Precision.Distance)) {
-        return Result.err("Pattern path has an edge with no length");
+        return Result.err(I18n.translate("error.feature.patternPathHasEdgeWithNo"));
     }
     const total = lengths.reduce((sum, length) => sum + length, 0);
-    if (total <= Precision.Distance) return Result.err("Pattern path has no length");
+    if (total <= Precision.Distance)
+        return Result.err(I18n.translate("error.feature.patternPathHasNoLength"));
 
     const samples = sampleChain(edges, lengths, total);
     if (!samples.isOk) return Result.err(samples.error);
@@ -199,7 +200,7 @@ function sampleEdge(
     const curve = ordered.edge.curve;
     const count = Math.min(SAMPLES_MAX, Math.max(SAMPLES_MIN, Math.ceil((length / total) * SAMPLES_MAX)));
     const points = curve.uniformAbscissaByCount(count);
-    if (points.length < 2) return Result.err("Pattern path edge could not be sampled");
+    if (points.length < 2) return Result.err(I18n.translate("error.feature.patternPathEdgeCouldNotSampled"));
     const parameters = sampleParameters(curve, points);
     if (!parameters.isOk) return Result.err(parameters.error);
     return Result.ok({
@@ -225,7 +226,7 @@ function sampleParameters(curve: ICurve, points: readonly XYZ[]): Result<number[
     for (const point of points) {
         let parameter = curve.parameter(point, Precision.Distance);
         if (parameter === undefined) {
-            return Result.err("Pattern path edge could not be measured along its length");
+            return Result.err(I18n.translate("error.feature.patternPathEdgeCouldNotMeasured"));
         }
         while (period > 0 && parameter < previous) parameter += period;
         parameters.push(parameter);

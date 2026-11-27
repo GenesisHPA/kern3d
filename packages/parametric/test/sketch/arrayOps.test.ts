@@ -245,30 +245,30 @@ describe("resolveArray", () => {
     test("refuses a count outside what a pattern can hold", () => {
         const { solver } = solverWithGeometry();
         // one instance in all is the seed alone, which is not a pattern
-        expect(errorOf(solver, linear(5, 1))).toBe("An array needs at least two instances");
+        expect(errorOf(solver, linear(5, 1))).toBe("error.sketch.arrayNeedsAtLeastTwoInstances");
         // and the bound is on the *total* the two directions make between them
         expect(errorOf(solver, linear(5, MAX_ARRAY_COUNT, { count: 2, spacing: 5 }))).toBe(
-            `An array holds at most ${MAX_ARRAY_COUNT} instances`,
+            `error.sketch.arrayHoldsAtMostInstances${MAX_ARRAY_COUNT}`,
         );
     });
 
     test("refuses a pattern that would pile its instances on top of each other", () => {
         const { solver } = solverWithGeometry();
-        expect(errorOf(solver, linear(0, 3))).toBe("The array spacing is too small to place an instance");
+        expect(errorOf(solver, linear(0, 3))).toBe("error.sketch.arraySpacingTooSmallPlaceInstance");
     });
 
     test("refuses a turn of nothing", () => {
         const { solver } = solverWithGeometry();
-        expect(errorOf(solver, circular(0, 3, false))).toBe(
-            "The array turn is too small to place an instance",
-        );
+        expect(errorOf(solver, circular(0, 3, false))).toBe("error.sketch.arrayTurnTooSmallPlaceInstance");
     });
 
     test("refuses a curve that is not sketch geometry, or has no length", () => {
         const { solver, lineId } = solverWithGeometry();
         solver.setPointPosition({ entityId: lineId, pointIndex: 1 }, 0, 0);
-        expect(errorOf(solver, curve(lineId, 5, 3))).toBe("The array curve is too short to follow");
-        expect(errorOf(solver, curve(SKETCH_ORIGIN_ID, 5, 3))).toBe("The array curve is not sketch geometry");
+        expect(errorOf(solver, curve(lineId, 5, 3))).toBe("error.sketch.arrayCurveTooShortFollow");
+        expect(errorOf(solver, curve(SKETCH_ORIGIN_ID, 5, 3))).toBe(
+            "error.sketch.arrayCurveNotSketchGeometry",
+        );
     });
 });
 

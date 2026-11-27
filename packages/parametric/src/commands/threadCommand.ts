@@ -5,6 +5,7 @@ import {
     Combobox,
     command,
     EMPTY_SCOPE,
+    I18n,
     Id,
     type IFace,
     type INodeVisual,
@@ -299,7 +300,11 @@ export class ThreadFeatureCommand extends MultistepCommand {
     protected override executeMainTask(): void {
         const picked = this.pickedFace();
         if (picked === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a cylindrical face to thread");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectCylindricalFaceThread"),
+            );
             return;
         }
         const { node: body, data } = picked;

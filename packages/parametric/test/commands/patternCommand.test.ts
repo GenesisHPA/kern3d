@@ -1835,7 +1835,7 @@ describe("curve pattern command", () => {
                 pub.mock.calls.some(
                     (call) =>
                         call[0] === "showToast" &&
-                        call[2] === "Pattern path is too short for the count and spacing",
+                        call[2] === "error.command.patternPathTooShortCountSpacing",
                 ),
             ).toBe(true);
         } finally {
@@ -1907,7 +1907,7 @@ describe("curve pattern command", () => {
             expect(
                 pub.mock.calls.some(
                     (call) =>
-                        call[0] === "showToast" && call[2] === "Pattern path edges must connect end to end",
+                        call[0] === "showToast" && call[2] === "error.feature.patternPathEdgesMustConnectEnd",
                 ),
             ).toBe(true);
         } finally {

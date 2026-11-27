@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type I18nKeys,
     type IDocument,
     type IShape,
@@ -51,7 +52,7 @@ const booleanHandler: FeatureHandler<BooleanFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         if (context.input === undefined) {
-            return Result.err("boolean requires a preceding feature");
+            return Result.err(I18n.translate("error.feature.booleanRequiresPrecedingFeature"));
         }
         const collected = collectTools(feature, context.document);
         if (!collected.isOk) return Result.err(collected.error);
@@ -120,10 +121,10 @@ function collectTools(
             missing.push(index);
             continue;
         }
-        if (!node.shape.isOk) return Result.err("Boolean tool has no shape");
+        if (!node.shape.isOk) return Result.err(I18n.translate("error.feature.booleanToolHasNoShape"));
         tools.push(node);
     }
-    if (tools.length === 0) return Result.err("Boolean tool not found");
+    if (tools.length === 0) return Result.err(I18n.translate("error.feature.booleanToolNotFound"));
     return Result.ok({ tools, missing });
 }
 
@@ -149,7 +150,7 @@ function evaluateTracked(
     const { input, tracking } = context;
     // Both are guaranteed by the caller's guards — the type just cannot see it.
     if (input === undefined || tracking === undefined) {
-        return Result.err("boolean requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.booleanRequiresPrecedingFeature"));
     }
     const result = tracked([input], toolShapes);
     if (!result.isOk) return Result.err(result.error);

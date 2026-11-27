@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IFace, Matrix4, type Plane, Result, ShapeNode, ShapeTypes } from "@chili3d/core";
+import { I18n, type IFace, Matrix4, type Plane, Result, ShapeNode, ShapeTypes } from "@chili3d/core";
 import { resolvePlaneSourceInWorld } from "../plane/planeSource";
 import { type IdLookup, type IdMultiLookup, matchFace, planeOfFace } from "../sketch/planeRef";
 import { isBodyTimelineNode, isBodyTrackingNode } from "./bodyTracking";
@@ -40,7 +40,8 @@ export function resolveNeutralPlane(
  */
 export function neutralPlaneInHost(world: Plane, host: IShapeHost, label: string): Result<Plane> {
     const inverse = host.worldTransform().invert();
-    if (inverse === undefined) return Result.err(`${label} cannot place the plane in the body`);
+    if (inverse === undefined)
+        return Result.err(I18n.translate("error.feature.cannotPlacePlaneBody{0}", label));
     return Result.ok(world.transformed(inverse));
 }
 
@@ -65,7 +66,8 @@ function worldPlaneOf(ref: NeutralPlaneRef, context: FeatureContext, label: stri
         idLookup(source.value.faceIds),
         idMultiLookup(source.value.faceIds),
     );
-    if (face === undefined) return Result.err(`${label} plane not found after rebuild`);
+    if (face === undefined)
+        return Result.err(I18n.translate("error.feature.planeNotFoundAfterRebuild{0}", label));
     // `planeOfFace` rather than the sketch path's `sketchPlaneOfFace`: a feature wants the face's
     // own outward plane (a draft's default pull direction is its normal), not a sketch's
     // re-origined frame. Both lie on the same plane, so only the orientation of the frame differs.
@@ -100,7 +102,8 @@ interface PlaneFaceSource {
 function planeFaceSource(nodeId: string, context: FeatureContext, label: string): Result<PlaneFaceSource> {
     if (nodeId === context.host.id) {
         const input = context.input;
-        if (input === undefined) return Result.err(`${label} requires a preceding feature`);
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.requiresPrecedingFeature{0}", label));
         const faces = input.findSubShapes(ShapeTypes.face) as IFace[];
         const ids = context.tracking?.inputFaceIds;
         return Result.ok({
@@ -112,12 +115,13 @@ function planeFaceSource(nodeId: string, context: FeatureContext, label: string)
     const node = context.document.modelManager.findNode((n) => n.id === nodeId);
     // Three different troubles, three messages: "not found" sent a user hunting for a body that was
     // sitting right there but had failed to build, which is a different fix (repair that feature).
-    if (node === undefined) return Result.err(`${label} plane body not found`);
-    if (!(node instanceof ShapeNode)) return Result.err(`${label} plane source is not a body`);
-    if (!node.shape.isOk) return Result.err(`${label} plane body failed to build`);
+    if (node === undefined) return Result.err(I18n.translate("error.feature.planeBodyNotFound{0}", label));
+    if (!(node instanceof ShapeNode))
+        return Result.err(I18n.translate("error.feature.planeSourceNotBody{0}", label));
+    if (!node.shape.isOk) return Result.err(I18n.translate("error.feature.planeBodyFailedBuild{0}", label));
     // A rolled-back node's shape is the session's preview, not its real state — refuse it.
     if (isBodyTimelineNode(node) && node.rollbackIndex !== undefined) {
-        return Result.err(`${label} plane body is rolled back`);
+        return Result.err(I18n.translate("error.feature.planeBodyRolledBack{0}", label));
     }
     const faces = node.shape.value.findSubShapes(ShapeTypes.face) as IFace[];
     const tracked = isBodyTrackingNode(node) ? node : undefined;

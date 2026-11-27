@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision, Result } from "@chili3d/core";
+import { I18n, Precision, Result } from "@chili3d/core";
 import {
     curveControlPoints,
     ellipseParameterOf,
@@ -133,11 +133,15 @@ export function extendEntity(
     if (solver.entity(options.targetId)?.type === "offsetCurve") {
         const copyPlan = planCopyExtend(solver, options, tolerance);
         if (!copyPlan.isOk) return Result.err(copyPlan.error);
-        return guardedEdit(solver, "the extend", () => applyCopyExtend(solver, copyPlan.value, tolerance));
+        return guardedEdit(solver, I18n.translate("error.sketch.edit.extend"), () =>
+            applyCopyExtend(solver, copyPlan.value, tolerance),
+        );
     }
     const plan = planExtend(solver, options, tolerance);
     if (!plan.isOk) return Result.err(plan.error);
-    return guardedEdit(solver, "the extend", () => applyMoves(solver, plan.value, tolerance));
+    return guardedEdit(solver, I18n.translate("error.sketch.edit.extend"), () =>
+        applyMoves(solver, plan.value, tolerance),
+    );
 }
 
 /**
@@ -176,26 +180,30 @@ function extendPair(
     options: ExtendOptions,
 ): Result<{ target: SketchEntityData; boundary: SketchEntityData }> {
     const target = solver.entity(options.targetId);
-    if (target === undefined) return Result.err("Unknown sketch entity");
+    if (target === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
     // the datum and the external references are reference geometry: they cut, but they
     // are never cut up
-    if (solver.isFixed(target.id)) return Result.err("The datum and external references cannot be extended");
+    if (solver.isFixed(target.id))
+        return Result.err(I18n.translate("error.sketch.datumExternalReferencesCannotExtended"));
     // a point *is* its one position: no end of it to move along its own curve
-    if (target.type === "point") return Result.err("A point has no end to extend");
+    if (target.type === "point") return Result.err(I18n.translate("error.sketch.pointHasNoEndExtend"));
     // a text has no end either: its one point is its anchor, not an end of a curve
-    if (target.type === "text") return Result.err("A text has no end to extend");
+    if (target.type === "text") return Result.err(I18n.translate("error.sketch.textHasNoEndExtend"));
     if (isClosedCurveType(target.type)) {
         return Result.err(
-            target.type === "circle" ? "A circle has no end to extend" : "An ellipse has no end to extend",
+            target.type === "circle"
+                ? I18n.translate("error.sketch.circleHasNoEndExtend")
+                : I18n.translate("error.sketch.ellipseHasNoEndExtend"),
         );
     }
     const boundary = solver.entity(options.boundaryId);
-    if (boundary === undefined) return Result.err("Unknown sketch entity");
-    if (boundary.id === target.id) return Result.err("Pick a different entity for the boundary");
+    if (boundary === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
+    if (boundary.id === target.id)
+        return Result.err(I18n.translate("error.sketch.pickDifferentEntityBoundary"));
     // a point is no boundary either: there is no corner of two curves where one is a position
-    if (boundary.type === "point") return Result.err("A point is no boundary to extend to");
+    if (boundary.type === "point") return Result.err(I18n.translate("error.sketch.pointNoBoundaryExtend"));
     // nor is a text: it is no single curve, so no corner of it and anything can be found
-    if (boundary.type === "text") return Result.err("A text is no boundary to extend to");
+    if (boundary.type === "text") return Result.err(I18n.translate("error.sketch.textNoBoundaryExtend"));
     return Result.ok({ target, boundary });
 }
 
@@ -224,7 +232,8 @@ function planExtend(solver: SketchSolver, options: ExtendOptions, tol: number): 
     if (!targetMove.isOk) return Result.err(targetMove.error);
     // the target has nothing to do if it already ends on the corner — that is the refusal,
     // where the boundary's own version of the same finding is what makes its move fall away
-    if (targetMove.value === undefined) return Result.err("The entity already reaches the corner");
+    if (targetMove.value === undefined)
+        return Result.err(I18n.translate("error.sketch.entityAlreadyReachesCorner"));
     if (sides[1].end === undefined) return Result.ok({ target: targetMove.value });
     // the boundary's move is the gesture's second half, never its point: one the boundary
     // has no way to make — a corner it already stands on, an end that would collapse it, an
@@ -248,7 +257,7 @@ function planExtend(solver: SketchSolver, options: ExtendOptions, tol: number): 
  */
 function bestCorner(sides: readonly CornerSide[], tolerance: number): Result<[number, number]> {
     const candidates = rawIntersections(sides[0].entity, sides[1].entity);
-    if (candidates.length === 0) return Result.err("The two entities do not meet when extended");
+    if (candidates.length === 0) return Result.err(I18n.translate("error.sketch.twoEntitiesDoNotMeetWhen"));
     const missed = (point: [number, number]) =>
         sides.reduce((count, side) => count + (reachedOutward(side, point, tolerance) ? 0 : 1), 0);
     const cost = (point: [number, number]) =>
@@ -349,7 +358,7 @@ function moveOf(
 ): Result<EndMove | undefined> {
     const { entity } = side;
     const end = endToMove(entity, side.end, point);
-    if (end === undefined) return Result.err("The entity has no end to move");
+    if (end === undefined) return Result.err(I18n.translate("error.sketch.entityHasNoEndMove"));
     if (onAnEnd(entity, point, tolerance)) return Result.ok(undefined);
     const length = entityLength(entity);
     const at = endParameter(entity, end.atOrigin, supportParameterAt(entity, point));
@@ -400,23 +409,25 @@ function freeCurveReplacement(
     const { t, distance } = projectSupport(entity, point);
     // the corner came off the two support curves, and a free curve's support reaches only so
     // far past its ends (`bezierAdapter` / `nurbsAdapter`) — past that there is no curve
-    if (distance > tolerance) return Result.err("The corner lies beyond where the curve can reach");
+    if (distance > tolerance) return Result.err(I18n.translate("error.sketch.cornerLiesBeyondWhereCurveCan"));
     const poles = curveControlPoints(entity);
     if (entity.type === "nurbs") {
         const spec = nurbsSpec(entity);
         const [from, to] = end.atOrigin ? [t, spec.knots[poles.length]] : [spec.knots[spec.degree], t];
         const piece = subNurbs(poles, nurbsWeights(entity.params), spec, from, to);
-        if (piece === undefined) return Result.err("The corner lies beyond where the curve can reach");
+        if (piece === undefined)
+            return Result.err(I18n.translate("error.sketch.cornerLiesBeyondWhereCurveCan"));
         return Result.ok({ points: piece.poles, weights: piece.weights, spec: piece.spec });
     }
     const [t0, t1]: [number, number] = end.atOrigin ? [t, 1] : [0, t];
     if (entity.type === "conic") {
         const piece = subConic(poles, entity.params[6], t0, t1);
-        if (piece === undefined) return Result.err("The corner lies beyond where the curve can reach");
+        if (piece === undefined)
+            return Result.err(I18n.translate("error.sketch.cornerLiesBeyondWhereCurveCan"));
         return Result.ok({ points: piece.poles, rho: piece.rho });
     }
     const piece = subBezier(poles, t0, t1);
-    if (piece === undefined) return Result.err("The corner lies beyond where the curve can reach");
+    if (piece === undefined) return Result.err(I18n.translate("error.sketch.cornerLiesBeyondWhereCurveCan"));
     return Result.ok({ points: piece.poles });
 }
 
@@ -428,11 +439,11 @@ function whyNotACurve(
     remaining: number,
     tolerance: number,
 ): string | undefined {
-    if (remaining <= tolerance) return "The entity would be left with nothing to extend";
+    if (remaining <= tolerance) return I18n.translate("error.sketch.entityWouldLeftWithNothingExtend");
     if (entity.type === "arc") {
         const sweep = remaining / entityRadiusOf(entity);
-        if (sweep <= Precision.Angle) return "The arc would be left with nothing to extend";
-        if (sweep >= Math.PI * 2 - Precision.Angle) return "The arc would close on itself";
+        if (sweep <= Precision.Angle) return I18n.translate("error.sketch.arcWouldLeftWithNothingExtend");
+        if (sweep >= Math.PI * 2 - Precision.Angle) return I18n.translate("error.sketch.arcWouldCloseItself");
         return undefined;
     }
     if (entity.type !== "ellipseArc") return undefined;
@@ -444,8 +455,8 @@ function whyNotACurve(
     const sweep = end.atOrigin
         ? (((tEnd - tCorner) % full) + full) % full
         : (((tCorner - tStart) % full) + full) % full;
-    if (sweep <= Precision.Angle) return "The ellipse arc would be left with nothing to extend";
-    if (sweep >= full - Precision.Angle) return "The ellipse arc would close on itself";
+    if (sweep <= Precision.Angle) return I18n.translate("error.sketch.ellipseArcWouldLeftWithNothing");
+    if (sweep >= full - Precision.Angle) return I18n.translate("error.sketch.ellipseArcWouldCloseItself");
     return undefined;
 }
 
@@ -533,7 +544,7 @@ function applyEndMove(
     // The pin reads the end *as it now is*: a NURBS' reshape re-makes its control-point
     // list, so the index the end carried before belongs to a pole the curve no longer has.
     const kept = solver.entity(move.entity.id);
-    if (kept === undefined) return Result.err("Unknown sketch entity");
+    if (kept === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
     pinCut(solver, move.atOrigin ? originEnd(kept) : farEnd(kept), move.crossing, tolerance);
     return Result.ok(removed);
 }
@@ -586,12 +597,13 @@ function copyExtendPair(
     const copy = solver.entity(options.targetId);
     const source = copy?.offset === undefined ? undefined : solver.entity(copy.offset.sourceId);
     if (copy === undefined || copy.type !== "offsetCurve" || source === undefined) {
-        return Result.err("Unknown sketch entity");
+        return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
     }
-    if (isClosedEntity(copy)) return Result.err("A closed copy has no end to extend");
+    if (isClosedEntity(copy)) return Result.err(I18n.translate("error.sketch.closedCopyHasNoEndExtend"));
     const boundary = solver.entity(options.boundaryId);
-    if (boundary === undefined) return Result.err("Unknown sketch entity");
-    if (boundary.id === copy.id) return Result.err("Pick a different entity for the boundary");
+    if (boundary === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
+    if (boundary.id === copy.id)
+        return Result.err(I18n.translate("error.sketch.pickDifferentEntityBoundary"));
     return Result.ok({ copy, source, boundary });
 }
 
@@ -635,7 +647,7 @@ function copyCorner(
     atOrigin: boolean,
 ): Result<[number, number]> {
     const points = rawIntersections(copy, boundary);
-    if (points.length === 0) return Result.err("The two entities do not meet when extended");
+    if (points.length === 0) return Result.err(I18n.translate("error.sketch.twoEntitiesDoNotMeetWhen"));
     const [start, end] = entityDomain(copy);
     const slack = (end - start) * 1e-9;
     const reachedOutward = (point: [number, number]) => {

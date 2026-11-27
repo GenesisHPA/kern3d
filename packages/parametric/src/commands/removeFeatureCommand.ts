@@ -3,6 +3,7 @@
 
 import {
     command,
+    I18n,
     Id,
     type IFace,
     type IStep,
@@ -33,7 +34,11 @@ export class RemoveFeatureCommand extends MultistepCommand {
         const body = this.stepDatas[0].nodes?.[0];
         const picked = this.stepDatas[0].shapes.filter((x) => x.shape.shapeType === ShapeTypes.face);
         if (!(body instanceof ParametricBodyNode) || picked.length === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select at least one face to remove");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectAtLeastOneFaceRemove"),
+            );
             return;
         }
 

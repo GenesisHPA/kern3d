@@ -266,7 +266,10 @@ describe("EqualConstraintCommand", () => {
 
             await runCommand(new EqualConstraintCommand(), editor);
 
-            expect(pub).toHaveBeenCalledWith("displayValidation", "Equal applies to lines, circles and arcs");
+            expect(pub).toHaveBeenCalledWith(
+                "displayValidation",
+                "error.sketch.equalAppliesLinesCirclesArcs",
+            );
             expect(editor.solver.toData().constraints.filter((c) => EQUAL_KINDS.includes(c.kind))).toEqual(
                 [],
             );

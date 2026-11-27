@@ -4,6 +4,7 @@
 import {
     ANGLE_UNITS,
     type FeatureParameter,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -212,11 +213,14 @@ const holeHandler: FeatureHandler<HoleFeatureData> = {
     evaluate(feature, context): Result<IShape> {
         // The dropdown keeps the panel from writing a bad token; this keeps a hand-edited file
         // from reaching geometry that would read it wrong (the shell's join-type guard's twin).
-        if (!HOLE_STYLES.includes(feature.style)) return Result.err(`Invalid hole style: ${feature.style}`);
+        if (!HOLE_STYLES.includes(feature.style))
+            return Result.err(I18n.translate("error.feature.invalidHoleStyle{0}", feature.style));
         const input = context.input;
-        if (input === undefined) return Result.err("Hole requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.holeRequiresPrecedingFeature"));
         const bound = feature.sketchPoints?.entityIds.length ?? 0;
-        if (feature.points.length + bound === 0) return Result.err("Hole requires at least one point");
+        if (feature.points.length + bound === 0)
+            return Result.err(I18n.translate("error.feature.holeRequiresAtLeastOnePoint"));
 
         const params = resolveHoleParams(feature, context.scope);
         if (!params.isOk) return Result.err(params.error);
@@ -315,16 +319,14 @@ interface HoleParams {
 function resolveHoleParams(feature: HoleFeatureData, scope: Scope): Result<HoleParams> {
     const diameter = resolveUnitSpec(feature.diameter, scope, LENGTH_UNITS);
     if (!diameter.isOk) return Result.err(diameter.error);
-    if (!(diameter.value > 0)) return Result.err("Hole diameter must be positive");
+    if (!(diameter.value > 0)) return Result.err(I18n.translate("error.feature.holeDiameterMustPositive"));
     const radius = diameter.value / 2;
     let tipHeight = 0; // a flat bottom has no point
     if (feature.tip !== "flat") {
         const angle = resolveUnitSpec(feature.drillAngle ?? DEFAULT_DRILL_ANGLE, scope, ANGLE_UNITS);
         if (!angle.isOk) return Result.err(angle.error);
         if (!(angle.value > 0 && angle.value < 180)) {
-            return Result.err(
-                "Hole drill angle must be between 0 and 180 degrees (choose a flat end for a flat bottom)",
-            );
+            return Result.err(I18n.translate("error.feature.holeDrillAngleMustBetween0"));
         }
         tipHeight = radius / Math.tan(MathUtils.degToRad(angle.value / 2));
     }
@@ -334,8 +336,9 @@ function resolveHoleParams(feature: HoleFeatureData, scope: Scope): Result<HoleP
     if (feature.depth !== undefined && feature.depth !== "") {
         const resolved = resolveUnitSpec(feature.depth, scope, LENGTH_UNITS);
         if (!resolved.isOk) return Result.err(resolved.error);
-        if (!(resolved.value > 0)) return Result.err("Hole depth must be positive");
-        if (resolved.value <= tipHeight) return Result.err("Hole depth must exceed the drill tip height");
+        if (!(resolved.value > 0)) return Result.err(I18n.translate("error.feature.holeDepthMustPositive"));
+        if (resolved.value <= tipHeight)
+            return Result.err(I18n.translate("error.feature.holeDepthMustExceedDrillTip"));
         depth = resolved.value;
     }
 
@@ -360,14 +363,15 @@ function resolveCounterbore(
 ): Result<HoleParams["counterbore"]> {
     if (feature.style !== "counterbore") return Result.ok(undefined);
     if (feature.counterbore === undefined) {
-        return Result.err("Counterbore hole requires its counterbore dimensions");
+        return Result.err(I18n.translate("error.feature.counterboreHoleRequiresCounterboreDimensions"));
     }
     const cd = resolveUnitSpec(feature.counterbore.diameter, scope, LENGTH_UNITS);
     if (!cd.isOk) return Result.err(cd.error);
-    if (!(cd.value > diameter)) return Result.err("Counterbore diameter must exceed the hole diameter");
+    if (!(cd.value > diameter))
+        return Result.err(I18n.translate("error.feature.counterboreDiameterMustExceedHoleDiameter"));
     const depth = resolveUnitSpec(feature.counterbore.depth, scope, LENGTH_UNITS);
     if (!depth.isOk) return Result.err(depth.error);
-    if (!(depth.value > 0)) return Result.err("Counterbore depth must be positive");
+    if (!(depth.value > 0)) return Result.err(I18n.translate("error.feature.counterboreDepthMustPositive"));
     return Result.ok({ radius: cd.value / 2, depth: depth.value });
 }
 
@@ -380,15 +384,16 @@ function resolveCountersink(
 ): Result<HoleParams["countersink"]> {
     if (feature.style !== "countersink") return Result.ok(undefined);
     if (feature.countersink === undefined) {
-        return Result.err("Countersink hole requires its countersink dimensions");
+        return Result.err(I18n.translate("error.feature.countersinkHoleRequiresCountersinkDimensions"));
     }
     const cd = resolveUnitSpec(feature.countersink.diameter, scope, LENGTH_UNITS);
     if (!cd.isOk) return Result.err(cd.error);
-    if (!(cd.value > diameter)) return Result.err("Countersink diameter must exceed the hole diameter");
+    if (!(cd.value > diameter))
+        return Result.err(I18n.translate("error.feature.countersinkDiameterMustExceedHoleDiameter"));
     const angle = resolveUnitSpec(feature.countersink.angle ?? DEFAULT_COUNTERSINK_ANGLE, scope, ANGLE_UNITS);
     if (!angle.isOk) return Result.err(angle.error);
     if (!(angle.value > 0 && angle.value < 180)) {
-        return Result.err("Countersink angle must be between 0 and 180 degrees");
+        return Result.err(I18n.translate("error.feature.countersinkAngleMustBetween0180"));
     }
     const height = (cd.value / 2 - radius) / Math.tan(MathUtils.degToRad(angle.value / 2));
     return Result.ok({ radius: cd.value / 2, height });
@@ -419,7 +424,8 @@ interface ResolvedHolePlane {
  */
 export function resolveHolePlane(ref: PlaneFaceRef, context: FeatureContext): Result<ResolvedHolePlane> {
     const hostInverse = context.host.worldTransform().invert();
-    if (hostInverse === undefined) return Result.err("Hole cannot place the plane in the body");
+    if (hostInverse === undefined)
+        return Result.err(I18n.translate("error.feature.holeCannotPlacePlaneBody"));
     const source = holeFaceSource(ref.nodeId, context);
     if (!source.isOk) return Result.err(source.error);
     const { faces, transform } = source.value;
@@ -453,7 +459,7 @@ export function resolveHolePlane(ref: PlaneFaceRef, context: FeatureContext): Re
     const normal = new XYZ(ref.normal).normalize();
     const sourceInverse = transform.invert();
     if (normal === undefined || sourceInverse === undefined) {
-        return Result.err("Hole plane not found after rebuild");
+        return Result.err(I18n.translate("error.feature.holePlaneNotFoundAfterRebuild"));
     }
     // The frozen frame follows the same source-local rule the live match does, so a re-pick and
     // a thaw land in the same frame.
@@ -476,7 +482,8 @@ interface HoleFaceSource {
 function holeFaceSource(nodeId: string, context: FeatureContext): Result<HoleFaceSource> {
     if (nodeId === context.host.id) {
         const input = context.input;
-        if (input === undefined) return Result.err("Hole requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.holeRequiresPrecedingFeature"));
         const faces = input.findSubShapes(ShapeTypes.face) as IFace[];
         const ids = context.tracking?.inputFaceIds;
         return Result.ok({
@@ -486,10 +493,11 @@ function holeFaceSource(nodeId: string, context: FeatureContext): Result<HoleFac
         });
     }
     const node = context.document.modelManager.findNode((n) => n.id === nodeId);
-    if (!(node instanceof ShapeNode) || !node.shape.isOk) return Result.err("Hole plane body not found");
+    if (!(node instanceof ShapeNode) || !node.shape.isOk)
+        return Result.err(I18n.translate("error.feature.holePlaneBodyNotFound"));
     // A rolled-back node's shape is the session's preview, not its real state — refuse it.
     if (isBodyTimelineNode(node) && node.rollbackIndex !== undefined) {
-        return Result.err("Hole plane body is rolled back");
+        return Result.err(I18n.translate("error.feature.holePlaneBodyRolledBack"));
     }
     const faces = node.shape.value.findSubShapes(ShapeTypes.face) as IFace[];
     const tracked = isBodyTrackingNode(node) ? node : undefined;
@@ -679,16 +687,23 @@ function buildHoleTool(
     // full-diameter part exits cleanly — the tip pokes out like a real drill's.
     let depth = params.depth;
     if (depth === undefined) {
-        const through = throughAllDepth(input, Matrix4.identity(), center, dir, 0, "Hole");
+        const through = throughAllDepth(
+            input,
+            Matrix4.identity(),
+            center,
+            dir,
+            0,
+            I18n.translate("error.feature.hole"),
+        );
         if (!through.isOk) return Result.err(through.error);
         depth = through.value + params.tipHeight;
     }
     const wallRun = depth - params.tipHeight;
     if (params.counterbore !== undefined && params.counterbore.depth >= wallRun) {
-        return Result.err("Counterbore depth must leave room for the hole");
+        return Result.err(I18n.translate("error.feature.counterboreDepthMustLeaveRoomHole"));
     }
     if (params.countersink !== undefined && params.countersink.height >= wallRun) {
-        return Result.err("Countersink must leave room for the hole");
+        return Result.err(I18n.translate("error.feature.countersinkMustLeaveRoomHole"));
     }
     const profile = revolveHoleProfile(params, wallRun, depth, center, dir, radial);
     if (!profile.isOk) return Result.err(profile.error);

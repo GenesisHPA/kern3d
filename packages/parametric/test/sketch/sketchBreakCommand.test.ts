@@ -139,7 +139,7 @@ describe("SketchBreakCommand", () => {
 
                 expect(pub).toHaveBeenCalledWith(
                     "displayValidation",
-                    "Pick a point along the entity, not one of its ends",
+                    "error.sketch.pickPointAlongEntityNotOne",
                 );
                 expect(editor.solver.entities()).toHaveLength(3);
                 expect(editor.commit).toHaveBeenCalledTimes(1);

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IEdge,
     type IFace,
     type IShape,
@@ -159,7 +160,7 @@ function endConditionSweep(
                 point,
                 dir,
                 plan.sweepStartOffset,
-                "Extrude",
+                I18n.translate("error.command.extrude"),
             );
             return depth.isOk ? Result.ok({ dir, depth: depth.value }) : Result.err(depth.error);
         }
@@ -181,7 +182,7 @@ function planVectorsOf(plan: ExtrudePlanState, point: XYZ, normal: XYZ): Result<
     // A direction override parallel to the profile plane sweeps a degenerate prism
     // (without an override dir IS the normal — never parallel, and no dot to pay).
     if (plan.direction.dir !== undefined && Math.abs(normal.dot(plan.direction.dir)) < PARALLEL_DOT) {
-        return Result.err("Extrude direction is parallel to the profile plane");
+        return Result.err(I18n.translate("error.feature.extrudeDirectionParallelProfilePlane"));
     }
     const base = plan.direction.dir ?? normal;
     const dir = plan.reverse ? base.multiply(-1) : base;
@@ -205,14 +206,14 @@ export function resolveExtrudePlan(
     if (!params.isOk) return Result.err(params.error);
     const { blindDepth, startOffset, endOffset, depth2 } = params.value;
     if (feature.symmetric === true && depth2 !== undefined) {
-        return Result.err("Extrude cannot be both symmetric and have a second depth");
+        return Result.err(I18n.translate("error.feature.extrudeCannotBothSymmetricHaveSecond"));
     }
 
     const direction = resolveDirectionOverride(feature.direction, context);
     const target = resolveEndTarget(feature, context);
     const condition = feature.endCondition ?? "blind";
     if (condition === "throughAll" && context.input === undefined) {
-        return Result.err("Extrude through-all requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.extrudeThroughAllRequiresPrecedingFeature"));
     }
     const reverse = feature.reverse === true;
     const plan: ExtrudePlanState = {
@@ -258,7 +259,8 @@ function resolveEndParams(
     const depth2 =
         feature.depth2 === undefined ? undefined : resolveUnitSpec(feature.depth2, scope, LENGTH_UNITS);
     if (depth2 !== undefined && !depth2.isOk) return Result.err(depth2.error);
-    if (depth2 !== undefined && depth2.value <= 0) return Result.err("Extrude depth2 must be positive");
+    if (depth2 !== undefined && depth2.value <= 0)
+        return Result.err(I18n.translate("error.feature.extrudeDepth2MustPositive"));
     return Result.ok({
         blindDepth: depth.value,
         startOffset: startOffset.value,
@@ -297,7 +299,7 @@ export function throughAllDepth(
     // `sweepStartOffset` is signed along `dir`: the start plane's reach from the profile
     // plane. Negative (the extrude's unflipped-sense offset under `reverse`) EXTENDS the run.
     const depth = farthest - sweepStartOffset + THROUGH_ALL_MARGIN;
-    if (depth <= 0) return Result.err(`${label} target lies behind the start plane`);
+    if (depth <= 0) return Result.err(I18n.translate("error.feature.targetLiesBehindStartPlane{0}", label));
     return Result.ok(depth);
 }
 
@@ -321,7 +323,7 @@ function upToAim(
 ): Result<{ dir: XYZ; depth: number }> {
     const denominator = normal.dot(dir);
     if (Math.abs(denominator) < PARALLEL_DOT) {
-        return Result.err("Extrude direction is parallel to the profile plane");
+        return Result.err(I18n.translate("error.feature.extrudeDirectionParallelProfilePlane"));
     }
     const reachOf = (p: XYZ) => normal.dot(p.sub(point)) / denominator;
     // Every sample lies ON the target surface (see `faceSamples`): the reach over a planar
@@ -350,8 +352,8 @@ function upToAim(
     if (depth <= 0) {
         return Result.err(
             reach <= 0
-                ? "Extrude target lies on or crosses the start plane"
-                : "Extrude offsets place the end behind the start plane",
+                ? I18n.translate("error.feature.extrudeTargetLiesCrossesStartPlane")
+                : I18n.translate("error.feature.extrudeOffsetsPlaceEndBehindStart"),
         );
     }
     return Result.ok({ dir: sweepDir, depth });

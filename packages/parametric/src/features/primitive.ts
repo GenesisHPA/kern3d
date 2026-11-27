@@ -3,6 +3,7 @@
 
 import {
     type FeatureParameter,
+    I18n,
     type I18nKeys,
     type IEdge,
     type IFace,
@@ -330,7 +331,8 @@ type SizesInProgress = { -readonly [K in keyof PrimitiveSizes]: PrimitiveSizes[K
  */
 function resolveSizes(feature: PrimitiveFeatureData, scope: Scope): Result<PrimitiveSizes> {
     const fields = kindFields(feature.primitive);
-    if (fields === undefined) return Result.err(`Unknown primitive kind: ${feature.primitive}`);
+    if (fields === undefined)
+        return Result.err(I18n.translate("error.feature.unknownPrimitiveKind{0}", feature.primitive));
     const sizes: SizesInProgress = { ...SIZE_DEFAULTS };
     for (const key of fields) {
         const resolved = resolveUnitSpec(feature[key] ?? SIZE_DEFAULTS[key], scope, LENGTH_UNITS);
@@ -356,16 +358,16 @@ function validateSizes(kind: PrimitiveKind, sizes: PrimitiveSizes): string | und
         case "box":
             return sizes.dx > 0 && sizes.dy > 0 && sizes.dz > 0
                 ? undefined
-                : "Box dimensions must be positive";
+                : I18n.translate("error.feature.boxDimensionsMustPositive");
         case "cylinder":
-            if (sizes.radius <= 0) return "Cylinder radius must be positive";
-            return sizes.height > 0 ? undefined : "Cylinder height must be positive";
+            if (sizes.radius <= 0) return I18n.translate("error.feature.cylinderRadiusMustPositive");
+            return sizes.height > 0 ? undefined : I18n.translate("error.feature.cylinderHeightMustPositive");
         case "sphere":
-            return sizes.radius > 0 ? undefined : "Sphere radius must be positive";
+            return sizes.radius > 0 ? undefined : I18n.translate("error.feature.sphereRadiusMustPositive");
         default:
-            if (sizes.radius <= 0) return "Cone base radius must be positive";
-            if (sizes.radius2 < 0) return "Cone top radius must be non-negative";
-            return sizes.height > 0 ? undefined : "Cone height must be positive";
+            if (sizes.radius <= 0) return I18n.translate("error.feature.coneBaseRadiusMustPositive");
+            if (sizes.radius2 < 0) return I18n.translate("error.feature.coneTopRadiusMustNonNegative");
+            return sizes.height > 0 ? undefined : I18n.translate("error.feature.coneHeightMustPositive");
     }
 }
 
@@ -508,7 +510,7 @@ function combineWithInput(
     const input = context.input;
     if (input === undefined) {
         built.shape.dispose();
-        return Result.err("Primitive join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.primitiveJoinCutIntersectRequiresPreceding"));
     }
     const tracked = trackedBoolean(operation);
     const tracking = context.tracking;
@@ -534,7 +536,7 @@ function combinePlain(
     const input = context.input;
     if (input === undefined) {
         built.shape.dispose();
-        return Result.err("Primitive join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.primitiveJoinCutIntersectRequiresPreceding"));
     }
     const owned: IShape[] = [];
     try {

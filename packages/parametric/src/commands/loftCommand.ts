@@ -10,6 +10,7 @@ import {
     Continuities,
     type Continuity,
     command,
+    I18n,
     type I18nKeys,
     Id,
     type IEdge,
@@ -238,7 +239,7 @@ export class LoftFeatureCommand extends CancelableCommand {
             PubSub.default.pub(
                 "showToast",
                 "error.default:{0}",
-                "Loft vertex sections must be first or last",
+                I18n.translate("error.command.loftVertexSectionsMustFirstLast"),
             );
             return false;
         }
@@ -286,7 +287,7 @@ export class LoftFeatureCommand extends CancelableCommand {
                     shape: this.worldShape(data) as IVertex,
                 });
             default:
-                return Result.err("Unsupported loft section");
+                return Result.err(I18n.translate("error.command.unsupportedLoftSection"));
         }
     }
 
@@ -325,7 +326,7 @@ export class LoftFeatureCommand extends CancelableCommand {
     ): Result<{ section: LoftSectionData; shape: IWire | IEdge | IVertex }> {
         const node = data.owner.node as ShapeNode;
         const edge = data.shape as unknown as IEdge;
-        if (!edge.isClosed()) return Result.err("A loft section edge must be closed");
+        if (!edge.isClosed()) return Result.err(I18n.translate("error.command.loftSectionEdgeMustClosed"));
         const tracked = isBodyTrackingNode(node) ? node : undefined;
         const edgeId = tracked?.edgeIdAt(data.indexes[0]);
         const splitPiece = node instanceof ParametricBodyNode ? node.edgeIdIsShared(edgeId) : undefined;

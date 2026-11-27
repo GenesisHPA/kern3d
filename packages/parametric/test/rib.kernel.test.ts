@@ -272,7 +272,7 @@ describe("rib refusals", () => {
         // Stopped short of the wall: the region never closes, so there is no rib to make.
         const body = ribbed(scene(bracketSketch(), gussetChain(16)));
 
-        expect(errors(body)[1]).toBe("The rib does not reach the body");
+        expect(errors(body)[1]).toBe("error.feature.ribDoesNotReachBody");
     });
 
     test("refuses a plane that does not cross the body", () => {
@@ -294,12 +294,16 @@ describe("rib refusals", () => {
         });
         shared.doc.modelManager.addNode(body);
 
-        expect(errors(body)[1]).toBe("The rib plane does not cross the body");
+        expect(errors(body)[1]).toBe("error.feature.ribPlaneDoesNotCrossBody");
     });
 
     test("refuses a non-positive thickness", () => {
-        expect(errors(ribbed(scene(), { thickness: 0 }))[1]).toBe("Rib requires a positive thickness");
-        expect(errors(ribbed(scene(), { thickness: -4 }))[1]).toBe("Rib requires a positive thickness");
+        expect(errors(ribbed(scene(), { thickness: 0 }))[1]).toBe(
+            "error.feature.ribRequiresPositiveThickness",
+        );
+        expect(errors(ribbed(scene(), { thickness: -4 }))[1]).toBe(
+            "error.feature.ribRequiresPositiveThickness",
+        );
     });
 
     test("refuses a chain that needs no body to join, rather than building a wall into nothing", () => {
@@ -319,12 +323,12 @@ describe("rib refusals", () => {
         });
         doc.modelManager.addNode(body);
 
-        expect(errors(body)).toEqual(["Rib requires a preceding feature"]);
+        expect(errors(body)).toEqual(["error.feature.ribRequiresPrecedingFeature"]);
     });
 
     test("reports a chain whose entities are gone instead of matching a look-alike", () => {
         expect(errors(ribbed(scene(), { entityIds: [99] }))[1]).toBe(
-            "The rib chain has no entities left in the sketch",
+            "error.feature.ribChainHasNoEntitiesLeft",
         );
     });
 });
@@ -336,7 +340,7 @@ describe("rib extend to part", () => {
 
     test("pushes a chord drawn short of the wall out until the corner closes", () => {
         expect(errors(ribbed(scene(bracketSketch(), shortChain())))[1]).toBe(
-            "The rib does not reach the body",
+            "error.feature.ribDoesNotReachBody",
         );
 
         const body = ribbed(scene(bracketSketch(), shortChain()), { extend: true });
@@ -368,7 +372,7 @@ describe("rib extend to part", () => {
         // Clear of the bracket, with both tangents pointing away from it.
         const body = ribbed(scene(bracketSketch(), gussetChain(-100)), { extend: true });
 
-        expect(errors(body)[1]).toBe("A rib chain end does not reach the body");
+        expect(errors(body)[1]).toBe("error.feature.ribChainEndDoesNotReach");
     });
 });
 
@@ -395,7 +399,7 @@ describe("rib region classification", () => {
 
         // The extrusion is fine and the rib refuses: the chain bounds regions, and every one of
         // them is material the body already had.
-        expect(errors(body)).toEqual([undefined, "The rib does not reach the body"]);
+        expect(errors(body)).toEqual([undefined, "error.feature.ribDoesNotReachBody"]);
     });
 });
 

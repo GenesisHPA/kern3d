@@ -251,7 +251,7 @@ describe("OffsetFaceFeatureCommand commit", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Enter a distance other than 0",
+                "error.command.enterDistanceOtherThan0",
             );
         } finally {
             pub.mockRestore();
@@ -271,7 +271,7 @@ describe("OffsetFaceFeatureCommand commit", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Select at least one face to move",
+                "error.command.selectAtLeastOneFaceMove",
             );
         } finally {
             pub.mockRestore();

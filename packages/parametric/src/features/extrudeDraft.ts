@@ -3,6 +3,7 @@
 
 import {
     ANGLE_UNITS,
+    I18n,
     type IFace,
     type IShape,
     Plane,
@@ -63,7 +64,7 @@ export function resolveExtrudeDraft(feature: ExtrudeFeatureData, scope: Scope): 
     if (!angle.isOk) return Result.err(angle.error);
     if (angle.value === 0) return Result.ok(undefined);
     if (Math.abs(angle.value) >= 90) {
-        return Result.err("Extrude draft angle must lie strictly between -90 and 90 degrees");
+        return Result.err(I18n.translate("error.feature.extrudeDraftAngleMustLieStrictly"));
     }
     return Result.ok(angle.value);
 }
@@ -93,7 +94,8 @@ export function taperSweptPrism(
     // must not fail the feature.
     if (faces.length === 0) return Result.ok(prism);
     const pull = pullDirection.normalize();
-    if (pull === undefined) return Result.err("Extrude draft requires a non-zero sweep direction");
+    if (pull === undefined)
+        return Result.err(I18n.translate("error.feature.extrudeDraftRequiresNonZeroSweep"));
     const plane = draftPlane(basePoint, pull);
     const tracked = draftTracked(
         { shape: prism.shape, faces, faceIds: prism.faceIds, edgeIds: prism.edgeIds },

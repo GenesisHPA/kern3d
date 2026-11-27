@@ -6,6 +6,7 @@ import {
     type BoundingBox,
     Combobox,
     command,
+    I18n,
     type I18nKeys,
     Id,
     type IFace,
@@ -232,7 +233,11 @@ abstract class PrimitiveCommandBase extends MultistepCommand {
             return resolved === undefined || resolved > Precision.Distance;
         });
         if (!valid) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Primitive sizes must be positive");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.primitiveSizesMustPositive"),
+            );
         }
         return valid;
     }
@@ -679,7 +684,11 @@ export class PrimitiveConeCommand extends RoundPrimitiveCommandBase {
         // unresolvable expression passes, for the feature's rebuild to report.
         const top = this.resolvedSize(this.diameter2);
         if (top !== undefined && top < 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Cone top diameter must be non-negative");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.coneTopDiameterMustNonNegative"),
+            );
             return undefined;
         }
         return this.buildRoundFeature(halfOf(this.diameter2));

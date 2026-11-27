@@ -8,6 +8,7 @@ import {
     defaultTextFont,
     FontCatalog,
     type FontOutline,
+    I18n,
     type IStep,
     LENGTH_UNITS,
     Logger,
@@ -62,7 +63,7 @@ export class SketchTextCommand extends SketchMultistepCommand {
 
     @property("text.content")
     get text(): string {
-        return this.getPrivateValue("text", "Text");
+        return this.getPrivateValue("text", I18n.translate("common.defaultText"));
     }
     set text(value: string) {
         this.setProperty("text", value);
@@ -189,7 +190,7 @@ export class SketchTextCommand extends SketchMultistepCommand {
             return undefined;
         }
         if (size.value <= 0) {
-            PubSub.default.pub("displayValidation", "The text height must be positive");
+            PubSub.default.pub("displayValidation", I18n.translate("error.sketch.textHeightMustPositive"));
             return undefined;
         }
         return { sizeMm: size.value, angle: 0 };

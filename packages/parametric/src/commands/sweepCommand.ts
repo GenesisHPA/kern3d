@@ -7,6 +7,7 @@ import {
     type BoundingBox,
     Combobox,
     command,
+    I18n,
     type I18nKeys,
     Id,
     type IEdge,
@@ -354,7 +355,8 @@ export class SweepFeatureCommand extends MultistepCommand {
      */
     private wholeSketchProfiles(): Result<IFace[]> {
         const node = this.sourceNode;
-        if (!(node instanceof SketchNode)) return Result.err("Sweep has no profile");
+        if (!(node instanceof SketchNode))
+            return Result.err(I18n.translate("error.command.sweepHasNoProfile"));
         const profiles = sketchProfiles(node);
         if (!profiles.isOk) return Result.err(profiles.error);
         return Result.ok(profiles.value.outer);
@@ -379,7 +381,7 @@ export class SweepFeatureCommand extends MultistepCommand {
                 faces = profiles.value;
             }
             const pathDatas = this.stepDatas[1].shapes;
-            if (pathDatas.length === 0) return Result.err("Sweep has no path");
+            if (pathDatas.length === 0) return Result.err(I18n.translate("error.command.sweepHasNoPath"));
             const node = pathDatas[0].owner.node;
             const edges = pathDatas
                 .filter((data) => data.owner.node === node)

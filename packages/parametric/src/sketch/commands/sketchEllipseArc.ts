@@ -4,6 +4,7 @@
 import {
     command,
     Dimensions,
+    I18n,
     type IStep,
     Precision,
     PubSub,
@@ -68,12 +69,18 @@ export class SketchEllipseArcCommand extends SketchMultistepCommand {
     protected executeMainTask(): void {
         const params = ellipseArcParams(this.uvOf(0), this.uvOf(1), this.uvOf(2), this.uvOf(3), this.uvOf(4));
         if (params === undefined) {
-            PubSub.default.pub("displayValidation", "Ellipse axis point is too close to the center");
+            PubSub.default.pub(
+                "displayValidation",
+                I18n.translate("error.sketch.ellipseAxisPointTooCloseCenter"),
+            );
             return;
         }
         const [t0, t1] = ellipseSweep(params);
         if (t1 - t0 <= Precision.Angle || Math.PI * 2 - (t1 - t0) <= Precision.Angle) {
-            PubSub.default.pub("displayValidation", "EllipseArc end point is on the start ray (zero sweep)");
+            PubSub.default.pub(
+                "displayValidation",
+                I18n.translate("error.sketch.ellipseArcEndPointStartRayZero"),
+            );
             return;
         }
         this.commitNewEntity(this.editor.solver.addEllipseArc(...params));

@@ -149,7 +149,7 @@ describe("helix command", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Helix radius and length must be positive, and the pitch non-zero",
+                "error.command.helixRadiusLengthMustPositivePitch",
             );
         } finally {
             pub.mockRestore();
@@ -171,7 +171,7 @@ describe("helix command", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Helix radius and length must be positive, and the pitch non-zero",
+                "error.command.helixRadiusLengthMustPositivePitch",
             );
         } finally {
             pub.mockRestore();

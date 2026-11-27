@@ -3,6 +3,7 @@
 
 import {
     ANGLE_UNITS,
+    I18n,
     type IFace,
     type IShape,
     type Plane,
@@ -63,18 +64,24 @@ const draftHandler: FeatureHandler<DraftFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Draft requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.draftRequiresPrecedingFeature"));
         const angle = resolveUnitSpec(feature.angle, context.scope, ANGLE_UNITS);
         if (!angle.isOk) return Result.err(angle.error);
         // Measured: at zero the kernel does not fail, it silently hands the input straight back —
         // no face's surface is recomputed, so nothing is registered and `Build` "succeeds". That
         // would be a feature that quietly does nothing, which is worse than a row saying so.
-        if (angle.value === 0) return Result.err("Draft requires a non-zero angle");
+        if (angle.value === 0) return Result.err(I18n.translate("error.feature.draftRequiresNonZeroAngle"));
 
         const faces = resolveDraftFaces(feature, context, input);
         if (!faces.isOk) return Result.err(faces.error);
-        if (faces.value.length === 0) return Result.err("Draft requires at least one face to taper");
-        const neutral = resolveNeutralPlane(feature.neutralPlane, context, "Draft");
+        if (faces.value.length === 0)
+            return Result.err(I18n.translate("error.feature.draftRequiresAtLeastOneFace"));
+        const neutral = resolveNeutralPlane(
+            feature.neutralPlane,
+            context,
+            I18n.translate("error.command.draft"),
+        );
         if (!neutral.isOk) return Result.err(neutral.error);
 
         // The pull direction is the neutral plane's own normal — Onshape's default —

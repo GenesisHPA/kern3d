@@ -144,6 +144,6 @@ describe("a corner edge the rebuild cannot find", () => {
         );
 
         expect(matched.isOk).toBe(false);
-        expect(matched.isOk ? "" : matched.error).toBe("Edge not found after rebuild");
+        expect(matched.isOk ? "" : matched.error).toBe("error.feature.edgeNotFoundAfterRebuild");
     });
 });

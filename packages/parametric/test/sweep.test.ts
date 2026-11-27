@@ -218,7 +218,7 @@ describe("sweep feature", () => {
         const body = bodyWith([sweepFeature(host.id, pathRefs(pathEdges), { sketchId: "deleted" })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Sketch not found");
+        expect(body.featureItems()[0].error).toBe("error.feature.sketchNotFound");
         expect(mocks.sweep).not.toHaveBeenCalled();
     });
 
@@ -234,7 +234,7 @@ describe("sweep feature", () => {
         ]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Sweep path body not found");
+        expect(body.featureItems()[0].error).toBe("error.feature.sweepPathBodyNotFound");
         expect(mocks.sweep).not.toHaveBeenCalled();
     });
 
@@ -250,7 +250,7 @@ describe("sweep feature", () => {
         const body = bodyWith([sweepFeature(host.id, [circle], { sketchId: sketch.id })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Edge not found after rebuild");
+        expect(body.featureItems()[0].error).toBe("error.feature.edgeNotFoundAfterRebuild");
         expect(mocks.sweep).not.toHaveBeenCalled();
     });
 
@@ -327,7 +327,7 @@ describe("sweep feature", () => {
             const body = bodyWith([feature]);
 
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Extrude source body not found");
+            expect(body.featureItems()[0].error).toBe("error.feature.extrudeSourceBodyNotFound");
             expect(mocks.sweep).not.toHaveBeenCalled();
         });
     });
@@ -516,9 +516,7 @@ describe("sweep feature", () => {
             ]);
 
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe(
-                "Sweep join/cut/intersect requires a preceding feature",
-            );
+            expect(body.featureItems()[0].error).toBe("error.feature.sweepJoinCutIntersectRequiresPreceding");
             expect(sweep).not.toHaveBeenCalled();
             expect(booleanFuse).not.toHaveBeenCalled();
         });

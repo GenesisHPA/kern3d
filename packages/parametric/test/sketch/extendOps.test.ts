@@ -259,7 +259,7 @@ describe("extendEntity refusals", () => {
             const boundary = solver.addLine(0, 5, 10, 5);
 
             expect(refusal(solver, { targetId: target, boundaryId: boundary })).toBe(
-                "The two entities do not meet when extended",
+                "error.sketch.twoEntitiesDoNotMeetWhen",
             );
             expect(params(solver, target)).toEqual([0, 0, 10, 0]);
         } finally {
@@ -274,7 +274,7 @@ describe("extendEntity refusals", () => {
             const boundary = solver.addLine(20, 0, 30, 0);
 
             expect(refusal(solver, { targetId: target, boundaryId: boundary })).toBe(
-                "The two entities do not meet when extended",
+                "error.sketch.twoEntitiesDoNotMeetWhen",
             );
         } finally {
             solver.dispose();
@@ -286,7 +286,7 @@ describe("extendEntity refusals", () => {
         try {
             const circle = solver.addCircle(0, 0, 3);
             expect(refusal(solver, { targetId: circle, boundaryId: boundary })).toBe(
-                "A circle has no end to extend",
+                "error.sketch.circleHasNoEndExtend",
             );
         } finally {
             solver.dispose();
@@ -297,7 +297,7 @@ describe("extendEntity refusals", () => {
         const { solver, boundary } = crossSolver();
         try {
             expect(refusal(solver, { targetId: -2, boundaryId: boundary })).toBe(
-                "The datum and external references cannot be extended",
+                "error.sketch.datumExternalReferencesCannotExtended",
             );
         } finally {
             solver.dispose();
@@ -308,7 +308,7 @@ describe("extendEntity refusals", () => {
         const { solver, target } = crossSolver();
         try {
             expect(refusal(solver, { targetId: target, boundaryId: target })).toBe(
-                "Pick a different entity for the boundary",
+                "error.sketch.pickDifferentEntityBoundary",
             );
         } finally {
             solver.dispose();
@@ -328,7 +328,7 @@ describe("extendEntity refusals", () => {
                     targetUv: [19, 0],
                     boundaryId: boundary,
                 }),
-            ).toBe("The entity already reaches the corner");
+            ).toBe("error.sketch.entityAlreadyReachesCorner");
         } finally {
             solver.dispose();
         }
@@ -351,7 +351,7 @@ describe("extendEntity refusals", () => {
                     boundaryId: boundary,
                     boundaryUv: [10, 2],
                 }),
-            ).toBe("The entity already reaches the corner");
+            ).toBe("error.sketch.entityAlreadyReachesCorner");
         } finally {
             solver.dispose();
         }
@@ -371,7 +371,9 @@ describe("extendEntity refusals", () => {
             try {
                 const error = refusal(solver, { targetId: target, boundaryId: boundary });
                 expect(error).toBeInstanceOf(SketchSolveError);
-                expect(String(error)).toMatch(/could not solve after the extend/);
+                expect(String(error)).toMatch(
+                    /error\.sketch\.sketchCouldNotSolveAftererror\.sketch\.edit\.extend/,
+                );
             } finally {
                 spy.mockRestore();
             }

@@ -248,7 +248,7 @@ describe("mirror feature", () => {
         const body = bodyWith([{ id: "m1", type: "mirror", plane: DATUM_YZ }]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Mirror requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.feature.mirrorRequiresPrecedingFeature");
         expect(mocks.booleanFuse).not.toHaveBeenCalled();
     });
 
@@ -260,7 +260,7 @@ describe("mirror feature", () => {
         const body = mirroredBody(plane);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe("Mirror plane body not found");
+        expect(body.featureItems()[1].error).toBe("error.feature.planeBodyNotFounderror.feature.mirror");
         expect(mocks.booleanFuse).not.toHaveBeenCalled();
     });
 
@@ -274,7 +274,7 @@ describe("mirror feature", () => {
         const body = mirroredBody(plane);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe("Mirror plane body is rolled back");
+        expect(body.featureItems()[1].error).toBe("error.feature.planeBodyRolledBackerror.feature.mirror");
         expect(mocks.booleanFuse).not.toHaveBeenCalled();
     });
 
@@ -288,7 +288,9 @@ describe("mirror feature", () => {
         const body = mirroredBody(plane);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe("Mirror plane not found after rebuild");
+        expect(body.featureItems()[1].error).toBe(
+            "error.feature.planeNotFoundAfterRebuilderror.feature.mirror",
+        );
     });
 
     test("the merge checkbox parameter defaults to true and writes back", () => {

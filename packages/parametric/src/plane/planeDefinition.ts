@@ -3,6 +3,7 @@
 
 import {
     CurveUtils,
+    I18n,
     type IDocument,
     type IEdge,
     type IShape,
@@ -208,7 +209,7 @@ function applyFlip(plane: Plane, flip: boolean | undefined): Plane {
 /** A plane through `point` whose normal is `normal`, with a stable, Z-up in-plane X axis. */
 function planeAtPoint(point: XYZ, normal: XYZ): Result<Plane> {
     const n = normal.normalize();
-    if (n === undefined) return Result.err("Plane normal is degenerate");
+    if (n === undefined) return Result.err(I18n.translate("error.datum.planeNormalDegenerate"));
     return Result.ok(canonicalFrame(point, n));
 }
 
@@ -251,11 +252,14 @@ export function resolvePlaneDefinition(
                 );
             default:
                 return Result.err(
-                    `Unknown plane definition: ${String((definition as { kind?: string }).kind)}`,
+                    I18n.translate(
+                        "error.datum.unknownPlaneDefinition{0}",
+                        String((definition as { kind?: string }).kind),
+                    ),
                 );
         }
     } catch (error) {
-        return Result.err(`Plane definition could not be resolved: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.planeDefinitionCouldNotResolved{0}", String(error)));
     }
 }
 
@@ -275,7 +279,7 @@ function offsetDefinition(
     visited: ReadonlySet<string> | undefined,
 ): Result<Plane> {
     if (!Number.isFinite(definition.distance)) {
-        return Result.err("Plane offset distance is not a finite number");
+        return Result.err(I18n.translate("error.datum.planeOffsetDistanceNotFiniteNumber"));
     }
     const source = sourcePlane(document, definition.source, definition.anchors, "Plane", visited);
     if (!source.isOk) return source;
@@ -328,7 +332,7 @@ function lineAngleDefinition(
     visited: ReadonlySet<string> | undefined,
 ): Result<Plane> {
     if (!Number.isFinite(definition.angle)) {
-        return Result.err("Plane angle is not a finite number");
+        return Result.err(I18n.translate("error.datum.planeAngleNotFiniteNumber"));
     }
     const line = withEdge(
         document,
@@ -336,7 +340,8 @@ function lineAngleDefinition(
         definition.anchors,
         "Plane",
         (edge, transform) => {
-            if (!isLineEdge(edge)) return Result.err("Line angle requires a straight edge");
+            if (!isLineEdge(edge))
+                return Result.err(I18n.translate("error.datum.lineAngleRequiresStraightEdge"));
             let start = edge.startPoint();
             let end = edge.endPoint();
             let direction = end.sub(start);
@@ -413,7 +418,7 @@ function curvePointDefinition(
             const derivative = edge.curve.d1(nearest.parameter);
             const direction = derivative.vec.normalize();
             return direction === undefined
-                ? Result.err("Curve tangent is degenerate")
+                ? Result.err(I18n.translate("error.datum.curveTangentDegenerate"))
                 : Result.ok({ direction, origin: nearest.point });
         },
         visited,
@@ -438,10 +443,12 @@ function tangentDefinition(
     definition: Extract<PlaneDefinition, { kind: "tangent" }>,
     document: IDocument,
 ): Result<Plane> {
-    if (!Number.isFinite(definition.angle)) return Result.err("Plane angle is not a finite number");
+    if (!Number.isFinite(definition.angle))
+        return Result.err(I18n.translate("error.datum.planeAngleNotFiniteNumber"));
     return withFace(document, definition.face, definition.anchors, "Plane", (face, transform) => {
         const axis = revolutionAxisOfFace(face);
-        if (!axis.isOk) return Result.err("Tangent plane requires a cylindrical or conical face");
+        if (!axis.isOk)
+            return Result.err(I18n.translate("error.datum.tangentPlaneRequiresCylindricalConicalFace"));
         const at = transform.ofPoint(new XYZ(definition.at));
         const radians = (definition.angle * Math.PI) / 180;
         const rotated = rotateAbout(at, axis.value.point, axis.value.direction, radians);
@@ -467,18 +474,19 @@ export function lineAnglePlane(
     flip: boolean | undefined,
 ): Result<Plane> {
     let direction = lineDirection.normalize();
-    if (direction === undefined) return Result.err("Line direction is degenerate");
+    if (direction === undefined) return Result.err(I18n.translate("error.datum.lineDirectionDegenerate"));
     if (capturedDirection !== undefined && direction.dot(new XYZ(capturedDirection)) < 0) {
         direction = direction.reverse();
     }
     const referenceNormal = reference.normal.normalize();
-    if (referenceNormal === undefined) return Result.err("Reference plane normal is degenerate");
+    if (referenceNormal === undefined)
+        return Result.err(I18n.translate("error.datum.referencePlaneNormalDegenerate"));
     const perpendicular = referenceNormal.sub(direction.multiply(referenceNormal.dot(direction))).normalize();
     if (perpendicular === undefined) {
-        return Result.err("Line is parallel to the reference plane normal");
+        return Result.err(I18n.translate("error.datum.lineParallelReferencePlaneNormal"));
     }
     const normal = perpendicular.rotate(direction, (angleDegrees * Math.PI) / 180);
-    if (normal === undefined) return Result.err("Plane normal is degenerate");
+    if (normal === undefined) return Result.err(I18n.translate("error.datum.planeNormalDegenerate"));
     return Result.ok(applyFlip(canonicalFrame(linePoint, normal), flip));
 }
 
@@ -491,7 +499,7 @@ export function threePointPlane(
     const x = second.sub(first).normalize();
     const normal = second.sub(first).cross(third.sub(first)).normalize();
     if (x === undefined || normal === undefined) {
-        return Result.err("Three points are collinear");
+        return Result.err(I18n.translate("error.datum.threePointsAreCollinear"));
     }
     return Result.ok(applyFlip(canonicalFrame(first, normal), flip));
 }
@@ -507,7 +515,7 @@ function parallelMidPlane(first: Plane, second: Plane, flip: boolean | undefined
     const firstOffset = normal.dot(first.origin);
     const secondOffset = normal.dot(second.origin);
     if (Math.abs(secondOffset - firstOffset) <= Precision.Distance) {
-        return Result.err("The two planes are coincident");
+        return Result.err(I18n.translate("error.datum.twoPlanesAreCoincident"));
     }
     const origin = first.origin.add(normal.multiply((secondOffset - firstOffset) / 2));
     return Result.ok(applyFlip(canonicalFrame(origin, normal), flip));
@@ -524,7 +532,8 @@ function bisectorPlane(first: Plane, second: Plane, dot: number, flip: boolean |
     const combined = flip === true ? first.normal.sub(secondNormal) : first.normal.add(secondNormal);
     const normal = combined.normalize();
     const line = first.normal.cross(second.normal).normalize();
-    if (normal === undefined || line === undefined) return Result.err("The two planes do not intersect");
+    if (normal === undefined || line === undefined)
+        return Result.err(I18n.translate("error.datum.twoPlanesDoNotIntersect"));
     const denominator = 1 - dot * dot;
     const firstOffset = first.normal.dot(first.origin);
     const secondOffset = second.normal.dot(second.origin);
@@ -541,7 +550,7 @@ export function curvePointPlane(
     flip: boolean | undefined,
 ): Result<Plane> {
     let normal = tangent.normalize();
-    if (normal === undefined) return Result.err("Curve tangent is degenerate");
+    if (normal === undefined) return Result.err(I18n.translate("error.datum.curveTangentDegenerate"));
     if (capturedTangent !== undefined && normal.dot(new XYZ(capturedTangent)) < 0) {
         normal = normal.reverse();
     }
@@ -558,5 +567,5 @@ function axisOfEdge(edge: IEdge): Result<XYZ> {
     const basis = edge.curve.basisCurve;
     if (CurveUtils.isCircle(basis)) return Result.ok(basis.axis);
     if (CurveUtils.isLine(basis)) return Result.ok(edge.endPoint().sub(edge.startPoint()));
-    return Result.err("Point normal requires a straight or circular edge");
+    return Result.err(I18n.translate("error.datum.pointNormalRequiresStraightCircularEdge"));
 }

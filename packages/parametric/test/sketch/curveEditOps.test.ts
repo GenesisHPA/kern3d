@@ -627,7 +627,7 @@ describe("transformEntities on the curve families", () => {
 
             expect(result.isOk).toBe(false);
             if (result.isOk) throw new Error("unreachable");
-            expect(result.error).toBe("The scale would collapse the sketch geometry");
+            expect(result.error).toBe("error.sketch.scaleWouldCollapseSketchGeometry");
             expect(paramsOf(solver, conic)).toEqual([0, 0, 0.2, 0.4, 0.4, 0, 0.5]);
         } finally {
             solver.dispose();
@@ -698,7 +698,7 @@ describe("transformEntities on the curve families", () => {
 
             expect(result.isOk).toBe(false);
             if (result.isOk) throw new Error("unreachable");
-            expect(result.error).toBe("The scale would collapse the sketch geometry");
+            expect(result.error).toBe("error.sketch.scaleWouldCollapseSketchGeometry");
             expect(paramsOf(solver, ellipse)).toEqual([0, 0, 0.4, 0, 0, 0.2]);
         } finally {
             solver.dispose();
@@ -1114,7 +1114,7 @@ describe("extendEntity on the curve families", () => {
             const result = extendEntity(solver, options);
             expect(result.isOk).toBe(false);
             if (result.isOk) throw new Error("unreachable");
-            expect(result.error).toBe("The corner lies beyond where the curve can reach");
+            expect(result.error).toBe("error.sketch.cornerLiesBeyondWhereCurveCan");
             expect(paramsOf(solver, conic)).toEqual([0, 0, 5, 5, 10, 0, 0.25]);
             expect(solver.toData().constraints).toEqual([]);
         } finally {
@@ -1274,7 +1274,7 @@ describe("extendEntity on the curve families", () => {
             const result = extendEntity(solver, options);
             expect(result.isOk).toBe(false);
             if (result.isOk) throw new Error("unreachable");
-            expect(result.error).toBe("The entity already reaches the corner");
+            expect(result.error).toBe("error.sketch.entityAlreadyReachesCorner");
             expect(paramsOf(solver, bezier)).toEqual([0, 0, 3, 0, 6, 0, 8, 0]);
             expect(solver.toData().entities).toHaveLength(2);
             expect(solver.toData().constraints).toEqual([]);
@@ -1676,7 +1676,7 @@ describe("breakEntity on the curve families", () => {
             const result = breakEntity(solver, conic, [[5, 0]], TOLERANCE);
             expect(result.isOk).toBe(false);
             if (result.isOk) throw new Error("expected the break to be refused");
-            expect(result.error).toMatch(/not one of its ends/);
+            expect(result.error).toMatch(/error\.sketch\.pickPointAlongEntityNotOne/);
         } finally {
             solver.dispose();
         }
@@ -1899,7 +1899,7 @@ describe("extendEntity on an offset copy", () => {
             const result = extendEntity(solver, options);
             expect(result.isOk).toBe(false);
             if (result.isOk) throw new Error("unreachable");
-            expect(result.error).toBe("A closed copy has no end to extend");
+            expect(result.error).toBe("error.sketch.closedCopyHasNoEndExtend");
         } finally {
             solver.dispose();
         }

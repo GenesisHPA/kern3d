@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision, Result } from "@chili3d/core";
+import { I18n, Precision, Result } from "@chili3d/core";
 import { type SketchOperationResult, SketchSolveError } from "./sketchError";
 import {
     ConstraintKind,
@@ -104,11 +104,11 @@ export function reflectPoint(
 function axisOf(solver: SketchSolver, axisId: number): Result<MirrorAxis> {
     const line = solver.entity(axisId);
     if (line === undefined || line.type !== "line") {
-        return Result.err("The mirror line must be a line");
+        return Result.err(I18n.translate("error.sketch.mirrorLineMustLine"));
     }
     const [x1, y1, x2, y2] = line.params;
     if (Math.hypot(x2 - x1, y2 - y1) <= Precision.Distance) {
-        return Result.err("The mirror line is too short to mirror about");
+        return Result.err(I18n.translate("error.sketch.mirrorLineTooShortMirrorAbout"));
     }
     return Result.ok({ a: [x1, y1], b: [x2, y2] });
 }
@@ -307,7 +307,8 @@ export function mirrorEntities(
     const { planned, skippedSelfMirror } = planSources(solver, sourceIds, axisId, axis.value, tol);
     // Nothing eligible is an error; everything eligible being its own mirror is not —
     // that is a real answer, and the caller reports which entities it covered.
-    if (planned.length === 0 && skippedSelfMirror.length === 0) return Result.err("Nothing to mirror");
+    if (planned.length === 0 && skippedSelfMirror.length === 0)
+        return Result.err(I18n.translate("error.sketch.nothingMirror"));
     if (planned.length === 0) return Result.ok({ createdEntityIds: [], skippedSelfMirror });
 
     const snapshot = solver.toData();
@@ -326,7 +327,9 @@ export function mirrorEntities(
     if (outcome.result === "Conflicting" || outcome.result === "Diverged" || outcome.result === "Stalled") {
         solver.reset(snapshot);
         return Result.err(
-            new SketchSolveError(`The sketch could not solve after the mirror (${outcome.result})`),
+            new SketchSolveError(
+                I18n.translate("error.sketch.sketchCouldNotSolveAfterMirror{0}", outcome.result),
+            ),
         );
     }
     return Result.ok({ createdEntityIds: copies.map((copy) => copy.copyId), skippedSelfMirror });

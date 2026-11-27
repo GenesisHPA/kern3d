@@ -7,6 +7,7 @@ import {
     Combobox,
     CurveUtils,
     command,
+    I18n,
     type I18nKeys,
     Id,
     type IEdge,
@@ -372,9 +373,9 @@ export class ChamferFeatureCommand extends EdgeCornerFeatureCommand {
         const angle = this.resolveParameter(this.angle, ANGLE_UNITS);
         if (!angle.isOk) return angle;
         if (angle.value <= 0 || angle.value >= 90)
-            return Result.err("The angle must lie between 0 and 90 degrees");
+            return Result.err(I18n.translate("error.command.angleMustLieBetween090"));
         const d1 = this.valueNumber;
-        if (d1 === undefined) return Result.err("The length does not resolve");
+        if (d1 === undefined) return Result.err(I18n.translate("error.command.lengthDoesNotResolve"));
         return Result.ok(d1 * Math.tan(MathUtils.degToRad(angle.value)));
     }
 
@@ -388,7 +389,9 @@ export class ChamferFeatureCommand extends EdgeCornerFeatureCommand {
         if (this.chamferMode === "equal") return Result.ok(undefined);
         const d2 = this.secondDistance();
         if (!d2.isOk) return Result.err(d2.error);
-        return d2.value > 0 ? Result.ok(undefined) : Result.err("The second distance must be positive");
+        return d2.value > 0
+            ? Result.ok(undefined)
+            : Result.err(I18n.translate("error.command.secondDistanceMustPositive"));
     }
 
     protected override feature(value: ParameterValue, edges: EdgeRef[]): ChamferFeatureData {
@@ -451,7 +454,8 @@ function cornerResult(
 ): Result<IShape> {
     if (method === "fillet" || sides === undefined) return shapeFactory[method](shape, indexes, value);
     const twoDist = shapeFactory.chamferTwoDist;
-    if (twoDist === undefined) return Result.err("The kernel does not support two-distance chamfers");
+    if (twoDist === undefined)
+        return Result.err(I18n.translate("error.command.kernelDoesNotSupportTwoDistance"));
     const faces = referenceFaces(shape, indexes, sides.flip);
     if (!faces.isOk) return Result.err(faces.error);
     return twoDist.call(shapeFactory, shape, indexes, value, sides.distance2, faces.value);

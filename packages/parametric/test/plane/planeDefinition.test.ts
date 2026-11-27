@@ -62,7 +62,7 @@ describe("lineAnglePlane", () => {
     test("a line parallel to the reference normal has no angle plane", () => {
         const plane = lineAnglePlane(origin, new XYZ(0, 0, 1), reference, 45, undefined, false);
         expect(plane.isOk).toBe(false);
-        expect(plane.error).toContain("parallel");
+        expect(plane.error).toContain("error.datum.lineParallelReferencePlaneNormal");
     });
 
     test("a degenerate line direction is rejected", () => {
@@ -98,7 +98,7 @@ describe("threePointPlane", () => {
     test("collinear points are rejected", () => {
         const plane = threePointPlane(new XYZ(0, 0, 0), new XYZ(1, 0, 0), new XYZ(2, 0, 0), false);
         expect(plane.isOk).toBe(false);
-        expect(plane.error).toContain("collinear");
+        expect(plane.error).toContain("error.datum.threePointsAreCollinear");
     });
 });
 
@@ -123,7 +123,7 @@ describe("midPlaneOf", () => {
     test("coincident planes are rejected", () => {
         const plane = midPlaneOf(Plane.XY, Plane.XY, false);
         expect(plane.isOk).toBe(false);
-        expect(plane.error).toContain("coincident");
+        expect(plane.error).toContain("error.datum.twoPlanesAreCoincident");
     });
 
     test("intersecting planes give their bisector", () => {

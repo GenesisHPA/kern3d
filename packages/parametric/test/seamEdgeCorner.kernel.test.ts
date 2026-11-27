@@ -96,7 +96,7 @@ test("a fillet on a closed sweep's seam is refused, not left to abort the kernel
     // it — every later operation in the session failing. It must come back as an error row.
     addFillet(body, seamEdgeIndex(body));
 
-    expect(body.featureItems()[1].error).toContain("same face on both sides");
+    expect(body.featureItems()[1].error).toContain("error.kernel.needsDihedralSitEdgeHasSame");
     // The chain survives: the body still holds the revolve alone, and says so.
     expect(body.shape.isOk).toBe(true);
 });

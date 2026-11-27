@@ -123,7 +123,7 @@ describe("extrude end conditions (real kernel)", () => {
         const body = plate(doc, rect(0, 0, 10, 10), 10, { endCondition: "throughAll" });
 
         expect(body.shape.isOk).toBe(false);
-        expect(errors(body)).toEqual(["Extrude through-all requires a preceding feature"]);
+        expect(errors(body)).toEqual(["error.feature.extrudeThroughAllRequiresPrecedingFeature"]);
     });
 
     test("upToFace ends at another body's face and follows its transform", () => {
@@ -398,7 +398,7 @@ describe("extrude end conditions (real kernel)", () => {
         doc.modelManager.addNode(body);
 
         expect(body.shape.isOk).toBe(false);
-        expect(errors(body)).toEqual(["Extrude target lies on or crosses the start plane"]);
+        expect(errors(body)).toEqual(["error.feature.extrudeTargetLiesCrossesStartPlane"]);
     });
 
     test("upToFace with an oblique sweep reads the cylinder's own reach, not its box's", () => {
@@ -601,7 +601,7 @@ describe("extrude end conditions (real kernel)", () => {
         // Rotated back, the direction lies IN the profile plane — a degenerate sweep is an
         // error, not a silent flat prism.
         axle.transform = Matrix4.fromAxisRad({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, 0);
-        expect(errors(body)).toEqual(["Extrude direction is parallel to the profile plane"]);
+        expect(errors(body)).toEqual(["error.feature.extrudeDirectionParallelProfilePlane"]);
     });
 });
 

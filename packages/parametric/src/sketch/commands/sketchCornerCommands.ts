@@ -4,6 +4,7 @@
 import {
     AsyncController,
     command,
+    I18n,
     LENGTH_UNITS,
     type ParameterValue,
     PubSub,
@@ -50,7 +51,10 @@ abstract class SketchCornerCommand extends SketchConstraintCommand {
             return undefined;
         }
         if (found.value.length === 0) {
-            PubSub.default.pub("displayValidation", "The picked lines do not share an endpoint");
+            PubSub.default.pub(
+                "displayValidation",
+                I18n.translate("error.sketch.pickedLinesDoNotShareEndpoint"),
+            );
             return undefined;
         }
         return found.value;

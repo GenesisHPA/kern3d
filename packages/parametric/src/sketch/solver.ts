@@ -1,7 +1,15 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { EMPTY_SCOPE, type ParameterValue, type Plane, Precision, Result, type Scope } from "@chili3d/core";
+import {
+    EMPTY_SCOPE,
+    I18n,
+    type ParameterValue,
+    type Plane,
+    Precision,
+    Result,
+    type Scope,
+} from "@chili3d/core";
 import type { SolveResultInfo, WasmSystem } from "../../lib/garlic";
 import { INCIDENCE_TOLERANCE } from "../features/refGeometry";
 import {
@@ -606,10 +614,12 @@ export class SketchSolver implements ExternalEntityHost {
         const record = this.constraints.get(constraintId);
         const paramId = record?.datumParamIds?.[index];
         if (record === undefined || paramId === undefined) {
-            return Result.err(`Constraint ${constraintId} has no datum ${index}`);
+            return Result.err(I18n.translate("error.sketch.constraintHasNoDatum{0}{1}", constraintId, index));
         }
         if (record.driven === true) {
-            return Result.err(`Constraint ${constraintId} is driven — it measures, it does not drive`);
+            return Result.err(
+                I18n.translate("error.sketch.constraintDrivenMeasuresDoesNotDrive{0}", constraintId),
+            );
         }
         const source = toDatumSource(record.kind, input, record.display);
         const resolved = resolveDatumSource(record.kind, source, this._scope, record.display);
@@ -997,13 +1007,13 @@ export class SketchSolver implements ExternalEntityHost {
     /** Refuses a retype the id itself forbids: a datum, an external ref, an array instance, an unknown id. */
     private assertRetypeable(id: number): Result<void> {
         if (isDatumEntityId(id) || isExternalEntityId(id)) {
-            return Result.err("The datum and external references cannot change type");
+            return Result.err(I18n.translate("error.sketch.datumExternalReferencesCannotChangeType"));
         }
         if (this.derivedEntities.has(id)) {
-            return Result.err("An array instance takes its type from the entity it copies");
+            return Result.err(I18n.translate("error.sketch.arrayInstanceTakesTypeFromEntity"));
         }
         if (this.entityTypes.get(id) === undefined) {
-            return Result.err(`Unknown sketch entity: ${id}`);
+            return Result.err(I18n.translate("error.sketch.unknownSketchEntity{0}", id));
         }
         return Result.ok(undefined);
     }
@@ -1042,14 +1052,15 @@ export class SketchSolver implements ExternalEntityHost {
      */
     setOffsetDistance(entityId: number, distance: number): Result<void> {
         const ref = this.entityOffsets.get(entityId);
-        if (ref === undefined) return Result.err("Not an offset curve");
+        if (ref === undefined) return Result.err(I18n.translate("error.sketch.notOffsetCurve"));
         if (!Number.isFinite(distance) || Math.abs(distance) <= Precision.Distance) {
-            return Result.err("The offset distance is too small");
+            return Result.err(I18n.translate("error.sketch.offsetDistanceTooSmall"));
         }
         const source = this.entity(ref.sourceId);
-        if (source === undefined) return Result.err("The entity an offset curve reads is gone");
+        if (source === undefined)
+            return Result.err(I18n.translate("error.sketch.entityOffsetCurveReadsGone"));
         if (offsetFolds(source, distance)) {
-            return Result.err("The offset distance is larger than the geometry it comes from");
+            return Result.err(I18n.translate("error.sketch.offsetDistanceLargerThanGeometryComes"));
         }
         this.entityOffsets.set(entityId, { ...ref, distance });
         return Result.ok(undefined);
@@ -1073,7 +1084,7 @@ export class SketchSolver implements ExternalEntityHost {
      */
     setOffsetWindow(entityId: number, window: [number, number] | undefined): Result<void> {
         const ref = this.entityOffsets.get(entityId);
-        if (ref === undefined) return Result.err("Not an offset curve");
+        if (ref === undefined) return Result.err(I18n.translate("error.sketch.notOffsetCurve"));
         const whole: OffsetCurveRef = {
             sourceId: ref.sourceId,
             sourceType: ref.sourceType,
@@ -1084,7 +1095,8 @@ export class SketchSolver implements ExternalEntityHost {
             return Result.ok(undefined);
         }
         const source = this.entity(ref.sourceId);
-        if (source === undefined) return Result.err("The entity an offset curve reads is gone");
+        if (source === undefined)
+            return Result.err(I18n.translate("error.sketch.entityOffsetCurveReadsGone"));
         const [first, last] = window[0] <= window[1] ? window : [window[1], window[0]];
         const [domainStart, domainEnd] = entityDomain(source);
         const reach = domainEnd - domainStart;
@@ -1096,10 +1108,10 @@ export class SketchSolver implements ExternalEntityHost {
         // share of the source's own extent that the emptiness test below reads.
         const slack = reach * OFFSET_WINDOW_MIN_FRACTION;
         if (!Number.isFinite(span) || span <= slack) {
-            return Result.err("The offset copy would be left with nothing");
+            return Result.err(I18n.translate("error.sketch.offsetCopyWouldLeftWithNothing"));
         }
         if (span > reach + slack) {
-            return Result.err("The offset copy cannot run past the end of what it came from");
+            return Result.err(I18n.translate("error.sketch.offsetCopyCannotRunPastEnd"));
         }
         // a window covering the whole source *is* the whole source: kept as one it would make
         // the copy read as a trimmed piece of itself (see `isClosedEntity`), which is a
@@ -1118,7 +1130,7 @@ export class SketchSolver implements ExternalEntityHost {
             return Result.ok(undefined);
         }
         if (first < domainStart - slack || last > domainEnd + slack) {
-            return Result.err("The offset copy cannot run past the end of what it came from");
+            return Result.err(I18n.translate("error.sketch.offsetCopyCannotRunPastEnd"));
         }
         this.entityOffsets.set(entityId, { ...whole, window: [first, last] });
         return Result.ok(undefined);
@@ -1504,7 +1516,7 @@ export class SketchSolver implements ExternalEntityHost {
      */
     addArray(pattern: SketchArrayPattern, sourceIds: readonly number[]): Result<number> {
         const sources = this.arrayableSources(sourceIds);
-        if (sources.length === 0) return Result.err("Nothing to array");
+        if (sources.length === 0) return Result.err(I18n.translate("error.sketch.nothingArray"));
         const resolved = resolveArray(this, pattern, sources, this._scope);
         if (!resolved.isOk) return Result.err(resolved.error);
         const id = this.arrayIdSeq++;
@@ -1524,14 +1536,14 @@ export class SketchSolver implements ExternalEntityHost {
      */
     updateArray(id: number, patch: ArrayPatch): Result<void> {
         const data = this.arrayRecords.get(id);
-        if (data === undefined) return Result.err(`Unknown sketch array: ${id}`);
+        if (data === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchArray{0}", id));
         if (patch.pattern !== undefined && arrayInstanceTotal(patch.pattern) < 2) {
             this.removeArray(id);
             return Result.ok(undefined);
         }
         const sources =
             patch.sourceIds === undefined ? data.sourceIds : this.arrayableSources(patch.sourceIds);
-        if (sources.length === 0) return Result.err("Nothing to array");
+        if (sources.length === 0) return Result.err(I18n.translate("error.sketch.nothingArray"));
         const pattern = patch.pattern ?? data.pattern;
         const resolved = resolveArray(this, pattern, sources, this._scope);
         if (!resolved.isOk) return Result.err(resolved.error);

@@ -553,7 +553,7 @@ describe("feature evaluation", () => {
                 selection.onShapeChanged.emit([pick, pick]);
                 // The preview is debounced.
                 await new Promise((resolve) => setTimeout(resolve, 50));
-                expect(onError).toHaveBeenCalledWith("Sketch profile match is ambiguous after rebuild");
+                expect(onError).toHaveBeenCalledWith("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
                 answerProfiles([]);
                 await run;
             } finally {
@@ -609,7 +609,7 @@ describe("feature evaluation", () => {
 
             expect(onToast).toHaveBeenCalledWith(
                 "error.default:{0}",
-                "Sketch profile match is ambiguous after rebuild",
+                "error.feature.sketchProfileMatchAmbiguousAfterRebuild",
             );
             const stored = body.features[0] as RevolveFeatureData;
             expect(stored.profiles).toBeUndefined();
@@ -651,8 +651,10 @@ describe("feature evaluation", () => {
         const body = bodyWith([fillet]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("fillet requires a preceding feature");
-        expect(body.featureItems()[0].error).toBe("fillet requires a preceding feature");
+        expect(body.shape.error).toBe("error.feature.requiresPrecedingFeaturecommand.modify.fillet");
+        expect(body.featureItems()[0].error).toBe(
+            "error.feature.requiresPrecedingFeaturecommand.modify.fillet",
+        );
     });
 
     test("an edge ref that matches nothing surfaces as a feature error", () => {
@@ -669,8 +671,8 @@ describe("feature evaluation", () => {
         const body = bodyWith([extrude, fillet]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Edge not found after rebuild");
-        expect(body.featureItems()[1].error).toBe("Edge not found after rebuild");
+        expect(body.shape.error).toBe("error.feature.edgeNotFoundAfterRebuild");
+        expect(body.featureItems()[1].error).toBe("error.feature.edgeNotFoundAfterRebuild");
         expect(mocks.fillet).not.toHaveBeenCalled();
     });
 
@@ -705,7 +707,7 @@ describe("feature evaluation", () => {
         const body = bodyWith([booleanFeature("fuse", [toolSketch().id])]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("boolean requires a preceding feature");
+        expect(body.shape.error).toBe("error.feature.booleanRequiresPrecedingFeature");
     });
 
     test("boolean fails when a tool node is missing", () => {
@@ -713,8 +715,8 @@ describe("feature evaluation", () => {
         const body = bodyWith([extrude, booleanFeature("cut", ["no-such-node"])]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Boolean tool not found");
-        expect(body.featureItems()[1].error).toBe("Boolean tool not found");
+        expect(body.shape.error).toBe("error.feature.booleanToolNotFound");
+        expect(body.featureItems()[1].error).toBe("error.feature.booleanToolNotFound");
     });
 
     test("a tool change re-evaluates the boolean but keeps the cached prefix", () => {
@@ -944,7 +946,7 @@ describe("feature evaluation", () => {
         const body = bodyWith([revolve]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Dimension mismatch: expected angle, got length");
+        expect(body.shape.error).toBe("error.expression.dimensionMismatchExpectedGotanglelength");
     });
 
     test("editing a variable re-evaluates bodies without touching their feature list", () => {
@@ -980,8 +982,8 @@ describe("feature evaluation", () => {
         const body = bodyWith([extrude]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Unknown identifier: nope");
-        expect(body.featureItems()[0].error).toBe("Unknown identifier: nope");
+        expect(body.shape.error).toBe("error.expression.unknownIdentifiernope");
+        expect(body.featureItems()[0].error).toBe("error.expression.unknownIdentifiernope");
     });
 
     test("a body with no features yields an empty compound", () => {
@@ -1248,7 +1250,7 @@ describe("feature evaluation", () => {
             const body = bodyWith([extrude]);
 
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Sketch profile not found after rebuild");
+            expect(body.featureItems()[0].error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
         });
 
         test("symmetric extrudes both directions and fuses the halves", () => {
@@ -1405,7 +1407,7 @@ describe("feature evaluation", () => {
 
             expect(body.shape.isOk).toBe(false);
             expect(body.featureItems()[0].error).toBe(
-                "Extrude join/cut/intersect requires a preceding feature",
+                "error.feature.extrudeJoinCutIntersectRequiresPreceding",
             );
         });
     });
@@ -1548,7 +1550,9 @@ describe("feature evaluation", () => {
             doc.modelManager.addNode(body);
 
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Extrude source face requires a preceding feature");
+            expect(body.featureItems()[0].error).toBe(
+                "error.feature.extrudeSourceFaceRequiresPrecedingFeature",
+            );
         });
 
         test("a missing source body surfaces as an error", () => {
@@ -1561,7 +1565,7 @@ describe("feature evaluation", () => {
             const body = bodyWith([feature]);
 
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Extrude source body not found");
+            expect(body.featureItems()[0].error).toBe("error.feature.extrudeSourceBodyNotFound");
         });
 
         test("a source body showing a session preview fails transiently, then self-heals on restore", () => {
@@ -1587,9 +1591,7 @@ describe("feature evaluation", () => {
             // match, produces the transient error; without it the run would
             // re-anchor (and untransacted persist) the profile refs onto the preview.
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe(
-                "Extrude source body is rolled back for a sketch session",
-            );
+            expect(body.featureItems()[0].error).toBe("error.feature.extrudeSourceBodyRolledBackSketch");
 
             // Once the source restores the full chain, the watch-triggered rebuild
             // resolves normally — the transient error heals itself.

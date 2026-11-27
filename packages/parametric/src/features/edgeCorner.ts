@@ -5,6 +5,7 @@ import {
     ANGLE_UNITS,
     CurveUtils,
     type FeatureParameter,
+    I18n,
     type I18nKeys,
     type IEdge,
     type IFace,
@@ -116,7 +117,14 @@ function edgeCornerHandler<F extends FilletFeatureData | ChamferFeatureData>(
         evaluate(feature, context: FeatureContext): Result<IShape> {
             const input = context.input;
             if (input === undefined) {
-                return Result.err(`${feature.type} requires a preceding feature`);
+                return Result.err(
+                    I18n.translate(
+                        "error.feature.requiresPrecedingFeature{0}",
+                        I18n.translate(
+                            feature.type === "chamfer" ? "command.modify.chamfer" : "command.modify.fillet",
+                        ),
+                    ),
+                );
             }
             const parameter = resolveUnitSpec(
                 feature[options.parameterKey] as number | string,
@@ -538,7 +546,8 @@ function resolveChamferCall(
     const mode = feature.mode ?? "equal";
     // The dropdown keeps the panel from writing a bad token; this keeps a hand-edited file
     // from reaching geometry that would read it wrong (the shell's join-type guard's twin).
-    if (!CHAMFER_MODES.includes(mode)) return Result.err(`Invalid chamfer mode: ${mode}`);
+    if (!CHAMFER_MODES.includes(mode))
+        return Result.err(I18n.translate("error.feature.invalidChamferMode{0}", mode));
     if (mode === "equal") return defaultCornerCall("chamfer", d1);
 
     const d2 = resolveSecondDistance(feature, mode, d1, context);
@@ -553,7 +562,7 @@ function resolveChamferCall(
         parameters: [d1, offset2],
         plain: (i, idx) =>
             plain === undefined
-                ? Result.err("The kernel does not support two-distance chamfers")
+                ? Result.err(I18n.translate("error.command.kernelDoesNotSupportTwoDistance"))
                 : plain(i, idx, d1, offset2, faceIndexes),
         tracked: tracked === undefined ? undefined : (i, idx) => tracked(i, idx, d1, offset2, faceIndexes),
     });
@@ -572,17 +581,17 @@ function resolveSecondDistance(
 ): Result<number> {
     if (mode === "twoDistance") {
         if (feature.distance2 === undefined || feature.distance2 === "") {
-            return Result.err("A two-distance chamfer requires distance2");
+            return Result.err(I18n.translate("error.feature.twoDistanceChamferRequiresDistance2"));
         }
         return resolveUnitSpec(feature.distance2, context.scope, LENGTH_UNITS);
     }
     if (feature.angle === undefined || feature.angle === "") {
-        return Result.err("A distance-angle chamfer requires an angle");
+        return Result.err(I18n.translate("error.feature.distanceAngleChamferRequiresAngle"));
     }
     const angle = resolveUnitSpec(feature.angle, context.scope, ANGLE_UNITS);
     if (!angle.isOk) return Result.err(angle.error);
     if (angle.value <= 0 || angle.value >= 90) {
-        return Result.err("A distance-angle chamfer's angle must lie between 0° and 90°");
+        return Result.err(I18n.translate("error.feature.distanceAngleChamferSAngleMust"));
     }
     return Result.ok(d1 * Math.tan(MathUtils.degToRad(angle.value)));
 }
@@ -599,7 +608,8 @@ export function referenceFaces(input: IShape, indexes: readonly number[], flip: 
     const result: number[] = [];
     for (const index of indexes) {
         const edge = edges[index];
-        if (edge === undefined) return Result.err(`Chamfer edge ${index} is out of range`);
+        if (edge === undefined)
+            return Result.err(I18n.translate("error.feature.chamferEdgeOutRange{0}", index));
         let adjacent: IFace[];
         try {
             adjacent = (edge.findAncestor(ShapeTypes.face, input) as IFace[]).filter(
@@ -608,11 +618,12 @@ export function referenceFaces(input: IShape, indexes: readonly number[], flip: 
         } catch {
             // A degenerate edge (its kernel queries throw, and the release build turns an
             // OCCT failure into a JS-level throw): refuse here rather than in the kernel.
-            return Result.err(`Chamfer edge ${index} has no readable adjacent faces`);
+            return Result.err(I18n.translate("error.feature.chamferEdgeHasNoReadableAdjacent{0}", index));
         }
         const chosen = adjacent[flip && adjacent.length > 1 ? 1 : 0];
         const faceIndex = chosen === undefined ? -1 : faces.findIndex((face) => face.isSame(chosen));
-        if (faceIndex < 0) return Result.err(`Chamfer edge ${index} has no adjacent face`);
+        if (faceIndex < 0)
+            return Result.err(I18n.translate("error.feature.chamferEdgeHasNoAdjacentFace{0}", index));
         result.push(faceIndex);
     }
     return Result.ok(result);
@@ -646,7 +657,7 @@ function resolveFilletCall(
         interpolated: true,
         plain: (i, idx) =>
             plain === undefined
-                ? Result.err("The kernel does not support variable-radius fillets")
+                ? Result.err(I18n.translate("error.feature.kernelDoesNotSupportVariableRadius"))
                 : plain(i, idx, radii),
         tracked: tracked === undefined ? undefined : (i, idx) => tracked(i, idx, radii),
     });

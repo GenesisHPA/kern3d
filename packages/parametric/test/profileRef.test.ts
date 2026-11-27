@@ -128,7 +128,7 @@ describe("matchProfileIndexes", () => {
         const result = matchProfileIndexes([faceOf(SQUARE_B.slice(0, 3))], [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile not found after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
     });
 
     test("fails when no candidate is clearly closest", () => {
@@ -139,7 +139,7 @@ describe("matchProfileIndexes", () => {
         const result = matchProfileIndexes(faces, [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
     });
 
     test("fails when two rebuilt profiles are identical", () => {
@@ -148,7 +148,7 @@ describe("matchProfileIndexes", () => {
         const result = matchProfileIndexes([faceOf([...SQUARE_A]), faceOf([...SQUARE_A])], [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
     });
 
     test("fails when two refs resolve to the same profile", () => {
@@ -157,7 +157,7 @@ describe("matchProfileIndexes", () => {
         const result = matchProfileIndexes([faceOf([...SQUARE_A])], [ref, ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
     });
 
     test("a moved circle adopts the leftover face after identical siblings lock in", () => {
@@ -233,7 +233,7 @@ describe("region-similarity fallback (crossing sketches)", () => {
         const result = matchProfileIndexes([faceOf(RESPLIT_B, [], boxOf(5, 5, 9, 9), 16)], [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile not found after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
     });
 
     test("reports ambiguity between two equally similar re-split regions", () => {
@@ -246,7 +246,7 @@ describe("region-similarity fallback (crossing sketches)", () => {
         const result = matchProfileIndexes(faces, [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
     });
 
     test("a legacy ref without center/area keeps the strict edge-count behavior", () => {
@@ -259,7 +259,7 @@ describe("region-similarity fallback (crossing sketches)", () => {
         const result = matchProfileIndexes([faceOf(RESPLIT_B, [], boxOf(5, 5, 7, 7), 4)], [legacy]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile not found after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
     });
 });
 
@@ -349,7 +349,7 @@ describe("entity-set matching (crossing sketches)", () => {
         );
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
     });
 
     test("falls back to geometric matching when no candidate carries the entity set", () => {
@@ -400,7 +400,7 @@ describe("source-face normal gate (press-pull refs)", () => {
         const result = matchProfileIndexes([faceOf(SQUARE_B, [], boxOf(5, 5, 7, 7), 4, UP)], [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile not found after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
     });
 
     test("the gate disambiguates otherwise identical candidates", () => {
@@ -494,7 +494,7 @@ describe("the allow predicate (dead-id refs vs live-id faces)", () => {
         const result = matchProfileIndexes([faceOf([...SQUARE_B])], [ref], undefined, () => false);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Sketch profile not found after rebuild");
+        expect(result.error).toBe("error.feature.sketchProfileNotFoundAfterRebuild");
     });
 
     test("a disallowed exact hit is skipped, not claimed", () => {

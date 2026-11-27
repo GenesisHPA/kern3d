@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IShape, Matrix4, Result } from "@chili3d/core";
+import { I18n, type IShape, Matrix4, Result } from "@chili3d/core";
 import {
     type FeatureContext,
     type FeatureHandler,
@@ -60,8 +60,9 @@ const mirrorHandler: FeatureHandler<MirrorFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Mirror requires a preceding feature");
-        const plane = resolveNeutralPlane(feature.plane, context, "Mirror");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.mirrorRequiresPrecedingFeature"));
+        const plane = resolveNeutralPlane(feature.plane, context, I18n.translate("error.feature.mirror"));
         if (!plane.isOk) return Result.err(plane.error);
 
         const copy = input.transformedMul(Matrix4.createMirrorWithPlane(plane.value));

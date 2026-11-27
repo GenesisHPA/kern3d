@@ -3,6 +3,7 @@
 
 import {
     ANGLE_UNITS,
+    I18n,
     LENGTH_UNITS,
     type ParameterValue,
     Precision,
@@ -494,13 +495,13 @@ const STEP_PATH_SLICES = 16;
 function curveSource(solver: SketchSolver, curveId: number): Result<SketchEntityData> {
     const curve = solver.entity(curveId);
     if (curve === undefined || isDatumEntityId(curve.id) || isExternalEntityId(curve.id)) {
-        return Result.err("The array curve is not sketch geometry");
+        return Result.err(I18n.translate("error.sketch.arrayCurveNotSketchGeometry"));
     }
     // a text is many contours rather than the one curve a run follows — it cannot be a path
     // (the pick filter keeps new ones out; this is for a record that names one anyway)
     if (curve.type === "text" || curve.type === "point")
-        return Result.err("The array curve is not sketch geometry");
-    if (isDegenerate(curve)) return Result.err("The array curve is too short to follow");
+        return Result.err(I18n.translate("error.sketch.arrayCurveNotSketchGeometry"));
+    if (isDegenerate(curve)) return Result.err(I18n.translate("error.sketch.arrayCurveTooShortFollow"));
     return Result.ok(curve);
 }
 
@@ -543,7 +544,7 @@ interface ResolvedAxis {
  */
 function resolveAxis(axis: SketchArrayAxis, scope: Scope): Result<ResolvedAxis> {
     if (!Number.isInteger(axis.count) || axis.count < 1) {
-        return Result.err("An array direction needs at least one instance");
+        return Result.err(I18n.translate("error.sketch.arrayDirectionNeedsAtLeastOne"));
     }
     if (axis.count === 1) {
         const spacing = resolveLength(axis.spacing, scope);
@@ -560,7 +561,7 @@ function resolveStep(source: ParameterValue, scope: Scope): Result<number> {
     const spacing = resolveLength(source, scope);
     if (!spacing.isOk) return Result.err(spacing.error);
     return Math.abs(spacing.value) <= Precision.Distance
-        ? Result.err("The array spacing is too small to place an instance")
+        ? Result.err(I18n.translate("error.sketch.arraySpacingTooSmallPlaceInstance"))
         : Result.ok(spacing.value);
 }
 
@@ -571,7 +572,7 @@ function resolveStep(source: ParameterValue, scope: Scope): Result<number> {
 function resolveRunCount(count: number): Result<number> {
     return Number.isInteger(count) && count >= 2
         ? Result.ok(count)
-        : Result.err("An array needs at least two instances");
+        : Result.err(I18n.translate("error.sketch.arrayNeedsAtLeastTwoInstances"));
 }
 
 /** One direction of a linear pattern as the run it makes, along `alongU` (X) or across it (Y). */
@@ -614,9 +615,9 @@ export function resolveArray(
     scope: Scope,
 ): Result<ResolvedArray> {
     const total = arrayInstanceTotal(pattern);
-    if (total < 2) return Result.err("An array needs at least two instances");
+    if (total < 2) return Result.err(I18n.translate("error.sketch.arrayNeedsAtLeastTwoInstances"));
     if (total > MAX_ARRAY_COUNT) {
-        return Result.err(`An array holds at most ${MAX_ARRAY_COUNT} instances`);
+        return Result.err(I18n.translate("error.sketch.arrayHoldsAtMostInstances{0}", MAX_ARRAY_COUNT));
     }
     switch (pattern.type) {
         case "linear":
@@ -683,7 +684,7 @@ function resolveCircularArray(
     const twist = resolveAngle(pattern.twist, scope);
     if (!twist.isOk) return Result.err(twist.error);
     if (Math.abs(twist.value) <= Precision.Angle) {
-        return Result.err("The array turn is too small to place an instance");
+        return Result.err(I18n.translate("error.sketch.arrayTurnTooSmallPlaceInstance"));
     }
     // even spacing spreads the turn over the count, so the last instance lands back on the
     // seed; otherwise it is spread over the gaps, and the last one lands on the turn asked for
@@ -740,7 +741,7 @@ function resolveCurveArray(
     const spacing = resolveStep(pattern.spacing, scope);
     if (!spacing.isOk) return Result.err(spacing.error);
     const base = transformBase(solver, sourceIds);
-    if (base === undefined) return Result.err("Nothing to array");
+    if (base === undefined) return Result.err(I18n.translate("error.sketch.nothingArray"));
     const frame = curveFrame(curve.value, base);
     return Result.ok({
         base,

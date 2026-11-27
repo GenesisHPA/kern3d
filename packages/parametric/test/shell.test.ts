@@ -63,9 +63,7 @@ describe("shell feature", () => {
         const body = bodyWith([shellFeature({ joinType: "tangent" as JoinType })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe(
-            'Shell join type "tangent" is not supported — the kernel returns the shape unchanged',
-        );
+        expect(body.featureItems()[0].error).toBe("error.feature.shellJoinTypeTangentNotSupported");
     });
 
     test("an invalid join type surfaces as a feature error without reaching the kernel", () => {
@@ -87,7 +85,7 @@ describe("shell feature", () => {
             const body = bodyWith([shellFeature({ joinType: "bogus" as JoinType })]);
 
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Invalid join type: bogus");
+            expect(body.featureItems()[0].error).toBe("error.feature.invalidJoinTypebogus");
             expect(makeThickSolidByJoin).not.toHaveBeenCalled();
         } finally {
             if (previous) Object.defineProperty(globalThis, "shapeFactory", previous);

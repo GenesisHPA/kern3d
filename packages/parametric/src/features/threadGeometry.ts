@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type ICylindricalSurface,
     type IEdge,
     type IFace,
@@ -115,15 +116,16 @@ export function cylinderOfFace(face: IFace): Result<CylinderFrame> {
     }
     const axis = cylinder?.axis.normalize();
     if (cylinder === undefined || axis === undefined || !(cylinder.radius > 0)) {
-        return Result.err("Thread needs a cylindrical face");
+        return Result.err(I18n.translate("error.feature.threadNeedsCylindricalFace"));
     }
     const [point, normal] = face.normal(0, 0);
     const offAxis = point.sub(cylinder.origin);
     const radial = offAxis.sub(axis.multiply(offAxis.dot(axis)));
     if (normal.length() < 1e-12 || radial.length() < 1e-9)
-        return Result.err("Thread needs a cylindrical face");
+        return Result.err(I18n.translate("error.feature.threadNeedsCylindricalFace"));
     const span = axialSpan(face, cylinder.origin, axis);
-    if (span === undefined || span.end - span.start < 1e-6) return Result.err("Thread face has no length");
+    if (span === undefined || span.end - span.start < 1e-6)
+        return Result.err(I18n.translate("error.feature.threadFaceHasNoLength"));
     return Result.ok({
         origin: cylinder.origin,
         axis,
@@ -191,11 +193,11 @@ export interface ThreadPlan {
  */
 export function planThread(frame: CylinderFrame, spec: ThreadSpec): Result<ThreadPlan> {
     const { pitch, diameter, clearance } = spec;
-    if (!(diameter > 0)) return Result.err("Thread diameter must be positive");
-    if (!(pitch > 0)) return Result.err("Thread pitch must be positive");
-    if (pitch > diameter / 2) return Result.err("Thread pitch is too large for the diameter");
+    if (!(diameter > 0)) return Result.err(I18n.translate("error.feature.threadDiameterMustPositive"));
+    if (!(pitch > 0)) return Result.err(I18n.translate("error.feature.threadPitchMustPositive"));
+    if (pitch > diameter / 2) return Result.err(I18n.translate("error.feature.threadPitchTooLargeDiameter"));
     if (!(clearance >= 0) || clearance > 0.3 * pitch) {
-        return Result.err("Thread clearance must be between 0 and 0.3 × pitch");
+        return Result.err(I18n.translate("error.feature.threadClearanceMustBetween00"));
     }
     const radii = grooveRadii(frame, spec);
     if (!radii.isOk) return Result.err(radii.error);
@@ -225,15 +227,28 @@ function grooveRadii(
     const root = frame.internal ? major + clearance : major - depth - clearance;
     const air = frame.internal ? face - AIR_MARGIN * pitch : face + AIR_MARGIN * pitch;
     const intoMaterial = frame.internal ? root - face : face - root;
-    if (root <= 0.2 * pitch || air <= 0.05 * pitch) return Result.err("Thread is too large for this face");
+    if (root <= 0.2 * pitch || air <= 0.05 * pitch)
+        return Result.err(I18n.translate("error.feature.threadTooLargeThisFace"));
     if (intoMaterial < 0.25 * depth) {
         return Result.err(
-            `Thread face ⌀${format(2 * face)} is too ${frame.internal ? "large" : "small"} for ⌀${format(diameter)}`,
+            frame.internal
+                ? I18n.translate("error.feature.threadFaceTooLarge{0}{1}", format(2 * face), format(diameter))
+                : I18n.translate(
+                      "error.feature.threadFaceTooSmall{0}{1}",
+                      format(2 * face),
+                      format(diameter),
+                  ),
         );
     }
     if (intoMaterial > depth + clearance + 0.5 * pitch) {
         return Result.err(
-            `Thread face ⌀${format(2 * face)} is too ${frame.internal ? "small" : "large"} for ⌀${format(diameter)}`,
+            frame.internal
+                ? I18n.translate("error.feature.threadFaceTooSmall{0}{1}", format(2 * face), format(diameter))
+                : I18n.translate(
+                      "error.feature.threadFaceTooLarge{0}{1}",
+                      format(2 * face),
+                      format(diameter),
+                  ),
         );
     }
     const section = grooveSection(root, air, face, rootWidth(form, frame.internal) * pitch, spec);
@@ -301,20 +316,22 @@ function helixRange(
     halfWidth: number,
 ): Result<{ start: number; turns: number }> {
     const { offset, length, flip, pitch } = spec;
-    if (!(offset >= 0)) return Result.err("Thread offset must not be negative");
-    if (length !== undefined && !(length > 0)) return Result.err("Thread length must be positive");
+    if (!(offset >= 0)) return Result.err(I18n.translate("error.feature.threadOffsetMustNotNegative"));
+    if (length !== undefined && !(length > 0))
+        return Result.err(I18n.translate("error.feature.threadLengthMustPositive"));
     const faceLength = frame.end - frame.start;
     const used = offset + (length ?? faceLength - offset);
     if (offset >= faceLength || used > faceLength + 1e-6) {
-        return Result.err(`Thread does not fit on the face (${format(faceLength)} long)`);
+        return Result.err(I18n.translate("error.feature.threadDoesNotFitFaceLong{0}", format(faceLength)));
     }
     const low = flip ? frame.end - used : frame.start + offset;
     const high = flip ? frame.end - offset : frame.start + used;
     const inset = halfWidth + END_MARGIN * pitch;
     const rise = high - low - 2 * inset;
-    if (rise < 0.25 * pitch) return Result.err("Thread is too short for its pitch");
+    if (rise < 0.25 * pitch) return Result.err(I18n.translate("error.feature.threadTooShortPitch"));
     const turns = rise / pitch;
-    if (turns > MAX_THREAD_TURNS) return Result.err(`Thread has more than ${MAX_THREAD_TURNS} turns`);
+    if (turns > MAX_THREAD_TURNS)
+        return Result.err(I18n.translate("error.feature.threadHasMoreThanTurns{0}", MAX_THREAD_TURNS));
     return Result.ok({ start: low + inset, turns });
 }
 
@@ -386,7 +403,7 @@ function mirrorTool(tool: ThreadTool, base: XYZ, axis: XYZ, xvec: XYZ): Result<T
     tool.shape.dispose();
     if (shape.findSubShapes(ShapeTypes.solid).length !== 1 || !shape.checkShape()) {
         shape.dispose();
-        return Result.err("Thread sweep did not make a valid solid");
+        return Result.err(I18n.translate("error.feature.threadSweepDidNotMakeValid"));
     }
     const faces = shape.findSubShapes(ShapeTypes.face).length;
     const edges = shape.findSubShapes(ShapeTypes.edge).length;
@@ -408,18 +425,18 @@ function sweepTool(
     let history: TrackedShape | undefined;
     if (shapeFactory.sweepWithModeTracked !== undefined) {
         const swept = shapeFactory.sweepWithModeTracked(profile, helix, "fixed", false, axis);
-        if (!swept.isOk) return Result.err(`Thread sweep failed: ${swept.error}`);
+        if (!swept.isOk) return Result.err(I18n.translate("error.feature.threadSweepFailed{0}", swept.error));
         shape = swept.value.shape;
         history = swept.value;
     } else {
         const swept = shapeFactory.sweepWithMode?.([profile], helix, "fixed", false, axis);
-        if (swept === undefined) return Result.err("The kernel cannot sweep a thread");
-        if (!swept.isOk) return Result.err(`Thread sweep failed: ${swept.error}`);
+        if (swept === undefined) return Result.err(I18n.translate("error.feature.kernelCannotSweepThread"));
+        if (!swept.isOk) return Result.err(I18n.translate("error.feature.threadSweepFailed{0}", swept.error));
         shape = swept.value;
     }
     if (shape.findSubShapes(ShapeTypes.solid).length !== 1 || !shape.checkShape()) {
         shape.dispose();
-        return Result.err("Thread sweep did not make a valid solid");
+        return Result.err(I18n.translate("error.feature.threadSweepDidNotMakeValid"));
     }
     return Result.ok({ shape, ...seedToolIds(shape, history, roles, featureId) });
 }
@@ -480,9 +497,10 @@ export function checkThreadedBody(input: IShape, output: IShape): Result<IShape>
     const before = input.findSubShapes(ShapeTypes.solid).length;
     const after = output.findSubShapes(ShapeTypes.solid).length;
     if (after !== before || !output.checkShape()) {
-        return Result.err("Thread cut did not leave a valid body");
+        return Result.err(I18n.translate("error.feature.threadCutDidNotLeaveValid"));
     }
     const removed = input.volume() - output.volume();
-    if (!(removed > 1e-9) || !(output.volume() > 0)) return Result.err("Thread cut removed no material");
+    if (!(removed > 1e-9) || !(output.volume() > 0))
+        return Result.err(I18n.translate("error.feature.threadCutRemovedNoMaterial"));
     return Result.ok(output);
 }

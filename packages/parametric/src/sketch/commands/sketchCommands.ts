@@ -5,6 +5,7 @@ import {
     AsyncController,
     CancelableCommand,
     command,
+    I18n,
     type IApplication,
     type ICommand,
     type IDocument,
@@ -351,7 +352,7 @@ export class CreateSketch extends MultistepCommand {
         // Closing any live session up front: the new sketch takes the view.
         SketchEditor.exit();
         if (this.application.activeView?.document === undefined) {
-            PubSub.default.pub("displayValidation", "No active view");
+            PubSub.default.pub("displayValidation", I18n.translate("error.sketch.noActiveView"));
             return false;
         }
         return true;
@@ -434,7 +435,7 @@ export class EnterSketch extends CancelableCommand {
 
         const document = this.application.activeView?.document;
         if (document === undefined) {
-            PubSub.default.pub("displayValidation", "No active view");
+            PubSub.default.pub("displayValidation", I18n.translate("error.sketch.noActiveView"));
             return;
         }
         this.controller = new AsyncController();

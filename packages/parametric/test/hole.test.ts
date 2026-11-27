@@ -219,46 +219,44 @@ describe("hole feature", () => {
             doc.modelManager.addNode(body);
             // Reading the shape is what runs the rebuild; the row then carries the error.
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Invalid hole style: bogus");
+            expect(body.featureItems()[0].error).toBe("error.feature.invalidHoleStylebogus");
         });
 
         test("a hole needs a preceding feature", () => {
             const body = new ParametricBodyNode({ document: doc, features: [holeFeature()] });
             doc.modelManager.addNode(body);
             expect(body.shape.isOk).toBe(false);
-            expect(body.featureItems()[0].error).toBe("Hole requires a preceding feature");
+            expect(body.featureItems()[0].error).toBe("error.feature.holeRequiresPrecedingFeature");
         });
 
         test("a hole needs at least one point", () => {
             const result = evaluate(holeFeature({ points: [] }));
             expect(result.isOk).toBe(false);
-            expect((result as { error: string }).error).toBe("Hole requires at least one point");
+            expect((result as { error: string }).error).toBe("error.feature.holeRequiresAtLeastOnePoint");
         });
 
         test("a non-positive or unresolvable diameter is rejected", () => {
             const zero = evaluate(holeFeature({ diameter: 0 }));
-            expect((zero as { error: string }).error).toBe("Hole diameter must be positive");
+            expect((zero as { error: string }).error).toBe("error.feature.holeDiameterMustPositive");
             const bad = evaluate(holeFeature({ diameter: "not a number" }));
             expect(bad.isOk).toBe(false);
         });
 
         test("the drill angle must lie between 0 and 180", () => {
             const flat = evaluate(holeFeature({ drillAngle: 180 }));
-            expect((flat as { error: string }).error).toBe(
-                "Hole drill angle must be between 0 and 180 degrees (choose a flat end for a flat bottom)",
-            );
+            expect((flat as { error: string }).error).toBe("error.feature.holeDrillAngleMustBetween0");
         });
 
         test("a blind depth must exceed the drill tip height", () => {
             // r = 2.5 at 118°: tip = 2.5/tan(59°) ≈ 1.5.
             const result = evaluate(holeFeature({ depth: 1 }));
-            expect((result as { error: string }).error).toBe("Hole depth must exceed the drill tip height");
+            expect((result as { error: string }).error).toBe("error.feature.holeDepthMustExceedDrillTip");
         });
 
         test("a counterbore style without recess dimensions is rejected", () => {
             const result = evaluate(holeFeature({ style: "counterbore" }));
             expect((result as { error: string }).error).toBe(
-                "Counterbore hole requires its counterbore dimensions",
+                "error.feature.counterboreHoleRequiresCounterboreDimensions",
             );
         });
 
@@ -267,14 +265,14 @@ describe("hole feature", () => {
                 holeFeature({ style: "counterbore", counterbore: { diameter: 5, depth: 2 } }),
             );
             expect((result as { error: string }).error).toBe(
-                "Counterbore diameter must exceed the hole diameter",
+                "error.feature.counterboreDiameterMustExceedHoleDiameter",
             );
         });
 
         test("a countersink style without recess dimensions is rejected", () => {
             const result = evaluate(holeFeature({ style: "countersink" }));
             expect((result as { error: string }).error).toBe(
-                "Countersink hole requires its countersink dimensions",
+                "error.feature.countersinkHoleRequiresCountersinkDimensions",
             );
         });
 
@@ -282,14 +280,12 @@ describe("hole feature", () => {
             const result = evaluate(
                 holeFeature({ style: "countersink", countersink: { diameter: 10, angle: 0 } }),
             );
-            expect((result as { error: string }).error).toBe(
-                "Countersink angle must be between 0 and 180 degrees",
-            );
+            expect((result as { error: string }).error).toBe("error.feature.countersinkAngleMustBetween0180");
         });
 
         test("a face on a node that no longer exists fails the rebuild", () => {
             const result = evaluate(holeFeature());
-            expect((result as { error: string }).error).toBe("Hole plane body not found");
+            expect((result as { error: string }).error).toBe("error.feature.holePlaneBodyNotFound");
         });
     });
 
@@ -339,7 +335,7 @@ describe("hole feature", () => {
             const result = evaluate(
                 holeFeature({ points: [], sketchPoints: { sketchId: "s1", entityIds: [] } }),
             );
-            expect((result as { error: string }).error).toBe("Hole requires at least one point");
+            expect((result as { error: string }).error).toBe("error.feature.holeRequiresAtLeastOnePoint");
         });
 
         test("with every center lost the holes suspend and the input passes through", () => {
@@ -570,7 +566,7 @@ describe("hole feature", () => {
             );
 
             expect(resolved.isOk).toBe(false);
-            expect((resolved as { error: string }).error).toBe("Hole plane body is rolled back");
+            expect((resolved as { error: string }).error).toBe("error.feature.holePlaneBodyRolledBack");
         });
 
         test("a foreign source's face thunk hands out host-local copies, one per call", () => {

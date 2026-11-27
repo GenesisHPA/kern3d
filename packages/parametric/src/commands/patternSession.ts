@@ -1049,7 +1049,7 @@ export class PatternDragHandler extends AxisDragHandler implements PatternPanelS
         const resolved = this.resolveInput(input, UNITLESS);
         if (!resolved.isOk) return resolved;
         if (!Number.isInteger(resolved.value) || resolved.value < 2) {
-            return Result.err("The count must be a whole number of at least 2");
+            return Result.err(I18n.translate("error.command.countMustWholeNumberAtLeast"));
         }
         return resolved;
     }
@@ -1086,12 +1086,13 @@ export function pathFramesFromPicks(
     shapes: readonly VisualShapeData[],
 ): Result<PatternPathFrames> {
     const first = shapes[0];
-    if (first === undefined) return Result.err("Select the path edges on one body");
+    if (first === undefined) return Result.err(I18n.translate("error.command.selectPathEdgesOneBody"));
     if (shapes.some((shape) => shape.owner.node !== first.owner.node)) {
-        return Result.err("Select the path edges on one body");
+        return Result.err(I18n.translate("error.command.selectPathEdgesOneBody"));
     }
     const inverse = body.worldTransform().invert();
-    if (inverse === undefined) return Result.err("Pattern path cannot be mapped into the body");
+    if (inverse === undefined)
+        return Result.err(I18n.translate("error.command.patternPathCannotMappedIntoBody"));
     const ordered = orderPathEdges(shapes.map((shape) => shape.shape as unknown as IEdge));
     if (!ordered.isOk) return Result.err(ordered.error);
     // Pick-local → world → host: the receiver of `multiply` runs first.

@@ -3,6 +3,7 @@
 
 import {
     Continuities,
+    I18n,
     type IEdge,
     type IShape,
     type IVertex,
@@ -98,13 +99,13 @@ interface ResolvedSections {
 
 /** The creation-time and rebuild-time section rules; the command toasts these, the feature row shows them. */
 export function validateLoftSections(sections: readonly LoftSectionData[]): Result<void> {
-    if (sections.length < 2) return Result.err("Loft requires at least 2 sections");
+    if (sections.length < 2) return Result.err(I18n.translate("error.feature.loftRequiresAtLeast2Sections"));
     if (!sections.some((x) => x.kind !== "vertex"))
-        return Result.err("Loft requires at least 1 wire section");
+        return Result.err(I18n.translate("error.feature.loftRequiresAtLeast1Wire"));
     const vertexInside = sections.some(
         (x, index) => x.kind === "vertex" && index > 0 && index < sections.length - 1,
     );
-    if (vertexInside) return Result.err("Loft vertex sections must be first or last");
+    if (vertexInside) return Result.err(I18n.translate("error.command.loftVertexSectionsMustFirstLast"));
     return Result.ok(undefined);
 }
 
@@ -165,13 +166,13 @@ const loftHandler: FeatureHandler<LoftFeatureData> = {
         const valid = validateLoftSections(feature.sections);
         if (!valid.isOk) return Result.err(valid.error);
         if (!Continuities.includes(feature.continuity)) {
-            return Result.err(`Invalid continuity: ${feature.continuity}`);
+            return Result.err(I18n.translate("error.feature.invalidContinuity{0}", feature.continuity));
         }
         // A shell has no volume to combine with. Refuse rather than quietly ignore the
         // operation: an ignored join would leave the loft's shell as the chain's output,
         // silently discarding the body it was appended to.
         if (feature.operation !== undefined && !feature.isSolid) {
-            return Result.err("A shell loft cannot join/cut/intersect");
+            return Result.err(I18n.translate("error.feature.shellLoftCannotJoinCutIntersect"));
         }
         const resolved = resolveSections(feature, context);
         if (!resolved.isOk) return Result.err(resolved.error);
@@ -219,7 +220,7 @@ function evaluateOperationTracked(
     }
     const input = context.input;
     if (input === undefined) {
-        return Result.err("Loft join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.loftJoinCutIntersectRequiresPreceding"));
     }
     const tool = loftTool(feature, sections);
     if (!tool.isOk) return Result.err(tool.error);
@@ -241,7 +242,7 @@ function combineWithInput(
     if (!built.isOk || operation === undefined) return built;
     if (context.input === undefined) {
         built.value.dispose();
-        return Result.err("Loft join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.loftJoinCutIntersectRequiresPreceding"));
     }
     try {
         switch (operation) {
@@ -285,7 +286,8 @@ function buildLoft(
 }
 
 function loftTool(feature: LoftFeatureData, sections: ResolvedSection[]): Result<LoftTool> {
-    if (shapeFactory.loftTracked === undefined) return Result.err("Loft tracking is unavailable");
+    if (shapeFactory.loftTracked === undefined)
+        return Result.err(I18n.translate("error.feature.loftTrackingUnavailable"));
     const shapes = sections.map((x) => x.shape);
     const result = shapeFactory.loftTracked(shapes, feature.isSolid, feature.isRuled, feature.continuity);
     if (!result.isOk) return Result.err(result.error);
@@ -417,7 +419,8 @@ function resolveBodyFaceSection(
     owned.push(...resolved.value.owned);
     const matched = matchSourceFaceIndexes(worldFaces, faceIds, [section.profile]);
     if (!matched.isOk) return Result.err(matched.error);
-    if (matched.value.indexes.length !== 1) return Result.err("A loft section must match a single face");
+    if (matched.value.indexes.length !== 1)
+        return Result.err(I18n.translate("error.feature.loftSectionMustMatchSingleFace"));
 
     const index = matched.value.indexes[0];
     const face = worldFaces[index];
@@ -442,17 +445,18 @@ function resolveEdgeSection(
     owned: IShape[],
 ): Result<ResolvedSection> {
     const node = context.document.modelManager.findNode((n) => n.id === section.nodeId);
-    if (!(node instanceof ShapeNode) || !node.shape.isOk) return Result.err("Loft section body not found");
+    if (!(node instanceof ShapeNode) || !node.shape.isOk)
+        return Result.err(I18n.translate("error.feature.loftSectionBodyNotFound"));
     const shape = node.shape.value;
     const shapeEdges = shape.findSubShapes(ShapeTypes.edge) as IEdge[];
     const edgeIds = isBodyTrackingNode(node) ? shapeEdges.map((_, i) => node.edgeIdAt(i)) : [];
     const matched = matchEdgesAnchored(shape, [section.edge], edgeIds);
     if (!matched.isOk) return Result.err(matched.error);
     if (matched.value.indexes.length !== 1) {
-        return Result.err("A loft section edge must stay a single edge after rebuild");
+        return Result.err(I18n.translate("error.feature.loftSectionEdgeMustStaySingle"));
     }
     const edge = shapeEdges[matched.value.indexes[0]];
-    if (!edge.isClosed()) return Result.err("A loft section edge must be closed");
+    if (!edge.isClosed()) return Result.err(I18n.translate("error.command.loftSectionEdgeMustClosed"));
 
     const wire = shapeFactory.wire([edge]);
     if (!wire.isOk) return Result.err(wire.error);
@@ -472,9 +476,11 @@ function resolveVertexSection(
     owned: IShape[],
 ): Result<ResolvedSection> {
     const node = context.document.modelManager.findNode((n) => n.id === section.nodeId);
-    if (!(node instanceof ShapeNode) || !node.shape.isOk) return Result.err("Loft section body not found");
+    if (!(node instanceof ShapeNode) || !node.shape.isOk)
+        return Result.err(I18n.translate("error.feature.loftSectionBodyNotFound"));
     const vertex = matchVertex(node.shape.value, section.vertex);
-    if (vertex === undefined) return Result.err("Loft section vertex not found after rebuild");
+    if (vertex === undefined)
+        return Result.err(I18n.translate("error.feature.loftSectionVertexNotFoundAfter"));
     return Result.ok({ kind: "vertex", shape: mapToHost(vertex, node, context, owned) as IVertex });
 }
 

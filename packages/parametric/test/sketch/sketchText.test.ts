@@ -656,7 +656,7 @@ describe("sketch text entity", () => {
             try {
                 const alone = offsetEntities(solver, [textId], 1, TOLERANCE);
                 expect(alone.isOk).toBe(false);
-                expect(alone.error).toBe("Nothing to offset");
+                expect(alone.error).toBe("error.sketch.nothingOffset");
 
                 const lineId = solver.addLine(0, 0, 10, 0);
                 const mixed = offsetEntities(solver, [lineId, textId], 1, TOLERANCE);
@@ -673,7 +673,7 @@ describe("sketch text entity", () => {
             try {
                 const result = trimEntity(solver, textId, [2, 3], TOLERANCE);
                 expect(result.isOk).toBe(false);
-                expect(result.error).toBe("A text cannot be trimmed");
+                expect(result.error).toBe("error.sketch.textCannotTrimmed");
             } finally {
                 solver.dispose();
             }
@@ -684,7 +684,7 @@ describe("sketch text entity", () => {
             try {
                 const result = breakEntity(solver, textId, [[2, 3]], TOLERANCE);
                 expect(result.isOk).toBe(false);
-                expect(result.error).toBe("A text cannot be broken");
+                expect(result.error).toBe("error.sketch.textCannotBroken");
                 expect(breakPreview(solver, textId, [[2, 3]], TOLERANCE)).toEqual([]);
             } finally {
                 solver.dispose();
@@ -704,7 +704,7 @@ describe("sketch text entity", () => {
                     tolerance: TOLERANCE,
                 });
                 expect(asTarget.isOk).toBe(false);
-                expect(asTarget.error).toBe("A text has no end to extend");
+                expect(asTarget.error).toBe("error.sketch.textHasNoEndExtend");
 
                 const asBoundary = extendEntity(solver, {
                     targetId: lineId,
@@ -715,7 +715,7 @@ describe("sketch text entity", () => {
                     tolerance: TOLERANCE,
                 });
                 expect(asBoundary.isOk).toBe(false);
-                expect(asBoundary.error).toBe("A text is no boundary to extend to");
+                expect(asBoundary.error).toBe("error.sketch.textNoBoundaryExtend");
             } finally {
                 solver.dispose();
             }
@@ -729,7 +729,7 @@ describe("sketch text entity", () => {
                 expect(transformPreview(solver, [textId], [0, 0], shift)).toEqual([]);
                 const moved = transformEntities(solver, [textId], [0, 0], shift);
                 expect(moved.isOk).toBe(false);
-                expect(moved.error).toBe("Nothing to transform");
+                expect(moved.error).toBe("error.sketch.nothingTransform");
                 expect(solver.pointOf({ entityId: textId, pointIndex: 0 })).toEqual([2, 3]);
             } finally {
                 solver.dispose();

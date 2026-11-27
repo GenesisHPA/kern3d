@@ -5,6 +5,7 @@ import {
     AsyncController,
     Combobox,
     command,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IShape,
@@ -130,19 +131,19 @@ export class AxisCommand extends MultistepCommand {
 
     buildDefinition(): Result<AxisDefinition> {
         const refs = this._refs;
-        if (refs === undefined) return Result.err("Pick the axis geometry first");
+        if (refs === undefined) return Result.err(I18n.translate("error.command.pickAxisGeometryFirst"));
         const base = { anchors: refs.anchors, anchor: refs.anchor, flip: this.flip };
         switch (this.kind) {
             // made by «Подогнать по области» from numbers, never from this command's picks
             case "fixed":
-                return Result.err("A fixed datum is not built from picks");
+                return Result.err(I18n.translate("error.command.fixedDatumNotBuiltFromPicks"));
             case "faceAxis":
                 return refs.face === undefined
-                    ? Result.err("Pick a cylindrical face")
+                    ? Result.err(I18n.translate("error.command.pickCylindricalFace"))
                     : Result.ok({ kind: "faceAxis", face: refs.face, ...base });
             case "edge":
                 return refs.edge === undefined
-                    ? Result.err("Pick an edge")
+                    ? Result.err(I18n.translate("error.command.pickEdge"))
                     : Result.ok({
                           kind: "edge",
                           edge: refs.edge,
@@ -151,19 +152,19 @@ export class AxisCommand extends MultistepCommand {
                       });
             case "twoPoints":
                 return refs.points === undefined
-                    ? Result.err("Pick two points")
+                    ? Result.err(I18n.translate("error.command.pickTwoPoints"))
                     : Result.ok({ kind: "twoPoints", points: refs.points, ...base });
             case "twoPlanes":
                 return refs.first === undefined || refs.second === undefined
-                    ? Result.err("Pick two planes")
+                    ? Result.err(I18n.translate("error.command.pickTwoPlanes"))
                     : Result.ok({ kind: "twoPlanes", first: refs.first, second: refs.second, ...base });
             case "faceNormal":
                 return refs.face === undefined || refs.point === undefined
-                    ? Result.err("Pick a face and a point")
+                    ? Result.err(I18n.translate("error.command.pickFacePoint"))
                     : Result.ok({ kind: "faceNormal", face: refs.face, point: refs.point, ...base });
             case "pointPlane":
                 return refs.point === undefined || refs.first === undefined
-                    ? Result.err("Pick a point and a plane")
+                    ? Result.err(I18n.translate("error.command.pickPointPlane"))
                     : Result.ok({ kind: "pointPlane", point: refs.point, plane: refs.first, ...base });
         }
     }

@@ -182,7 +182,7 @@ describe("matchEdgeIndexes", () => {
         const result = matchEdgeIndexes(shapeWith(lineEdge(0, 2, 1, 2), lineEdge(0, 3, 1, 3)), [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge not found after rebuild");
+        expect(result.error).toBe("error.feature.edgeNotFoundAfterRebuild");
     });
 
     test("fails when the best match is ambiguous", () => {
@@ -190,7 +190,7 @@ describe("matchEdgeIndexes", () => {
         const result = matchEdgeIndexes(shapeWith(lineEdge(0, 0, 1, 0), lineEdge(0, 0, 1, 0)), [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.edgeMatchAmbiguousAfterRebuild");
     });
 
     test("fails when the only candidate has the wrong curve type", () => {
@@ -198,7 +198,7 @@ describe("matchEdgeIndexes", () => {
         const result = matchEdgeIndexes(shapeWith(lineEdge(0, 0, 1, 0)), [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge not found after rebuild");
+        expect(result.error).toBe("error.feature.edgeNotFoundAfterRebuild");
     });
 
     test("fails when two refs collapse onto the same rebuilt edge", () => {
@@ -206,13 +206,13 @@ describe("matchEdgeIndexes", () => {
         const result = matchEdgeIndexes(shapeWith(lineEdge(0, 0, 1, 0)), [ref, ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.edgeMatchAmbiguousAfterRebuild");
     });
 
     test("fails when the shape has no edges", () => {
         const result = matchEdgeIndexes(shapeWith(), [captureEdgeRef(lineEdge(0, 0, 1, 0))]);
 
-        expect(result.error).toBe("Shape has no edges");
+        expect(result.error).toBe("error.feature.shapeHasNoEdges");
     });
 
     test("skips a degenerate edge instead of throwing", () => {
@@ -227,7 +227,7 @@ describe("matchEdgeIndexes", () => {
         const result = matchEdgeIndexes(shapeWith(degenerateEdge()), [ref]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge not found after rebuild");
+        expect(result.error).toBe("error.feature.edgeNotFoundAfterRebuild");
     });
 });
 
@@ -265,7 +265,7 @@ describe("matchEdgeIndexesTracked", () => {
         const result = matchEdgeIndexesTracked(shape, [withId, rival], ["f1:0"]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.edgeMatchAmbiguousAfterRebuild");
     });
 });
 
@@ -392,7 +392,7 @@ describe("matchEdgeIndexesTracked — invariant verification and splits", () => 
         const result = matchEdgeIndexesTracked(shape, [ref], ["f1:0", "f1:0"]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.edgeMatchAmbiguousAfterRebuild");
     });
 
     test("a splitPiece ref fails as ambiguous when several pieces match exactly", () => {
@@ -401,7 +401,7 @@ describe("matchEdgeIndexesTracked — invariant verification and splits", () => 
         const result = matchEdgeIndexesTracked(shape, [ref], ["f1:0", "f1:0"]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.edgeMatchAmbiguousAfterRebuild");
     });
 
     test("fails when another ref's fingerprint lands on a resolved split piece", () => {
@@ -411,7 +411,7 @@ describe("matchEdgeIndexesTracked — invariant verification and splits", () => 
         const result = matchEdgeIndexesTracked(shape, [withId, rival], ["f1:0", "f1:0"]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Edge match is ambiguous after rebuild");
+        expect(result.error).toBe("error.feature.edgeMatchAmbiguousAfterRebuild");
     });
 
     test("demotes an id hit on an edge-less shape instead of trusting it", () => {
@@ -419,7 +419,7 @@ describe("matchEdgeIndexesTracked — invariant verification and splits", () => 
         const result = matchEdgeIndexesTracked(shapeWith(), [ref], ["f1:0"]);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Shape has no edges");
+        expect(result.error).toBe("error.feature.shapeHasNoEdges");
     });
 
     test("excludes a degenerate edge carrying the ref's id from the hits", () => {
@@ -610,10 +610,10 @@ describe("matchEdgesAnchored", () => {
 
     test("keeps the matching failures of the indexes-only variant", () => {
         const ref: EdgeRef = { ...captureEdgeRef(lineEdge(0, 0, 1, 0)), edgeId: "gone:3" };
-        expect(matchEdgesAnchored(shapeWith(), [ref], ["f1:0"]).error).toBe("Shape has no edges");
+        expect(matchEdgesAnchored(shapeWith(), [ref], ["f1:0"]).error).toBe("error.feature.shapeHasNoEdges");
         const rivals = shapeWith(lineEdge(0, 2, 1, 2), lineEdge(0, 3, 1, 3));
         expect(matchEdgesAnchored(rivals, [ref], ["f1:0", "f1:1"]).error).toBe(
-            "Edge not found after rebuild",
+            "error.feature.edgeNotFoundAfterRebuild",
         );
     });
 

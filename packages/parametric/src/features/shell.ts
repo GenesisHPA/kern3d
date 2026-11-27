@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IFace,
     type IShape,
     JoinTypes,
@@ -73,7 +74,7 @@ const shellHandler: FeatureHandler<ShellFeatureData> = {
         // and aborts the whole chain. Same guard `loft.ts` puts on its continuity, and it comes
         // first for the same reason: the feature's own values are checked before the context's.
         if (feature.joinType !== undefined && !JoinTypes.includes(feature.joinType)) {
-            return Result.err(`Invalid join type: ${feature.joinType}`);
+            return Result.err(I18n.translate("error.feature.invalidJoinType{0}", feature.joinType));
         }
         // `tangent` IS a legal join type, but the kernel no-ops on it — measured on OCCT 8.0.0,
         // `MakeThickSolidByJoin` with `GeomAbs_Tangent` returns the input unchanged
@@ -81,18 +82,19 @@ const shellHandler: FeatureHandler<ShellFeatureData> = {
         // than a row saying so (the same call `draft.ts` makes on a zero angle), so a
         // hand-edited file carrying one fails loudly instead of building the untapered input.
         if (feature.joinType === "tangent") {
-            return Result.err(
-                'Shell join type "tangent" is not supported — the kernel returns the shape unchanged',
-            );
+            return Result.err(I18n.translate("error.feature.shellJoinTypeTangentNotSupported"));
         }
         const input = context.input;
-        if (input === undefined) return Result.err("Shell requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.shellRequiresPrecedingFeature"));
         const thickness = resolveUnitSpec(feature.thickness, context.scope, LENGTH_UNITS);
         if (!thickness.isOk) return Result.err(thickness.error);
-        if (!(thickness.value > 0)) return Result.err("Shell requires a positive thickness");
+        if (!(thickness.value > 0))
+            return Result.err(I18n.translate("error.feature.shellRequiresPositiveThickness"));
         const open = resolveOpenFaces(feature, context, input);
         if (!open.isOk) return Result.err(open.error);
-        if (open.value.indexes.length === 0) return Result.err("Shell requires at least one open face");
+        if (open.value.indexes.length === 0)
+            return Result.err(I18n.translate("error.feature.shellRequiresAtLeastOneOpen"));
 
         // Negative carves the wall out of the input, positive adds it outside (measured both
         // ways), so `outward` flips the sign and never the magnitude.

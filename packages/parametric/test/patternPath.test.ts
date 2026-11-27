@@ -102,7 +102,7 @@ describe("orderPathEdges", () => {
         const ordered = orderPathEdges([first, second]);
 
         expect(ordered.isOk).toBe(false);
-        expect(ordered.error).toBe("Pattern path edges must connect end to end");
+        expect(ordered.error).toBe("error.feature.patternPathEdgesMustConnectEnd");
     });
 
     test("refuses a fork", () => {
@@ -113,7 +113,7 @@ describe("orderPathEdges", () => {
         const ordered = orderPathEdges([stem, up, down]);
 
         expect(ordered.isOk).toBe(false);
-        expect(ordered.error).toBe("Pattern path branches; its edges must form a single chain");
+        expect(ordered.error).toBe("error.feature.patternPathBranchesEdgesMustForm");
     });
 });
 
@@ -205,6 +205,6 @@ describe("measuredPath", () => {
         const measured = measuredPath([{ edge: degenerate, reversed: false }]);
 
         expect(measured.isOk).toBe(false);
-        expect(measured.error).toBe("Pattern path has an edge with no length");
+        expect(measured.error).toBe("error.feature.patternPathHasEdgeWithNo");
     });
 });

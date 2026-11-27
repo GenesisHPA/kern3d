@@ -291,7 +291,7 @@ describe("primitive feature", () => {
         const body = bodyWith([primitive({ dx: "nosuchvar" })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Unknown identifier: nosuchvar");
+        expect(body.shape.error).toBe("error.expression.unknownIdentifiernosuchvar");
     });
 
     test("a bad expression in a field the kind does not read costs nothing", () => {
@@ -308,18 +308,18 @@ describe("primitive feature", () => {
         const body = bodyWith([primitive({ primitive: "torus" as PrimitiveKind })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Unknown primitive kind: torus");
+        expect(body.shape.error).toBe("error.feature.unknownPrimitiveKindtorus");
         expect(mocks.box).not.toHaveBeenCalled();
     });
 
     test.each([
-        { extra: { dx: 0 }, error: "Box dimensions must be positive" },
-        { extra: { primitive: "cylinder", radius: -1 }, error: "Cylinder radius must be positive" },
-        { extra: { primitive: "cylinder", height: 0 }, error: "Cylinder height must be positive" },
-        { extra: { primitive: "sphere", radius: 0 }, error: "Sphere radius must be positive" },
-        { extra: { primitive: "cone", radius: 0 }, error: "Cone base radius must be positive" },
-        { extra: { primitive: "cone", radius2: -0.5 }, error: "Cone top radius must be non-negative" },
-        { extra: { primitive: "cone", height: -10 }, error: "Cone height must be positive" },
+        { extra: { dx: 0 }, error: "error.feature.boxDimensionsMustPositive" },
+        { extra: { primitive: "cylinder", radius: -1 }, error: "error.feature.cylinderRadiusMustPositive" },
+        { extra: { primitive: "cylinder", height: 0 }, error: "error.feature.cylinderHeightMustPositive" },
+        { extra: { primitive: "sphere", radius: 0 }, error: "error.feature.sphereRadiusMustPositive" },
+        { extra: { primitive: "cone", radius: 0 }, error: "error.feature.coneBaseRadiusMustPositive" },
+        { extra: { primitive: "cone", radius2: -0.5 }, error: "error.feature.coneTopRadiusMustNonNegative" },
+        { extra: { primitive: "cone", height: -10 }, error: "error.feature.coneHeightMustPositive" },
     ])("an explicitly invalid size is a rebuild error ($error)", ({ extra, error }) => {
         const body = bodyWith([primitive(extra as Partial<PrimitiveFeatureData>)]);
 
@@ -331,7 +331,7 @@ describe("primitive feature", () => {
         const body = bodyWith([primitive({ operation: "fuse" })]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.shape.error).toBe("Primitive join/cut/intersect requires a preceding feature");
+        expect(body.shape.error).toBe("error.feature.primitiveJoinCutIntersectRequiresPreceding");
     });
 
     test("a join against a preceding feature booleans the two", () => {

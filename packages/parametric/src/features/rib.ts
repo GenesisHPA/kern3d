@@ -3,6 +3,7 @@
 
 import {
     BoundingBox,
+    I18n,
     type IEdge,
     type IFace,
     type IShape,
@@ -74,12 +75,13 @@ const ribHandler: FeatureHandler<RibFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Rib requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.ribRequiresPrecedingFeature"));
 
         const params = resolveParams(feature, context);
         if (!params.isOk) return Result.err(params.error);
         const sketch = findSketch(context.document, feature.sketchId);
-        if (sketch === undefined) return Result.err("Sketch not found");
+        if (sketch === undefined) return Result.err(I18n.translate("error.feature.sketchNotFound"));
 
         // The chain lives in world coordinates (a sketch builds its edges there), so the body has
         // to be read in world too — both to extend the chain to and to measure the sweep against.
@@ -176,7 +178,7 @@ function ribRegion(chain: RibChain, plane: Plane, body: IShape): Result<IFace[]>
     const section = body.section(plane);
     try {
         const outline = section.findSubShapes(ShapeTypes.edge) as IEdge[];
-        if (outline.length === 0) return Result.err("The rib plane does not cross the body");
+        if (outline.length === 0) return Result.err(I18n.translate("error.feature.ribPlaneDoesNotCrossBody"));
         return selectRibRegions(chain, outline, plane);
     } finally {
         section.dispose();
@@ -199,7 +201,7 @@ function selectRibRegions(chain: RibChain, outline: readonly IEdge[], plane: Pla
         if (rib.length === 0) {
             // Nothing is handed back, so nothing outlives this call.
             for (const face of regions.value.faces) face.dispose();
-            return Result.err("The rib does not reach the body");
+            return Result.err(I18n.translate("error.feature.ribDoesNotReachBody"));
         }
         for (const face of rib) {
             registerProfileEdgeSuffixes(face, qualify(attributeFaceLabels(face, inputs, chain)));
@@ -272,7 +274,8 @@ function inWorld(shape: IShape, context: FeatureContext, owned: IShape[]): IShap
 function resolveParams(feature: RibFeatureData, context: FeatureContext): Result<RibParams> {
     const thickness = resolveUnitSpec(feature.thickness, context.scope, LENGTH_UNITS);
     if (!thickness.isOk) return Result.err(thickness.error);
-    if (!(thickness.value > 0)) return Result.err("Rib requires a positive thickness");
+    if (!(thickness.value > 0))
+        return Result.err(I18n.translate("error.feature.ribRequiresPositiveThickness"));
     return Result.ok({
         thickness: thickness.value,
         extend: feature.extend === true,
@@ -348,7 +351,7 @@ function sweepBand(regions: readonly IFace[], seedBase: string, vec: XYZ, offset
 function combineWithInput(tool: IShape, feature: RibFeatureData, context: FeatureContext): Result<IShape> {
     if (feature.operation === undefined) return Result.ok(tool);
     if (context.input === undefined) {
-        return Result.err("Rib join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.ribJoinCutIntersectRequiresPreceding"));
     }
     const owned: IShape[] = [];
     try {

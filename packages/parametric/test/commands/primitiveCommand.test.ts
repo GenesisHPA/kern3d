@@ -143,7 +143,7 @@ describe("primitive command option-panel sizes", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Cone top diameter must be non-negative",
+                "error.command.coneTopDiameterMustNonNegative",
             );
         } finally {
             pub.mockRestore();
@@ -171,7 +171,7 @@ describe("primitive command option-panel sizes", () => {
             expect(pub).toHaveBeenCalledWith(
                 "showToast",
                 "error.default:{0}",
-                "Primitive sizes must be positive",
+                "error.command.primitiveSizesMustPositive",
             );
         } finally {
             pub.mockRestore();

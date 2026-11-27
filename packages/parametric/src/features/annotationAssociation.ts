@@ -5,6 +5,7 @@ import {
     type CircleEdgeAssociation,
     CurveUtils,
     type EdgeAnchor,
+    I18n,
     type IDocument,
     type IEdge,
     type IFace,
@@ -186,7 +187,7 @@ function resolveCircleEdge(
 ): Result<ResolvedCircleEdge> {
     try {
         const node = shapeNode(document, association.nodeId);
-        if (!node) return Result.err("The annotated body is missing");
+        if (!node) return Result.err(I18n.translate("error.feature.annotatedBodyMissing"));
 
         const shape = node.shape.value;
         const indexes = matchEdge(shape, node, association.edge as EdgeRef);
@@ -197,10 +198,10 @@ function resolveCircleEdge(
             const circle = worldCircle(node, edges[index]);
             if (circle !== undefined) return Result.ok(circle);
         }
-        return Result.err("The annotated edge is no longer a circle");
+        return Result.err(I18n.translate("error.feature.annotatedEdgeNoLongerCircle"));
     } catch {
         // A hand-edited or foreign ref payload must fail the resolve, not the rebuild.
-        return Result.err("The annotated edge could not be resolved");
+        return Result.err(I18n.translate("error.feature.annotatedEdgeCouldNotResolved"));
     }
 }
 
@@ -209,21 +210,21 @@ function resolvePointAnchor(document: IDocument, anchor: PointAnchor): Result<XY
 
     try {
         const node = shapeNode(document, anchor.nodeId);
-        if (!node) return Result.err("The annotated body is missing");
+        if (!node) return Result.err(I18n.translate("error.feature.annotatedBodyMissing"));
 
         const shape = node.shape.value;
         const local = localAnchorPoint(node, shape, anchor);
-        if (local === undefined) return Result.err("The annotated point is missing");
+        if (local === undefined) return Result.err(I18n.translate("error.feature.annotatedPointMissing"));
         return Result.ok(node.worldTransform().ofPoint(local));
     } catch {
-        return Result.err("The annotated point could not be resolved");
+        return Result.err(I18n.translate("error.feature.annotatedPointCouldNotResolved"));
     }
 }
 
 function resolveEdgeAnchor(document: IDocument, anchor: EdgeAnchor): Result<ResolvedLine> {
     try {
         const node = shapeNode(document, anchor.nodeId);
-        if (!node) return Result.err("The annotated body is missing");
+        if (!node) return Result.err(I18n.translate("error.feature.annotatedBodyMissing"));
 
         const shape = node.shape.value;
         const indexes = matchEdge(shape, node, anchor.ref as EdgeRef);
@@ -239,9 +240,9 @@ function resolveEdgeAnchor(document: IDocument, anchor: EdgeAnchor): Result<Reso
                 end: world.ofPoint(edge.endPoint()),
             });
         }
-        return Result.err("The annotated edge is missing");
+        return Result.err(I18n.translate("error.feature.annotatedEdgeMissing"));
     } catch {
-        return Result.err("The annotated edge could not be resolved");
+        return Result.err(I18n.translate("error.feature.annotatedEdgeCouldNotResolved"));
     }
 }
 

@@ -147,8 +147,8 @@ describe("extrude with draft angle (real kernel)", () => {
     });
 
     test.each([
-        [{ draftAngle: 95 }, "strictly between -90 and 90"],
-        [{ draftAngle: -90 }, "strictly between -90 and 90"],
+        [{ draftAngle: 95 }, "error.feature.extrudeDraftAngleMustLieStrictly"],
+        [{ draftAngle: -90 }, "error.feature.extrudeDraftAngleMustLieStrictly"],
     ] as const)("hand-edited data %o fails the feature rather than the kernel", (extra, message) => {
         const { body } = setup(extra as Partial<ExtrudeFeatureData>);
         expect(body.shape.isOk).toBe(false);

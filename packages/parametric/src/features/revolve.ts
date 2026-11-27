@@ -5,6 +5,7 @@ import {
     ANGLE_UNITS,
     CurveUtils,
     type FeatureParameter,
+    I18n,
     type IEdge,
     type IFace,
     type IShape,
@@ -143,7 +144,7 @@ interface RevolveTool {
  */
 function resolveRevolve(feature: RevolveFeatureData, context: FeatureContext): Result<ResolvedRevolve> {
     const sketch = findSketch(context.document, feature.sketchId);
-    if (sketch === undefined) return Result.err("Sketch not found");
+    if (sketch === undefined) return Result.err(I18n.translate("error.feature.sketchNotFound"));
 
     const angle = resolveUnitSpec(feature.angle, context.scope, ANGLE_UNITS);
     if (!angle.isOk) return Result.err(angle.error);
@@ -153,9 +154,10 @@ function resolveRevolve(feature: RevolveFeatureData, context: FeatureContext): R
             : resolveUnitSpec(feature.angle2, context.scope, ANGLE_UNITS);
     if (angle2 !== undefined && !angle2.isOk) return Result.err(angle2.error);
     if (feature.symmetric === true && angle2 !== undefined) {
-        return Result.err("Revolve cannot be both symmetric and have a second angle");
+        return Result.err(I18n.translate("error.feature.revolveCannotBothSymmetricHaveSecond"));
     }
-    if (angle2 !== undefined && angle2.value <= 0) return Result.err("Revolve angle2 must be positive");
+    if (angle2 !== undefined && angle2.value <= 0)
+        return Result.err(I18n.translate("error.feature.revolveAngle2MustPositive"));
     const { axis, anchor } = resolveAxis(feature, context);
     const resolved = resolveProfiles(sketch, feature.profiles);
     if (!resolved.isOk) return Result.err(resolved.error);
@@ -222,7 +224,7 @@ function evaluateOperationTracked(
     }
     const input = context.input;
     if (input === undefined) {
-        return Result.err("Revolve join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.revolveJoinCutIntersectRequiresPreceding"));
     }
     const tool = revolveTool(resolved);
     if (!tool.isOk) return Result.err(tool.error);
@@ -247,7 +249,7 @@ function combineWithInput(
     if (!built.isOk || feature.operation === undefined) return built;
     if (context.input === undefined) {
         built.value.dispose();
-        return Result.err("Revolve join/cut/intersect requires a preceding feature");
+        return Result.err(I18n.translate("error.feature.revolveJoinCutIntersectRequiresPreceding"));
     }
     const owned: IShape[] = [];
     try {
@@ -413,7 +415,8 @@ function matchAxis(
 }
 
 function revolveTool(resolved: ResolvedRevolve): Result<RevolveTool> {
-    if (shapeFactory.revolveTracked === undefined) return Result.err("Revolve tracking is unavailable");
+    if (shapeFactory.revolveTracked === undefined)
+        return Result.err(I18n.translate("error.feature.revolveTrackingUnavailable"));
     const shapes: IShape[] = [];
     const faceIds: (string | undefined)[] = [];
     const edgeIds: (string | undefined)[] = [];
@@ -479,7 +482,8 @@ function revolveProfileTracked(
     seedSuffix: string,
 ): Result<{ shape: IShape; faceIds: (string | undefined)[]; edgeIds: (string | undefined)[] }> {
     // Guaranteed by the caller's guard — the type just cannot see it.
-    if (shapeFactory.revolveTracked === undefined) return Result.err("Revolve tracking is unavailable");
+    if (shapeFactory.revolveTracked === undefined)
+        return Result.err(I18n.translate("error.feature.revolveTrackingUnavailable"));
     const result = shapeFactory.revolveTracked(profile.face, side.axis, side.angle);
     if (!result.isOk) return Result.err(result.error);
     // The backward half of a two-sided revolve derives its seed (`:neg`) so its names cannot

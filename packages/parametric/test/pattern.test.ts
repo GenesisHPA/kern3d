@@ -427,14 +427,14 @@ describe("pattern feature", () => {
         ]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Pattern requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.feature.patternRequiresPrecedingFeature");
     });
 
     test.each([
-        [{ count: 1 }, "Pattern count must be at least 2"],
-        [{ count: 2.5 }, "Pattern count must be a whole number"],
-        [{ count: "nope +" }, "Unknown identifier: nope"],
-        [{ spacing: 0 }, "Pattern spacing must be non-zero"],
+        [{ count: 1 }, "error.feature.patternCountMustAtLeast2"],
+        [{ count: 2.5 }, "error.feature.patternCountMustWholeNumber"],
+        [{ count: "nope +" }, "error.expression.unknownIdentifiernope"],
+        [{ spacing: 0 }, "error.feature.patternSpacingMustNonZero"],
     ])("linear rejects %o with '%s'", (patch, message) => {
         const source = sourceBody();
         const body = patternedBody({ mode: "linear", ...patch }, source.id);
@@ -448,7 +448,7 @@ describe("pattern feature", () => {
         const body = patternedBody({ mode: "circular", count: 3, angle: 0 }, source.id);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe("Pattern angle must be non-zero");
+        expect(body.featureItems()[1].error).toBe("error.feature.patternAngleMustNonZero");
     });
 
     test("curve: a locked pattern translates the copies along the path", () => {
@@ -516,11 +516,8 @@ describe("pattern feature", () => {
     });
 
     test.each([
-        [
-            { count: 3, equalSpacing: false, spacing: 20 },
-            "Pattern path is too short for the count and spacing",
-        ],
-        [{ count: 3, equalSpacing: false, spacing: 0 }, "Pattern spacing must be non-zero"],
+        [{ count: 3, equalSpacing: false, spacing: 20 }, "error.command.patternPathTooShortCountSpacing"],
+        [{ count: 3, equalSpacing: false, spacing: 0 }, "error.feature.patternSpacingMustNonZero"],
     ])("curve rejects %o with '%s'", (patch, message) => {
         const body = curvePatternBody(lPath(), patch as Partial<CurvePatternFeatureData> & { count: number });
 
@@ -537,7 +534,7 @@ describe("pattern feature", () => {
         const body = curvePatternBody(detached, { count: 2 });
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe("Pattern path edges must connect end to end");
+        expect(body.featureItems()[1].error).toBe("error.feature.patternPathEdgesMustConnectEnd");
     });
 
     test("curve reports a missing path body instead of arraying along a guess", () => {
@@ -555,7 +552,7 @@ describe("pattern feature", () => {
         expect(source.shape.isOk).toBe(true);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe("Pattern path body not found");
+        expect(body.featureItems()[1].error).toBe("error.feature.patternPathBodyNotFound");
     });
 
     test("a rotated host maps a moved foreign path into its own frame", () => {
@@ -998,7 +995,7 @@ describe("pattern feature", () => {
                     pub.mock.calls.some(
                         (call) =>
                             call[0] === "showToast" &&
-                            call[2] === "Pattern path edges must connect end to end",
+                            call[2] === "error.feature.patternPathEdgesMustConnectEnd",
                     ),
                 ).toBe(true);
             } finally {

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { AsyncController, CancelableCommand, command, type I18nKeys, PubSub } from "@chili3d/core";
+import { AsyncController, CancelableCommand, command, I18n, type I18nKeys, PubSub } from "@chili3d/core";
 import { SketchEditor, type SketchEntityPick } from "../editor/sketchEditor";
 import { ConstraintKind, datumIsReading, pointRefKey, type SketchPointRef } from "../sketchModel";
 import type { SketchSolver } from "../solver";
@@ -22,7 +22,7 @@ import {
 function editorOrError(): SketchEditor | undefined {
     const editor = SketchEditor.getActive();
     if (editor === undefined) {
-        PubSub.default.pub("displayValidation", "No active sketch editor");
+        PubSub.default.pub("displayValidation", I18n.translate("error.sketch.noActiveSketchEditor"));
     }
     return editor;
 }
@@ -271,18 +271,24 @@ export class EqualConstraintCommand extends SketchConstraintCommand {
         const e2 = await editor.pickEntity("prompt.pickSketchEntity", undefined, undefined, this.controller);
         if (e2 === undefined) return;
         if (e1 === e2) {
-            PubSub.default.pub("displayValidation", "Pick two different entities");
+            PubSub.default.pub("displayValidation", I18n.translate("error.sketch.pickTwoDifferentEntities"));
             return;
         }
         const t1 = editor.solver.entity(e1)?.type;
         const t2 = editor.solver.entity(e2)?.type;
         if (t1 === undefined || t1 !== t2) {
-            PubSub.default.pub("displayValidation", "Equal requires two entities of the same type");
+            PubSub.default.pub(
+                "displayValidation",
+                I18n.translate("error.sketch.equalRequiresTwoEntitiesSameType"),
+            );
             return;
         }
         const equal = equalConstraintFor(t1, e1, e2);
         if (equal === undefined) {
-            PubSub.default.pub("displayValidation", "Equal applies to lines, circles and arcs");
+            PubSub.default.pub(
+                "displayValidation",
+                I18n.translate("error.sketch.equalAppliesLinesCirclesArcs"),
+            );
             return;
         }
         if (!allowsConstraintOnRefs(editor.solver, equal.kind, equal.refs)) return;
@@ -301,14 +307,17 @@ export class TangentConstraintCommand extends SketchConstraintCommand {
         const e2 = await editor.pickEntity("prompt.pickSketchEntity", undefined, undefined, this.controller);
         if (e2 === undefined) return;
         if (e1 === e2) {
-            PubSub.default.pub("displayValidation", "Pick two different entities");
+            PubSub.default.pub("displayValidation", I18n.translate("error.sketch.pickTwoDifferentEntities"));
             return;
         }
         const t1 = editor.solver.entity(e1)?.type;
         const t2 = editor.solver.entity(e2)?.type;
         const tangent = tangentConstraintFor(t1, e1, t2, e2);
         if (tangent === undefined) {
-            PubSub.default.pub("displayValidation", "Tangent does not apply to two lines");
+            PubSub.default.pub(
+                "displayValidation",
+                I18n.translate("error.sketch.tangentDoesNotApplyTwoLines"),
+            );
             return;
         }
         if (!allowsConstraintOnRefs(editor.solver, tangent.kind, tangent.refs)) return;

@@ -4,6 +4,7 @@
 import {
     contourEdges,
     type EdgeMeshData,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -507,7 +508,7 @@ export class SketchNode extends ParameterShapeNode {
             case "point":
                 // unreachable through `buildEdges` — `profileEntities` keeps points out —
                 // but the switch must still answer for one
-                return Result.err("A sketch point has no curve to build an edge from");
+                return Result.err(I18n.translate("error.sketch.sketchPointHasNoCurveBuild"));
             case "offsetCurve":
                 return oneEdge(this.offsetCurveEdge(entity));
             case "text":
@@ -536,7 +537,7 @@ export class SketchNode extends ParameterShapeNode {
     /** One offset copy's edge, built off its source's own edge and cut to the window drawn. */
     private offsetCurveEdge(entity: SketchEntityData): Result<IEdge> {
         const ref = entity.offset;
-        if (ref === undefined) return Result.err("An offset curve carries no offset");
+        if (ref === undefined) return Result.err(I18n.translate("error.sketch.offsetCurveCarriesNoOffset"));
         // its params are the source's, so the basis is the source's own edge, built
         // the same way the source's would be
         const source: SketchEntityData = {
@@ -549,7 +550,8 @@ export class SketchNode extends ParameterShapeNode {
         if (!basis.isOk) return Result.err(basis.error);
         // the source of an offset copy is always a single curve — a text, the one entity
         // that builds several edges, is never offsettable (`isOffsettable`)
-        if (basis.value.length !== 1) return Result.err("An offset curve's source builds no single edge");
+        if (basis.value.length !== 1)
+            return Result.err(I18n.translate("error.sketch.offsetCurveSSourceBuildsNo"));
         // the edge's own offset: the kernel holds the pair (basis, distance) as a
         // `Geom_OffsetCurve` rather than deriving a curve of some other kind
         const offset = basis.value[0].offset(this.offsetReach(source, ref.distance), this.plane.normal);
@@ -564,7 +566,7 @@ export class SketchNode extends ParameterShapeNode {
         // that is empty within tolerance — which is a copy with nothing left.
         const trimmed = offset.value.trim(window[0], window[1]);
         return trimmed === undefined
-            ? Result.err("The offset copy is too short to build")
+            ? Result.err(I18n.translate("error.sketch.offsetCopyTooShortBuild"))
             : Result.ok(trimmed);
     }
 
@@ -644,7 +646,8 @@ export class SketchNode extends ParameterShapeNode {
 
     private ellipseEdge(p: readonly number[]): Result<IEdge> {
         const frame = this.ellipseKernelFrame(p);
-        if (frame === undefined) return Result.err("Ellipse is degenerate (an axis collapsed)");
+        if (frame === undefined)
+            return Result.err(I18n.translate("error.sketch.ellipseDegenerateAxisCollapsed"));
         return shapeFactory.ellipse(
             this.plane.normal,
             frame.center,
@@ -663,7 +666,8 @@ export class SketchNode extends ParameterShapeNode {
      */
     private ellipseArcEdge(p: readonly number[]): Result<IEdge> {
         const [tStart, tEnd] = ellipseSweep(p);
-        if (tEnd - tStart <= Precision.Angle) return Result.err("Ellipse arc is degenerate (zero sweep)");
+        if (tEnd - tStart <= Precision.Angle)
+            return Result.err(I18n.translate("error.sketch.ellipseArcDegenerateZeroSweep"));
         const ellipse = this.ellipseEdge(p);
         if (!ellipse.isOk) return ellipse;
         const frame = this.ellipseKernelFrame(p)!;
@@ -673,7 +677,9 @@ export class SketchNode extends ParameterShapeNode {
             to -= Math.PI / 2;
         }
         const edge = ellipse.value.trim(from, to);
-        return edge === undefined ? Result.err("Ellipse arc trim failed") : Result.ok(edge);
+        return edge === undefined
+            ? Result.err(I18n.translate("error.sketch.ellipseArcTrimFailed"))
+            : Result.ok(edge);
     }
 
     /**
@@ -717,7 +723,7 @@ export class SketchNode extends ParameterShapeNode {
     private arcEdge(params: [number, number, number, number, number, number]): Result<IEdge> {
         const [cx, cy, sx, sy] = params;
         if (Math.hypot(sx - cx, sy - cy) < Precision.Distance) {
-            return Result.err("Arc radius is too small");
+            return Result.err(I18n.translate("error.sketch.arcRadiusTooSmall"));
         }
         // Only a raw sweep of [0, Precision.Angle] is degenerate (start and end on
         // the same ray, within angular tolerance). A small NEGATIVE raw sweep is a
@@ -725,7 +731,7 @@ export class SketchNode extends ParameterShapeNode {
         // 2π — and must build.
         const rawSweep = rawArcSweep(params);
         if (rawSweep >= 0 && rawSweep <= Precision.Angle) {
-            return Result.err("Arc is degenerate (zero sweep)");
+            return Result.err(I18n.translate("error.sketch.arcDegenerateZeroSweep"));
         }
         const [, sweep] = arcAngles(params);
         return shapeFactory.arc(

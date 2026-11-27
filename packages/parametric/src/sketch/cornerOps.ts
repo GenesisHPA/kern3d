@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision, Result, XY } from "@chili3d/core";
+import { I18n, Precision, Result, XY } from "@chili3d/core";
 import { type SketchOperationResult, SketchSolveError } from "./sketchError";
 import {
     arcAngles,
@@ -177,7 +177,7 @@ function cornerBetween(
     );
     if (pairs.length === 0) return Result.ok(undefined);
     if (pairs.length > 1) {
-        return Result.err("The two lines are coincident end to end — there is no single corner");
+        return Result.err(I18n.translate("error.sketch.twoLinesAreCoincidentEndEnd"));
     }
     return Result.ok(cornerFrom(line1, line2, pairs[0], []));
 }
@@ -248,7 +248,7 @@ function confirmCorner(
     // in separate groups, and an entity hanging off ref2 alone would be dragged along
     for (const ref of [corner.ref1, corner.ref2].flatMap((r) => solver.coincidentGroup(r))) {
         if (own.has(ref.entityId) || isDatumEntityId(ref.entityId)) continue;
-        return Result.err("The corner joins another entity — trim that junction first");
+        return Result.err(I18n.translate("error.sketch.cornerJoinsAnotherEntityTrimThat"));
     }
     const keys = new Set([pointRefKey(corner.ref1), pointRefKey(corner.ref2)]);
     for (const constraint of constraints) {
@@ -259,7 +259,10 @@ function confirmCorner(
         if (isLineGapDistance(solver, constraint)) continue;
         if (method === "chamfer" && isEdgeLengthDimension(constraint, corner)) continue;
         return Result.err(
-            `The corner carries a ${ConstraintKind[constraint.kind]} constraint that the trim would break`,
+            I18n.translate(
+                "error.sketch.cornerCarriesConstraintThatTrimWould{0}",
+                ConstraintKind[constraint.kind],
+            ),
         );
     }
     return Result.ok(undefined);
@@ -298,7 +301,9 @@ export function applyCornerOps(
     if (outcome.result === "Conflicting" || outcome.result === "Diverged" || outcome.result === "Stalled") {
         solver.reset(snapshot);
         return Result.err(
-            new SketchSolveError(`The sketch could not solve after the change (${outcome.result})`),
+            new SketchSolveError(
+                I18n.translate("error.sketch.sketchCouldNotSolveAfterChange{0}", outcome.result),
+            ),
         );
     }
     return Result.ok(labels);
@@ -339,7 +344,8 @@ function cornerSides(solver: SketchSolver, corner: SketchCorner): Result<CornerS
     const d2 = toXY(solver.pointOf(corner.far2)).sub(p);
     const u1 = d1.normalize();
     const u2 = d2.normalize();
-    if (u1 === undefined || u2 === undefined) return Result.err("The corner has a zero-length side");
+    if (u1 === undefined || u2 === undefined)
+        return Result.err(I18n.translate("error.sketch.cornerHasZeroLengthSide"));
     return Result.ok({ p, d1, d2, u1, u2, angle: Math.abs(u1.angleTo(u2)!) });
 }
 
@@ -357,20 +363,21 @@ function isCollinear(angle: number): boolean {
  * degenerate (collinear sides) or the radius does not fit on both segments.
  */
 function filletGeometry(solver: SketchSolver, corner: SketchCorner, radius: number): Result<FilletGeometry> {
-    if (radius <= Precision.Distance) return Result.err("The fillet radius must be positive");
+    if (radius <= Precision.Distance)
+        return Result.err(I18n.translate("error.sketch.filletRadiusMustPositive"));
     const sides = cornerSides(solver, corner);
     if (!sides.isOk) return Result.err(sides.error);
     const { p, d1, d2, u1, u2, angle } = sides.value;
     if (isCollinear(angle)) {
-        return Result.err("The two lines are collinear — there is no corner to fillet");
+        return Result.err(I18n.translate("error.sketch.twoLinesAreCollinearThereNo"));
     }
     const half = angle / 2;
     const tangent = radius / Math.tan(half);
     if (tangent > d1.length() - Precision.Distance || tangent > d2.length() - Precision.Distance) {
-        return Result.err("The fillet radius is too large for one of the lines");
+        return Result.err(I18n.translate("error.sketch.filletRadiusTooLargeOneLines"));
     }
     const bisector = u1.add(u2).normalize();
-    if (bisector === undefined) return Result.err("The corner has no interior");
+    if (bisector === undefined) return Result.err(I18n.translate("error.sketch.cornerHasNoInterior"));
 
     const t1 = p.add(u1.multiply(tangent));
     const t2 = p.add(u2.multiply(tangent));
@@ -439,15 +446,16 @@ function applyChamfer(
     corner: SketchCorner,
     distance: number,
 ): Result<CornerLabel | undefined> {
-    if (distance <= Precision.Distance) return Result.err("The chamfer distance must be positive");
+    if (distance <= Precision.Distance)
+        return Result.err(I18n.translate("error.sketch.chamferDistanceMustPositive"));
     const sides = cornerSides(solver, corner);
     if (!sides.isOk) return Result.err(sides.error);
     const { p, d1, d2, u1, u2, angle } = sides.value;
     if (isCollinear(angle)) {
-        return Result.err("The two lines are collinear — there is no corner to chamfer");
+        return Result.err(I18n.translate("error.sketch.twoLinesAreCollinearThereNo2"));
     }
     if (distance > d1.length() - Precision.Distance || distance > d2.length() - Precision.Distance) {
-        return Result.err("The chamfer distance is too large for one of the lines");
+        return Result.err(I18n.translate("error.sketch.chamferDistanceTooLargeOneLines"));
     }
     // measured before the trim moves the corner: the trimmed edges keep a length dim
     const kept = [d1.length() - distance, d2.length() - distance];

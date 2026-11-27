@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision, Result } from "@chili3d/core";
+import { I18n, Precision, Result } from "@chili3d/core";
 import {
     ellipseParameterOf,
     entityDomain,
@@ -42,11 +42,11 @@ export function breakEntity(
 ): SketchOperationResult<BreakOutcome> {
     const tol = Math.max(tolerance, 1e-6);
     const entity = solver.entity(entityId);
-    if (entity === undefined) return Result.err("Unknown sketch entity");
+    if (entity === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
     // a point has no curve, so there is no span of it to cut pieces out of
-    if (entity.type === "point") return Result.err("A point cannot be broken");
+    if (entity.type === "point") return Result.err(I18n.translate("error.sketch.pointCannotBroken"));
     // a text is a placement, not a span of curve: there is no parameter to carve it at
-    if (entity.type === "text") return Result.err("A text cannot be broken");
+    if (entity.type === "text") return Result.err(I18n.translate("error.sketch.textCannotBroken"));
     // the datum and the external references are reference geometry: they cut, but they
     // are never cut up
     // An offset copy is `derived` too, and it *is* cut up — but only by the trim and the
@@ -56,13 +56,13 @@ export function breakEntity(
     if (solver.isFixed(entityId)) {
         return Result.err(
             entity.type === "offsetCurve"
-                ? "An offset copy cannot be broken; trim the piece away instead"
-                : "The datum and external references cannot be broken",
+                ? I18n.translate("error.sketch.offsetCopyCannotBrokenTrimPiece")
+                : I18n.translate("error.sketch.datumExternalReferencesCannotBroken"),
         );
     }
     const cuts = planCuts(entity, uvs, tol);
     if (!cuts.isOk) return Result.err(cuts.error);
-    return guardedEdit(solver, "the break", () => {
+    return guardedEdit(solver, I18n.translate("error.sketch.edit.break"), () => {
         if (entity.type === "circle") return carveCircle(solver, entity, cuts.value);
         if (entity.type === "ellipse") return carveEllipse(solver, entity, cuts.value);
         return carve(solver, entity, cuts.value[0]);
@@ -108,17 +108,17 @@ function planCuts(
     tolerance: number,
 ): Result<[number, number][]> {
     if (!isClosedCurveType(entity.type)) {
-        if (uvs.length === 0) return Result.err("Pick a point along the entity");
+        if (uvs.length === 0) return Result.err(I18n.translate("error.sketch.pickPointAlongEntity"));
         if (atOwnEnd(entity, uvs[0], tolerance)) {
-            return Result.err("Pick a point along the entity, not one of its ends");
+            return Result.err(I18n.translate("error.sketch.pickPointAlongEntityNotOne"));
         }
         return Result.ok([projected(entity, uvs[0])]);
     }
     if (uvs.length < 2) {
         return Result.err(
             entity.type === "circle"
-                ? "A circle needs a second point to break at"
-                : "An ellipse needs a second point to break at",
+                ? I18n.translate("error.sketch.circleNeedsSecondPointBreakAt")
+                : I18n.translate("error.sketch.ellipseNeedsSecondPointBreakAt"),
         );
     }
     const cuts: [number, number][] = [projected(entity, uvs[0]), projected(entity, uvs[1])];
@@ -126,8 +126,8 @@ function planCuts(
     if (sweeps.some((sweep) => sweep <= Precision.Angle || sweep >= Math.PI * 2 - Precision.Angle)) {
         return Result.err(
             entity.type === "circle"
-                ? "Pick two points further apart along the circle"
-                : "Pick two points further apart along the ellipse",
+                ? I18n.translate("error.sketch.pickTwoPointsFurtherApartAlong")
+                : I18n.translate("error.sketch.pickTwoPointsFurtherApartAlong2"),
         );
     }
     return Result.ok(cuts);
@@ -206,7 +206,7 @@ function carve(
     // control points afresh around the cut, so the kept half's far end is its own last one
     // rather than the index the original's far end had.
     const kept = solver.entity(entity.id);
-    if (kept === undefined) return Result.err("Unknown sketch entity");
+    if (kept === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
     solver.addConstraint({
         kind: ConstraintKind.P2PCoincident,
         refs: [farEnd(kept), { entityId: newId, pointIndex: originEnd(kept).pointIndex }],

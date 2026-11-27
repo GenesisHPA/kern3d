@@ -4,6 +4,7 @@
 import {
     ANGLE_UNITS,
     type FeatureParameter,
+    I18n,
     type IShape,
     LENGTH_UNITS,
     Matrix4,
@@ -174,11 +175,13 @@ const transformHandler: FeatureHandler<TransformFeatureData> = {
 
     evaluate(feature, context): Result<IShape> {
         const input = context.input;
-        if (input === undefined) return Result.err("Transform requires a preceding feature");
+        if (input === undefined)
+            return Result.err(I18n.translate("error.feature.transformRequiresPrecedingFeature"));
         const matrix = finiteMatrix(feature.matrix);
-        if (matrix === undefined) return Result.err("Transform matrix must be 16 finite numbers");
+        if (matrix === undefined)
+            return Result.err(I18n.translate("error.feature.transformMatrixMust16FiniteNumbers"));
         if (!isRigidTransform(matrix)) {
-            return Result.err("Transform supports only rigid transforms (no non-uniform scale)");
+            return Result.err(I18n.translate("error.feature.transformSupportsOnlyRigidTransformsNo"));
         }
 
         // `BRepBuilderAPI_Transform` rebuilds the topology without reordering its

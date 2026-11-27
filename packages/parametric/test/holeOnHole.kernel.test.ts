@@ -131,7 +131,7 @@ describe("a flat-bottomed hole", () => {
     test("an angled end still refuses a 0° point", () => {
         const body = plate();
         addHole(body, "h1", { diameter: 6, depth: 8, drillAngle: 0 });
-        expect(errors(body)[1]).toContain("flat");
+        expect(errors(body)[1]).toContain("error.feature.holeDrillAngleMustBetween0");
     });
 });
 

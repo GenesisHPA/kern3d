@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Result } from "@chili3d/core";
+import { I18n, Result } from "@chili3d/core";
 import {
     entityDomain,
     evaluateEntity,
@@ -94,7 +94,9 @@ export function trimEntity(
     // opened around the mutation alone
     const plan = planTrim(solver, entityId, uv, tol);
     if (!plan.isOk) return Result.err(plan.error);
-    return guardedEdit(solver, "the trim", () => applyPlan(solver, plan.value, tol));
+    return guardedEdit(solver, I18n.translate("error.sketch.edit.trim"), () =>
+        applyPlan(solver, plan.value, tol),
+    );
 }
 
 /**
@@ -157,18 +159,18 @@ function planTrim(
     tolerance: number,
 ): Result<TrimPlan> {
     const entity = solver.entity(entityId);
-    if (entity === undefined) return Result.err("Unknown sketch entity");
+    if (entity === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
     // a point has no curve, so there is no piece of it to remove: it answers a delete
     // key, not the trim tool
-    if (entity.type === "point") return Result.err("A point cannot be trimmed");
+    if (entity.type === "point") return Result.err(I18n.translate("error.sketch.pointCannotTrimmed"));
     // a text is a placement, not a piece of curve: reword or move it, there is no span to cut
-    if (entity.type === "text") return Result.err("A text cannot be trimmed");
+    if (entity.type === "text") return Result.err(I18n.translate("error.sketch.textCannotTrimmed"));
     // The datum, the external references and an array's instances are reference geometry:
     // they cut, but they are never cut up. An offset copy is the exception — the solver does
     // place it, but it is the user's own curve, and the copy's window is exactly what a trim
     // is written to (see `trimOffsetCopy`).
     if (solver.isFixed(entityId) && entity.type !== "offsetCurve") {
-        return Result.err("The datum and external references cannot be trimmed");
+        return Result.err(I18n.translate("error.sketch.datumExternalReferencesCannotTrimmed"));
     }
     const tol = Math.max(tolerance, 1e-6);
 
@@ -176,15 +178,15 @@ function planTrim(
     const cuts = cutsOn(solver, entity, tol).filter((cut) => !atOwnEnd(entity, cut, tol));
     const click = parameterAt(entity, uv);
     if (cuts.some((cut) => Math.abs(cut.s - click) <= tol)) {
-        return Result.err("Pick the piece to remove, not a crossing");
+        return Result.err(I18n.translate("error.sketch.pickPieceRemoveNotCrossing"));
     }
     const span = spanAround(entity, cuts, click);
     const removed = removedLength(entity, span, cuts, length);
-    if (removed <= tol) return Result.err("There is no piece to remove there");
+    if (removed <= tol) return Result.err(I18n.translate("error.sketch.thereNoPieceRemoveThere"));
     if (removed >= length - tol) return Result.ok({ kind: "delete", entity });
 
     const plan = boundedPlan(entity, span);
-    if (plan === undefined) return Result.err("There is no piece to remove there");
+    if (plan === undefined) return Result.err(I18n.translate("error.sketch.thereNoPieceRemoveThere"));
     return Result.ok(plan);
 }
 
@@ -288,7 +290,7 @@ function trimOffsetCopy(
 ): Result<TrimOutcome> {
     const copy = plan.entity;
     const ref = solver.offsetRefOf(copy.id);
-    if (ref === undefined) return Result.err("Not an offset curve");
+    if (ref === undefined) return Result.err(I18n.translate("error.sketch.notOffsetCurve"));
     const [start, end] = entityDomain(copy);
     if (plan.kind === "shorten") {
         const at = windowParameterAt(copy, plan.cut.point);
@@ -346,7 +348,7 @@ function shorten(
         const reshaped = shortenCurveEntity(solver, entity, projectPoint(entity, cut.point).t, atOrigin);
         if (!reshaped.isOk) return Result.err(reshaped.error);
         const kept = solver.entity(entity.id);
-        if (kept === undefined) return Result.err("Unknown sketch entity");
+        if (kept === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
         // the cut end is the piece's own: the reshape renumbers what it left
         pinCut(solver, atOrigin ? originEnd(kept) : farEnd(kept), cut, tolerance);
         return Result.ok({ entityIds: [entity.id], removedConstraints: reshaped.value, deletedEntities: [] });
@@ -373,7 +375,7 @@ function split(
     // curve's split re-makes its control-point list, so the far end the entity had before
     // is not the point that now sits at the cut (and on a reshaped NURBS it may not exist).
     const kept = solver.entity(entity.id);
-    if (kept === undefined) return Result.err("Unknown sketch entity");
+    if (kept === undefined) return Result.err(I18n.translate("error.sketch.unknownSketchEntity"));
     pinCut(solver, farEnd(kept), from, tolerance);
     pinCut(solver, { entityId: carved.value.newId, pointIndex: originEnd(kept).pointIndex }, to, tolerance);
     return Result.ok({

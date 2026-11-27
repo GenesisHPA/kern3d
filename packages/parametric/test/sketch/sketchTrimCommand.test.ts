@@ -102,7 +102,7 @@ describe("SketchTrimCommand", () => {
 
                 expect(pub).toHaveBeenCalledWith(
                     "displayValidation",
-                    "Pick the piece to remove, not a crossing",
+                    "error.sketch.pickPieceRemoveNotCrossing",
                 );
                 expect(editor.commit).not.toHaveBeenCalled();
             } finally {

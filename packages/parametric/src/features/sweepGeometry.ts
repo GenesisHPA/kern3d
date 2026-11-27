@@ -3,6 +3,7 @@
 
 import {
     BoundingBox,
+    I18n,
     type IFace,
     type IShape,
     type IVertex,
@@ -111,7 +112,8 @@ export function taperPrismSides(
     // a degenerate-but-answered sweep from failing the feature.
     if (sides.length === 0) return Result.ok(shape);
     const pull = vec.normalize();
-    if (pull === undefined) return Result.err("Extrude draft requires a non-zero sweep direction");
+    if (pull === undefined)
+        return Result.err(I18n.translate("error.feature.extrudeDraftRequiresNonZeroSweep"));
     const plane = new Plane({
         origin: basePoint,
         normal: pull,

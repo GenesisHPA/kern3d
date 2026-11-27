@@ -1048,7 +1048,10 @@ describe("the datum write", () => {
             try {
                 editor.writeDatum(id, 40);
 
-                expect(pub).toHaveBeenCalledWith("displayValidation", expect.stringContaining("driven"));
+                expect(pub).toHaveBeenCalledWith(
+                    "displayValidation",
+                    expect.stringContaining("error.sketch.constraintDrivenMeasuresDoesNotDrive"),
+                );
             } finally {
                 pub.mockRestore();
             }

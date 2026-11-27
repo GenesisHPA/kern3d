@@ -5,6 +5,7 @@ import {
     Combobox,
     command,
     GetOrSelectNodeStep,
+    I18n,
     type I18nKeys,
     Id,
     type INode,
@@ -60,12 +61,20 @@ export class SplitFeatureCommand extends MultistepCommand {
     protected override executeMainTask(): void {
         const body = this.stepDatas[0].nodes?.[0];
         if (!(body instanceof ParametricBodyNode)) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a parametric body");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectParametricBody"),
+            );
             return;
         }
         const plane = this.plane;
         if (plane === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select a split plane");
+            PubSub.default.pub(
+                "showToast",
+                "error.default:{0}",
+                I18n.translate("error.command.selectSplitPlane"),
+            );
             return;
         }
 

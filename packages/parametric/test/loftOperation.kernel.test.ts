@@ -197,7 +197,7 @@ describe("a loft carrying an operation (real kernel)", () => {
         };
         body.setFeaturesEmitShapeChanged([...body.features, feature]);
 
-        expect(body.featureItems()[1].error).toBe("A shell loft cannot join/cut/intersect");
+        expect(body.featureItems()[1].error).toBe("error.feature.shellLoftCannotJoinCutIntersect");
         // The failed feature leaves the last good shape on screen — the box, not the shell.
         expect(info(body).box.max.z).toBeCloseTo(40, 1);
     });
@@ -226,6 +226,6 @@ describe("a loft carrying an operation (real kernel)", () => {
         doc.modelManager.addNode(body);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Loft join/cut/intersect requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.feature.loftJoinCutIntersectRequiresPreceding");
     });
 });

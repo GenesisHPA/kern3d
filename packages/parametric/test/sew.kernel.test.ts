@@ -99,9 +99,7 @@ describe("sew feature", () => {
 
         // Constructed with the failing feature: the chain result itself is the error.
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe(
-            "Sew expects faces or shells — there is nothing to sew on a solid",
-        );
+        expect(body.featureItems()[1].error).toBe("error.feature.sewExpectsFacesShellsThereNothing");
     });
 
     test("a non-positive tolerance is a rebuild error", () => {
@@ -112,7 +110,7 @@ describe("sew feature", () => {
         ]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[1].error).toBe("Sew requires a positive tolerance");
+        expect(body.featureItems()[1].error).toBe("error.feature.sewRequiresPositiveTolerance");
     });
 
     test("sew as the first feature requires a preceding feature", () => {
@@ -120,6 +118,6 @@ describe("sew feature", () => {
         const body = bodyWith(doc, [{ id: "s1", type: "sew" }]);
 
         expect(body.shape.isOk).toBe(false);
-        expect(body.featureItems()[0].error).toBe("Sew requires a preceding feature");
+        expect(body.featureItems()[0].error).toBe("error.feature.sewRequiresPrecedingFeature");
     });
 });

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IFace, Result } from "@chili3d/core";
+import { I18n, type IFace, Result } from "@chili3d/core";
 import { type ProfileRef, profileScore, regionScore } from "./profileRef";
 import { MATCH_TOLERANCE } from "./refGeometry";
 
@@ -24,8 +24,11 @@ import { MATCH_TOLERANCE } from "./refGeometry";
  * rest and say so) from "the pick is ambiguous" (not recoverable — guessing which of
  * two candidates the user meant is worse than refusing).
  */
-export const PROFILE_NOT_FOUND = "Sketch profile not found after rebuild";
-export const PROFILE_AMBIGUOUS = "Sketch profile match is ambiguous after rebuild";
+/** The two fallback refusals other matchers compare against — worded in the current language. */
+export const profileNotFound = (): string =>
+    I18n.translate("error.feature.sketchProfileNotFoundAfterRebuild");
+export const profileAmbiguous = (): string =>
+    I18n.translate("error.feature.sketchProfileMatchAmbiguousAfterRebuild");
 
 /**
  * Re-matches stored profile refs against the faces of a rebuilt sketch, returning positions in
@@ -90,8 +93,8 @@ function matchIndexes(
 
     for (const refIndex of moved.value) {
         const match = clearestRemainingFace(faces, refs, refIndex, taken, allow, lone);
-        if (match === undefined) return Result.err(PROFILE_NOT_FOUND);
-        if (match === -1) return Result.err(PROFILE_AMBIGUOUS);
+        if (match === undefined) return Result.err(profileNotFound());
+        if (match === -1) return Result.err(profileAmbiguous());
         taken.add(match);
         indexes[refIndex] = match;
     }
@@ -142,14 +145,14 @@ export function matchProfilesTolerant(
             missing: [],
         });
     }
-    if (whole.error === PROFILE_AMBIGUOUS) return Result.err(PROFILE_AMBIGUOUS);
+    if (whole.error === profileAmbiguous()) return Result.err(profileAmbiguous());
 
     const taken = new Set<number>();
     const survivors: number[] = [];
     const missing: number[] = [];
     for (const refIndex of probeOrder(refs, entities)) {
         const claimed = claimFreeFace(faces, entities, refs[refIndex], taken, allow);
-        if (claimed === "ambiguous") return Result.err(PROFILE_AMBIGUOUS);
+        if (claimed === "ambiguous") return Result.err(profileAmbiguous());
         if (claimed === undefined) {
             missing.push(refIndex);
             continue;
@@ -157,7 +160,7 @@ export function matchProfilesTolerant(
         taken.add(claimed);
         survivors.push(refIndex);
     }
-    if (survivors.length === 0) return Result.err(PROFILE_NOT_FOUND);
+    if (survivors.length === 0) return Result.err(profileNotFound());
     const group = matchProfileIndexes(
         faces,
         survivors.map((index) => refs[index]),
@@ -197,7 +200,7 @@ function lockEntityMatches(
         candidates.sort((a, b) => a.score - b.score);
         const [best, second] = candidates;
         if (second !== undefined && second.score - best.score <= MATCH_TOLERANCE) {
-            return Result.err(PROFILE_AMBIGUOUS);
+            return Result.err(profileAmbiguous());
         }
         taken.add(best.index);
         indexes[refIndex] = best.index;
@@ -256,7 +259,7 @@ function lockExactMatches(
             if (profileScore(face, ref) <= MATCH_TOLERANCE * ref.edges.length) exact.push(index);
         }
         if (exact.length > 1 || (exact.length === 1 && taken.has(exact[0]))) {
-            return Result.err(PROFILE_AMBIGUOUS);
+            return Result.err(profileAmbiguous());
         }
         if (exact.length === 1) {
             taken.add(exact[0]);
@@ -359,6 +362,6 @@ function claimFreeFace(
         freeAllow,
         "reject",
     );
-    if (!alone.isOk) return alone.error === PROFILE_AMBIGUOUS ? "ambiguous" : undefined;
+    if (!alone.isOk) return alone.error === profileAmbiguous() ? "ambiguous" : undefined;
     return free[alone.value[0]];
 }

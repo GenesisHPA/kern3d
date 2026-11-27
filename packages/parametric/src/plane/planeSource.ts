@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, type IFace, Matrix4, type Plane, Result, ShapeTypes } from "@chili3d/core";
+import { I18n, type IDocument, type IFace, Matrix4, type Plane, Result, ShapeTypes } from "@chili3d/core";
 import { isBodyTrackingNode } from "../features/bodyTracking";
 import type { NeutralPlaneRef } from "../features/feature";
 import { indexesOfOverlappingId } from "../features/trackedId";
@@ -49,7 +49,7 @@ export function resolvePlaneSourceInWorld(
     anchors?: Readonly<Record<string, number>>,
     options?: PlaneSourceOptions,
 ): Result<Plane> {
-    const label = options?.label ?? "Plane";
+    const label = options?.label ?? I18n.translate("error.datum.plane");
     if (ref.kind === "datum") return Result.ok(datumPlaneOf(ref.name));
     if (ref.kind === "planeNode") return planeNodePlane(document, ref.nodeId, label, options?.visited);
     return facePlane(document, ref.ref, anchors, label);
@@ -62,14 +62,16 @@ function planeNodePlane(
     label: string,
     visited: ReadonlySet<string> | undefined,
 ): Result<Plane> {
-    if (visited?.has(nodeId) === true) return Result.err(`${label} plane reference is cyclic`);
+    if (visited?.has(nodeId) === true)
+        return Result.err(I18n.translate("error.datum.planeReferenceCyclic{0}", label));
     const node = document.modelManager.findNode((n) => n.id === nodeId);
-    if (!isPlaneNode(node)) return Result.err(`${label} plane reference not found`);
+    if (!isPlaneNode(node)) return Result.err(I18n.translate("error.datum.planeReferenceNotFound{0}", label));
     // NOT added to `visited` here: `worldPlane` adds the node itself when it resolves its
     // own definition. Adding it before the call made every plane-node reference a
     // self-cycle and returned undefined.
     const plane = node.worldPlane(visited);
-    if (plane === undefined) return Result.err(`${label} plane reference is not available`);
+    if (plane === undefined)
+        return Result.err(I18n.translate("error.datum.planeReferenceNotAvailable{0}", label));
     return Result.ok(plane);
 }
 
@@ -81,20 +83,23 @@ function facePlane(
     label: string,
 ): Result<Plane> {
     const source = resolveTimelineSource(document, ref.nodeId, anchors?.[ref.nodeId]);
-    if (source === ROLLED_BACK_SOURCE) return Result.err(`${label} plane body is rolled back`);
-    if (source === SOURCE_UNAVAILABLE) return Result.err(`${label} plane body not found`);
+    if (source === ROLLED_BACK_SOURCE)
+        return Result.err(I18n.translate("error.feature.planeBodyRolledBack{0}", label));
+    if (source === SOURCE_UNAVAILABLE)
+        return Result.err(I18n.translate("error.feature.planeBodyNotFound{0}", label));
 
     const base = shapeSourceOf(document, source.node, source.shape);
     const faces = source.shape.findSubShapes(ShapeTypes.face) as IFace[];
     const lookup = faceIdLookup(source);
     const face = matchFace(faces, base.transform, ref, lookup.indexById, lookup.indexesOfId);
-    if (face === undefined) return Result.err(`${label} plane not found after rebuild`);
+    if (face === undefined)
+        return Result.err(I18n.translate("error.feature.planeNotFoundAfterRebuild{0}", label));
 
     const identity = base.transform.equals(Matrix4.identity());
     const worldFace = identity ? face : (face.transformedMul(base.transform) as IFace);
     try {
         if (!worldFace.surface().isPlanar()) {
-            return Result.err(`${label} plane face is no longer planar`);
+            return Result.err(I18n.translate("error.datum.planeFaceNoLongerPlanar{0}", label));
         }
         // `sketchPlaneOfFace` re-origins the plane at the world origin's projection, not at
         // the face's arbitrary (0,0) parameter point — the latter may sit outside the
@@ -102,7 +107,7 @@ function facePlane(
         // becomes the sketch's coordinate origin, so it must be stable.
         return Result.ok(sketchPlaneOfFace(worldFace));
     } catch (error) {
-        return Result.err(`${label} plane face could not be read: ${String(error)}`);
+        return Result.err(I18n.translate("error.datum.planeFaceCouldNotRead{0}{1}", label, String(error)));
     } finally {
         if (!identity) worldFace.dispose();
     }

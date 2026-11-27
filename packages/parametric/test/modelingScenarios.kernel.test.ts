@@ -247,7 +247,7 @@ describe("press-pull flows", () => {
             source: { nodeId: "no-such-body", profiles: [ref] },
         } as ExtrudeFeatureData);
 
-        expect(body.featureItems()[1].error).toBe("Extrude source body not found");
+        expect(body.featureItems()[1].error).toBe("error.feature.extrudeSourceBodyNotFound");
         // The failed chain keeps the last good shape rather than showing nothing.
         expect(body.shape.isOk).toBe(true);
         expect(extent(body)).toEqual([0, 0, 0, 40, 40, 40]);
@@ -778,7 +778,7 @@ describe("serialization flows", () => {
         // The sketch it extrudes is not in the fresh document, so the reload cannot resolve
         // it — the row reports it rather than throwing.
         expect(reloaded.shape.isOk).toBe(false);
-        expect(reloaded.featureItems()[0].error).toBe("Sketch not found");
+        expect(reloaded.featureItems()[0].error).toBe("error.feature.sketchNotFound");
     });
 });
 
@@ -1015,7 +1015,7 @@ describe("referenced-node damage", () => {
         expect(extent(host)).toEqual([0, 0, 0, 60, 40, 40]);
 
         tool.parent?.remove(tool);
-        expect(host.featureItems()[1].error).toBe("Boolean tool not found");
+        expect(host.featureItems()[1].error).toBe("error.feature.booleanToolNotFound");
         // The failed chain keeps the last good shape.
         expect(extent(host)).toEqual([0, 0, 0, 60, 40, 40]);
 
@@ -1035,7 +1035,7 @@ describe("referenced-node damage", () => {
         expect(sketch).toBeDefined();
 
         sketch!.parent?.remove(sketch!);
-        expect(body.featureItems()[0].error).toBe("Sketch not found");
+        expect(body.featureItems()[0].error).toBe("error.feature.sketchNotFound");
         expect(body.shape.isOk).toBe(true);
 
         doc.modelManager.addNode(sketch!);

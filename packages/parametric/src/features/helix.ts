@@ -3,6 +3,7 @@
 
 import {
     type FeatureParameter,
+    I18n,
     type IEdge,
     type IShape,
     LENGTH_UNITS,
@@ -149,7 +150,7 @@ function resolveHelixParams(feature: HelixFeatureData, context: FeatureContext):
     if (!origin.isOk) return Result.err(origin.error);
     const radius = resolveUnitSpec(feature.radius, context.scope, LENGTH_UNITS);
     if (!radius.isOk) return Result.err(radius.error);
-    if (radius.value <= 0) return Result.err("Helix radius must be positive");
+    if (radius.value <= 0) return Result.err(I18n.translate("error.feature.helixRadiusMustPositive"));
     const coil = resolveCoil(feature, context.scope);
     if (!coil.isOk) return Result.err(coil.error);
     const direction: ResolvedDirection = resolveDirectionOverride(feature.direction, context);
@@ -184,9 +185,12 @@ function resolveCoil(feature: HelixFeatureData, scope: Scope): Result<{ pitch: n
     if (!pitch.isOk) return Result.err(pitch.error);
     const turns = resolveOptional(feature.turns, scope, UNITLESS);
     if (!turns.isOk) return Result.err(turns.error);
-    if (length.value !== undefined && length.value <= 0) return Result.err("Helix length must be positive");
-    if (pitch.value !== undefined && pitch.value <= 0) return Result.err("Helix pitch must be positive");
-    if (turns.value !== undefined && turns.value <= 0) return Result.err("Helix turns must be positive");
+    if (length.value !== undefined && length.value <= 0)
+        return Result.err(I18n.translate("error.feature.helixLengthMustPositive"));
+    if (pitch.value !== undefined && pitch.value <= 0)
+        return Result.err(I18n.translate("error.feature.helixPitchMustPositive"));
+    if (turns.value !== undefined && turns.value <= 0)
+        return Result.err(I18n.translate("error.feature.helixTurnsMustPositive"));
 
     // All three stored: length and pitch win, turns is re-derived (the app's Helix command
     // takes height and pitch, so they are what the user last meant).
@@ -199,7 +203,7 @@ function resolveCoil(feature: HelixFeatureData, scope: Scope): Result<{ pitch: n
     if (length.value !== undefined && turns.value !== undefined) {
         return Result.ok({ pitch: length.value / turns.value, turns: turns.value });
     }
-    return Result.err("Helix needs two of length, pitch, turns");
+    return Result.err(I18n.translate("error.feature.helixNeedsTwoLengthPitchTurns"));
 }
 
 /** An unset or blank coil field is ABSENT — to be derived — not zero. */

@@ -277,7 +277,7 @@ describe("sketch point entity", () => {
                 const id = solver.addPoint(1, 1);
                 const result = trimEntity(solver, id, [1, 1], TOLERANCE);
                 expect(result.isOk).toBe(false);
-                expect(result.error).toBe("A point cannot be trimmed");
+                expect(result.error).toBe("error.sketch.pointCannotTrimmed");
             } finally {
                 solver.dispose();
             }
@@ -289,7 +289,7 @@ describe("sketch point entity", () => {
                 const id = solver.addPoint(1, 1);
                 const result = breakEntity(solver, id, [[1, 1]], TOLERANCE);
                 expect(result.isOk).toBe(false);
-                expect(result.error).toBe("A point cannot be broken");
+                expect(result.error).toBe("error.sketch.pointCannotBroken");
                 expect(breakPreview(solver, id, [[1, 1]], TOLERANCE)).toEqual([]);
             } finally {
                 solver.dispose();
@@ -310,7 +310,7 @@ describe("sketch point entity", () => {
                     tolerance: TOLERANCE,
                 });
                 expect(asTarget.isOk).toBe(false);
-                expect(asTarget.error).toBe("A point has no end to extend");
+                expect(asTarget.error).toBe("error.sketch.pointHasNoEndExtend");
 
                 const asBoundary = extendEntity(solver, {
                     targetId: lineId,
@@ -321,7 +321,7 @@ describe("sketch point entity", () => {
                     tolerance: TOLERANCE,
                 });
                 expect(asBoundary.isOk).toBe(false);
-                expect(asBoundary.error).toBe("A point is no boundary to extend to");
+                expect(asBoundary.error).toBe("error.sketch.pointNoBoundaryExtend");
             } finally {
                 solver.dispose();
             }
@@ -333,7 +333,7 @@ describe("sketch point entity", () => {
                 const pointId = solver.addPoint(1, 1);
                 const alone = offsetEntities(solver, [pointId], 1, TOLERANCE);
                 expect(alone.isOk).toBe(false);
-                expect(alone.error).toBe("Nothing to offset");
+                expect(alone.error).toBe("error.sketch.nothingOffset");
 
                 const lineId = solver.addLine(0, 0, 10, 0);
                 const mixed = offsetEntities(solver, [lineId, pointId], 1, TOLERANCE);

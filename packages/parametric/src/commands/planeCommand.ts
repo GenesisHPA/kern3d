@@ -6,6 +6,7 @@ import {
     AsyncController,
     Combobox,
     command,
+    I18n,
     type I18nKeys,
     type IDocument,
     type IShape,
@@ -208,16 +209,17 @@ export class PlaneCommand extends MultistepCommand {
     /** The definition from the current panel values and collected refs, or an error message. */
     buildDefinition(): Result<PlaneDefinition> {
         const refs = this._refs;
-        if (refs === undefined) return Result.err("Pick the plane geometry first");
+        if (refs === undefined) return Result.err(I18n.translate("error.command.pickPlaneGeometryFirst"));
         const anchors = refs.anchors;
         switch (this.kind) {
             // made by «Подогнать по области» from numbers, never from this command's picks
             case "fixed":
-                return Result.err("A fixed datum is not built from picks");
+                return Result.err(I18n.translate("error.command.fixedDatumNotBuiltFromPicks"));
             case "offset": {
-                if (refs.source === undefined) return Result.err("Pick a plane");
+                if (refs.source === undefined) return Result.err(I18n.translate("error.command.pickPlane"));
                 const rawDistance = this.distance;
-                if (rawDistance === undefined) return Result.err("Plane distance is not set");
+                if (rawDistance === undefined)
+                    return Result.err(I18n.translate("error.command.planeDistanceNotSet"));
                 const distance = this.resolveParameter(rawDistance, LENGTH_UNITS);
                 if (!distance.isOk) return Result.err(distance.error);
                 return Result.ok({
@@ -232,7 +234,7 @@ export class PlaneCommand extends MultistepCommand {
             }
             case "planePoint": {
                 if (refs.source === undefined || refs.point === undefined) {
-                    return Result.err("Pick a plane and a point");
+                    return Result.err(I18n.translate("error.command.pickPlanePoint"));
                 }
                 return Result.ok({
                     kind: "planePoint",
@@ -245,10 +247,11 @@ export class PlaneCommand extends MultistepCommand {
             }
             case "lineAngle": {
                 if (refs.edge === undefined || refs.reference === undefined) {
-                    return Result.err("Pick a line and a reference plane");
+                    return Result.err(I18n.translate("error.command.pickLineReferencePlane"));
                 }
                 const rawAngle = this.angle;
-                if (rawAngle === undefined) return Result.err("Plane angle is not set");
+                if (rawAngle === undefined)
+                    return Result.err(I18n.translate("error.command.planeAngleNotSet"));
                 const angle = this.resolveParameter(rawAngle, ANGLE_UNITS);
                 if (!angle.isOk) return Result.err(angle.error);
                 return Result.ok({
@@ -264,7 +267,7 @@ export class PlaneCommand extends MultistepCommand {
             }
             case "pointNormal": {
                 if (refs.edge === undefined || refs.point === undefined) {
-                    return Result.err("Pick an axis and a point");
+                    return Result.err(I18n.translate("error.command.pickAxisPoint"));
                 }
                 return Result.ok({
                     kind: "pointNormal",
@@ -277,7 +280,8 @@ export class PlaneCommand extends MultistepCommand {
                 });
             }
             case "threePoint": {
-                if (refs.points === undefined) return Result.err("Pick three points");
+                if (refs.points === undefined)
+                    return Result.err(I18n.translate("error.command.pickThreePoints"));
                 return Result.ok({
                     kind: "threePoint",
                     points: refs.points,
@@ -288,7 +292,7 @@ export class PlaneCommand extends MultistepCommand {
             }
             case "midPlane": {
                 if (refs.source === undefined || refs.second === undefined) {
-                    return Result.err("Pick two planes");
+                    return Result.err(I18n.translate("error.command.pickTwoPlanes"));
                 }
                 return Result.ok({
                     kind: "midPlane",
@@ -301,7 +305,7 @@ export class PlaneCommand extends MultistepCommand {
             }
             case "curvePoint": {
                 if (refs.curve === undefined || refs.point === undefined) {
-                    return Result.err("Pick a curve and a point");
+                    return Result.err(I18n.translate("error.command.pickCurvePoint"));
                 }
                 return Result.ok({
                     kind: "curvePoint",
@@ -315,7 +319,7 @@ export class PlaneCommand extends MultistepCommand {
             }
             case "tangent": {
                 if (refs.face === undefined || refs.at === undefined)
-                    return Result.err("Pick a cylindrical face");
+                    return Result.err(I18n.translate("error.command.pickCylindricalFace"));
                 const angle = this.resolveParameter(this.tangentAngle, ANGLE_UNITS);
                 if (!angle.isOk) return Result.err(angle.error);
                 return Result.ok({

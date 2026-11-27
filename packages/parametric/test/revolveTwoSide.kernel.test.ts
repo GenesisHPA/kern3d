@@ -124,7 +124,7 @@ describe("revolve second side (real kernel)", () => {
         const body = revolvedBody(doc, { angle: 90, angle2: 30, symmetric: true });
 
         expect(body.shape.isOk).toBe(false);
-        expect(errors(body)).toEqual(["Revolve cannot be both symmetric and have a second angle"]);
+        expect(errors(body)).toEqual(["error.feature.revolveCannotBothSymmetricHaveSecond"]);
     });
 
     test("a non-positive angle2 is a rebuild error", () => {
@@ -132,6 +132,6 @@ describe("revolve second side (real kernel)", () => {
         const body = revolvedBody(doc, { angle: 90, angle2: 0 });
 
         expect(body.shape.isOk).toBe(false);
-        expect(errors(body)).toEqual(["Revolve angle2 must be positive"]);
+        expect(errors(body)).toEqual(["error.feature.revolveAngle2MustPositive"]);
     });
 });
