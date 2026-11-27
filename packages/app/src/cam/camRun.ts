@@ -7,6 +7,33 @@ function f(v: number): string {
     return String(Math.round(v * 1000) / 1000);
 }
 
+/**
+ * The spindle's words out of a program: M3 / M4 (on), the S speed word and the coolant / air
+ * (M7 / M8) — for a drag knife, which must never have the spindle turn. Comments are left as
+ * they are; a line left empty is dropped.
+ */
+export function withoutSpindle(lines: readonly string[]): string[] {
+    const out: string[] = [];
+    for (const line of lines) {
+        if (line.trim() === "" || /^\s*[(;]/.test(line)) {
+            out.push(line);
+            continue;
+        }
+        const stripped = line
+            .replace(/\bM0*[3478](?!\d)\s*/gi, "")
+            .replace(/\bS\s*-?[\d.]+\s*/gi, "")
+            .trim();
+        if (stripped !== "") out.push(stripped);
+    }
+    return out;
+}
+
+/** Whether a G-code line (comments aside) would start the spindle: M3 / M4, or sets its speed. */
+export function startsSpindle(line: string): boolean {
+    const code = line.toUpperCase().replace(/\(.*?\)|;.*/g, "");
+    return /(^|[^A-Z])M0*[34](?!\d)/.test(code) || /(^|[^A-Z])S\s*-?[\d.]+/.test(code);
+}
+
 /** `$#` replies: `[G54:1.000,2.000,3.000]`, `[G28:…]`, `[TLO:…]`, `[PRB:…:1]`. */
 export function parseOffsetLine(line: string): { name: string; values: number[] } | undefined {
     const m = /^\[(G5[4-9]|G28|G30|G92|TLO):([-\d.,]+)/.exec(line.trim());

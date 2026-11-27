@@ -1,7 +1,9 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { CamTool } from "./camTools";
+import { withoutSpindle } from "./camRun";
+import { type CamTool, isKnife } from "./camTools";
+import { knifeCanDo } from "./dragKnife";
 import { type CamOperation, cutData, type Heights, type MillMove, operationMoves } from "./toolpath";
 
 /** The milling machine: what the G-code may use. */
@@ -64,9 +66,24 @@ export interface MillProgram {
     moves: { op: CamOperation; tool: CamTool; moves: MillMove[] }[];
     /** Estimated run time, s (feeds as given, no acceleration). */
     seconds: number;
-    /** Operations left out, with why. */
-    skipped: { op: CamOperation; reason: "noTool" | "noGeometry" }[];
+    /**
+     * Operations left out, with why: no tool, nothing to cut, a knife asked to do what it cannot
+     * (a pocket, drilling…), a milling cutter in a job that has a knife in it.
+     */
+    skipped: { op: CamOperation; reason: SkipReason }[];
+    /** The job cuts with a drag knife: nothing in it starts the spindle, coolant or air. */
+    knife: boolean;
     bounds: { minX: number; minY: number; minZ: number; maxX: number; maxY: number };
+}
+
+export type SkipReason = "noTool" | "noGeometry" | "knifeOp" | "knifeJob";
+
+/**
+ * Whether a job cuts with a drag knife: any shown operation with a knife. Then the machine carries
+ * the knife where the spindle goes, so the whole program is a knife's — the spindle never starts.
+ */
+export function isKnifeJob(ops: readonly CamOperation[], tools: readonly CamTool[]): boolean {
+    return ops.some((op) => op.hidden !== true && isKnife(tools.find((x) => x.id === op.toolId)));
 }
 
 function f(v: number): string {
@@ -81,10 +98,13 @@ export function millProgram(
     m: MillMachine,
 ): MillProgram {
     const post = POSTS[m.post] ?? POSTS.grbl;
+    const knife = isKnifeJob(ops, tools);
     const out: string[] = [
         ...post.begin,
         `(Kern3D milling, ${m.post})`,
+        ...(knife ? ["(drag knife: the spindle stays off)"] : []),
         "G21 G90 G17 G94",
+        ...(knife ? ["M5"] : []),
         `G0 Z${f(m.heights.safeZ)}`,
     ];
     const moves: MillProgram["moves"] = [];
@@ -100,6 +120,14 @@ export function millProgram(
             skipped.push({ op, reason: "noTool" });
             continue;
         }
+        if (knife && !isKnife(t)) {
+            skipped.push({ op, reason: "knifeJob" });
+            continue;
+        }
+        if (knife && !knifeCanDo(op.kind)) {
+            skipped.push({ op, reason: "knifeOp" });
+            continue;
+        }
         const list = operationMoves(op, t, m.heights);
         if (list.length === 0) {
             skipped.push({ op, reason: "noGeometry" });
@@ -108,7 +136,7 @@ export function millProgram(
         const c = cutData(op, t);
         out.push(
             "",
-            `(${op.name.replace(/[()]/g, "")} — T${t.number} ${t.name.replace(/[()]/g, "")} Ø${f(t.diameter)})`,
+            `(${op.name.replace(/[()]/g, "")} — T${t.number} ${t.name.replace(/[()]/g, "")} ${knife ? "knife" : `Ø${f(t.diameter)}`})`,
         );
         if (tool?.id !== t.id) {
             if (tool !== undefined) out.push("M5", `G0 Z${f(m.heights.safeZ)}`);
@@ -118,11 +146,7 @@ export function millProgram(
                 out.push(`(change to T${t.number} ${t.name.replace(/[()]/g, "")}, set Z0)`, "M0");
             tool = t;
         }
-        out.push(`S${Math.round(c.rpm)} M3`);
-        if (m.spindleDelay > 0) out.push(`G4 P${f(m.spindleDelay)}`);
-        if (m.coolant || m.air === "m8") out.push("M8");
-        else if (m.air === "m7") out.push("M7");
-        seconds += m.spindleDelay;
+        if (!knife) seconds += spindleOn(out, m, c.rpm);
         let mode = "";
         let feed = -1;
         for (const mv of list) {
@@ -150,9 +174,20 @@ export function millProgram(
                 b.minZ = Math.min(b.minZ, mv.z);
             }
         }
-        if (m.coolant || m.air !== "off") out.push("M9");
+        if (!knife && (m.coolant || m.air !== "off")) out.push("M9");
         moves.push({ op, tool: t, moves: list });
     }
     out.push("", "M5", `G0 Z${f(m.heights.safeZ)}`, ...post.end, "");
-    return { gcode: out.join("\n"), moves, seconds, skipped, bounds: b };
+    // the hard rule, whatever was built above: a knife's program has no word that turns a spindle
+    const lines = knife ? withoutSpindle(out) : out;
+    return { gcode: lines.join("\n"), moves, seconds, skipped, bounds: b, knife };
+}
+
+/** The spindle started (and the air / coolant), with its spin-up wait: the seconds that takes. */
+function spindleOn(out: string[], m: MillMachine, rpm: number): number {
+    out.push(`S${Math.round(rpm)} M3`);
+    if (m.spindleDelay > 0) out.push(`G4 P${f(m.spindleDelay)}`);
+    if (m.coolant || m.air === "m8") out.push("M8");
+    else if (m.air === "m7") out.push("M7");
+    return m.spindleDelay;
 }

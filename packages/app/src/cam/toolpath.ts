@@ -1,7 +1,8 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { CamTool } from "./camTools";
+import { type CamTool, isKnife, knifeOf } from "./camTools";
+import { knifeCanDo, knifeLineMoves, knifeRingMoves } from "./dragKnife";
 import { offsetRegion, oriented, type Pt, region, ringLength } from "./offset";
 
 /**
@@ -271,6 +272,7 @@ function closedRings(rings: readonly Pt[][]): Pt[][] {
  * clockwise (the cutter turning clockwise from above), counter-clockwise inside and in pockets.
  */
 export function operationMoves(op: CamOperation, tool: CamTool, h: Heights): MillMove[] {
+    if (isKnife(tool)) return knifeMoves(op, tool, h);
     const c = cutData(op, tool);
     const zs = levels(op.depth, c.stepDown);
     const path = new Path(h);
@@ -346,6 +348,32 @@ export function operationMoves(op: CamOperation, tool: CamTool, h: Heights): Mil
         for (const r of ordered) cutRing(path, oriented(r, op.climb), [level], { ramp: op.ramp, from });
     });
     return path.moves;
+}
+
+/**
+ * A drag knife's moves: a profile cuts the outline (outside / inside: moved out / in by the
+ * allowance — a blade takes no width), an engraving the lines as drawn; nothing else (the knife
+ * cannot clear an area or drill: `knifeCanDo`).
+ */
+function knifeMoves(op: CamOperation, tool: CamTool, h: Heights): MillMove[] {
+    if (!knifeCanDo(op.kind)) return [];
+    const k = knifeOf(tool);
+    const zs = levels(op.depth, cutData(op, tool).stepDown);
+    const moves: MillMove[] = [];
+    if (op.kind === "engrave") {
+        for (const r of op.rings) {
+            const closed = r.length >= 3 && Math.hypot(r[0].x - r.at(-1)!.x, r[0].y - r.at(-1)!.y) < 1e-6;
+            moves.push(...(closed ? knifeRingMoves(r, zs, k, h) : knifeLineMoves(r, zs, k, h)));
+        }
+        return moves;
+    }
+    const delta = op.side === "outside" ? op.allowance : op.side === "inside" ? -op.allowance : 0;
+    const rings = offsetRegion(region(closedRings(op.rings)), delta);
+    for (const r of rings) {
+        const outer = (op.side === "inside") !== isHoleOf(r, rings);
+        moves.push(...knifeRingMoves(oriented(r, op.climb ? !outer : outer), zs, k, h));
+    }
+    return moves;
 }
 
 /** Whether a ring of an offset result is a hole (inside another ring of it). */
