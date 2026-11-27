@@ -57,3 +57,22 @@ describe("tool svg", () => {
         expect(toolIconSvg(tool({ kind: "ball" }))).not.toContain("<marker");
     });
 });
+
+describe("drag knife drawing", () => {
+    const knife = defaultTools().find((x) => x.kind === "knife")!;
+
+    test("a knife is drawn as a holder and a blade with its offset, not a fluted cutter", () => {
+        const s = toolSvg(knife);
+        expect(s).toContain("↤ 0.25");
+        expect(s).not.toContain("clipPath");
+        expect(toolIconSvg(knife)).not.toContain("↤");
+    });
+
+    test("its profile is a thin blade under a holder", () => {
+        const p = toolProfile(knife);
+        expect(p.radius).toBeLessThan(0.5);
+        expect(p.shankRadius).toBeCloseTo(5.5, 6);
+        expect(p.points[0]).toEqual({ r: 0, z: 0 });
+        expect(p.points.at(-1)?.r).toBe(0);
+    });
+});

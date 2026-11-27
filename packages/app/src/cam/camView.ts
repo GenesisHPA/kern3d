@@ -5,8 +5,9 @@ import type * as Three from "three";
 import { el, t } from "../laser/laserUi";
 import type { MillJob } from "./camData";
 import type { MillProgram } from "./camGcode";
-import { toolProfile } from "./camToolShape";
-import type { CamTool } from "./camTools";
+import { KNIFE_BLADE, KNIFE_HOLDER, toolProfile } from "./camToolShape";
+import { type CamTool, isKnife, knifeOf } from "./camTools";
+import { bladeTrace } from "./dragKnife";
 import { MillSimulation } from "./simulate";
 import type { CamOperation, MillMove } from "./toolpath";
 
@@ -405,6 +406,7 @@ export class CamView {
 
         this.buildSketch(world, job);
         this.buildPaths(world);
+        this.buildKnifeCuts(world, program, job.stock.top);
 
         this.cutter = new THREE.Group();
         this.spinner = new THREE.Group();
@@ -623,7 +625,7 @@ export class CamView {
         const THREE = this.three!;
         if (!this.cutter || !this.spinner) return;
         const key = tool
-            ? `${tool.id}|${tool.kind}|${tool.diameter}|${tool.cornerRadius}|${tool.angle}|${tool.fluteLength}|${tool.flutes}`
+            ? `${tool.id}|${tool.kind}|${tool.diameter}|${tool.cornerRadius}|${tool.angle}|${tool.fluteLength}|${tool.flutes}|${tool.knife?.offset ?? ""}`
             : "";
         if (tool === this.cutterTool && key === this.cutterKey) return;
         this.cutterTool = tool;
@@ -631,6 +633,10 @@ export class CamView {
         for (const o of [...this.cutter.children]) if (o !== this.spinner) this.cutter.remove(o);
         this.spinner.clear();
         if (!tool) return;
+        if (isKnife(tool)) {
+            this.buildKnife(tool);
+            return;
+        }
         const p = toolProfile(tool, 16);
         const segs = 40;
         const lathe = (pts: { r: number; z: number }[]) => {
@@ -683,6 +689,65 @@ export class CamView {
         spindle.position.z = p.length + nutH + spindleR * 1.5;
         this.cutter.add(nut, spindle);
         this.glow?.scale.set(p.radius * 1.15, p.radius * 1.15, 1);
+    }
+
+    /**
+     * A drag knife: the holder (it does not turn) and a thin blade below it whose tip is the
+     * offset off the axis; the blade turned (`placeCutter`) to trail the way the knife goes.
+     */
+    private buildKnife(tool: CamTool) {
+        const THREE = this.three!;
+        const offset = knifeOf(tool).offset;
+        const steel = new THREE.MeshStandardMaterial({ color: 0xe9ecef, metalness: 0.85, roughness: 0.25 });
+        const body = new THREE.MeshStandardMaterial({ color: 0x868e96, metalness: 0.7, roughness: 0.35 });
+        // the blade: a thin plate, back edge up the axis, the edge sloping to the tip at x = −offset
+        const shape = new THREE.Shape();
+        const w = Math.max(0.5, offset + 0.4);
+        shape.moveTo(-offset, 0);
+        shape.lineTo(w * 0.5, KNIFE_BLADE * 0.45);
+        shape.lineTo(w * 0.5, KNIFE_BLADE + 1);
+        shape.lineTo(-w * 0.6, KNIFE_BLADE + 1);
+        shape.lineTo(-w * 0.6, KNIFE_BLADE * 0.3);
+        shape.closePath();
+        const blade = new THREE.ExtrudeGeometry(shape, { depth: 0.25, bevelEnabled: false });
+        blade.translate(0, 0, -0.125);
+        blade.rotateX(Math.PI / 2);
+        this.spinner!.add(new THREE.Mesh(blade, steel));
+        const nose = (KNIFE_HOLDER / 2) * 0.45;
+        const cyl = (r0: number, r1: number, h: number, z: number, m: Three.Material) => {
+            const c = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, h, 32), m);
+            c.rotation.x = Math.PI / 2;
+            c.position.z = z + h / 2;
+            return c;
+        };
+        this.cutter!.add(
+            cyl(nose, nose, 3, KNIFE_BLADE, body),
+            cyl(nose, KNIFE_HOLDER / 2, 2, KNIFE_BLADE + 3, body),
+            cyl(KNIFE_HOLDER / 2, KNIFE_HOLDER / 2, 30, KNIFE_BLADE + 5, body),
+        );
+        this.glow?.scale.set(0.6, 0.6, 1);
+    }
+
+    /** The lines the knife's blade cuts (its tip, trailing the path): red, just above the top. */
+    private buildKnifeCuts(world: Three.Group, program: MillProgram, top: number) {
+        const THREE = this.three!;
+        const pos: number[] = [];
+        for (const m of program.moves) {
+            if (!isKnife(m.tool)) continue;
+            const trace = bladeTrace(m.moves, knifeOf(m.tool).offset, 0.02);
+            for (let i = 1; i < trace.length; i++)
+                if (trace[i].cutting && trace[i - 1].z <= 0)
+                    pos.push(trace[i - 1].x, trace[i - 1].y, top + 0.08, trace[i].x, trace[i].y, top + 0.08);
+        }
+        if (pos.length === 0) return;
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+        const lines = new THREE.LineSegments(
+            geometry,
+            new THREE.LineBasicMaterial({ color: 0xff4d4f, transparent: true, opacity: 0.9 }),
+        );
+        lines.renderOrder = 3;
+        world.add(lines);
     }
 
     private readonly textures = new Map<string, Three.CanvasTexture>();
@@ -793,6 +858,10 @@ export class CamView {
         const tip = s.tip;
         this.buildCutter(s.tool.tool);
         this.cutter.position.set(tip.x, tip.y, tip.z);
+        // a knife's blade turned to trail towards its tip (the blade drawn with its tip at −x)
+        const blade = s.blade;
+        if (blade && this.spinner && Math.hypot(blade.x - tip.x, blade.y - tip.y) > 1e-6)
+            this.spinner.rotation.z = Math.atan2(tip.y - blade.y, tip.x - blade.x);
         this.dirty = true;
     }
 
@@ -813,7 +882,7 @@ export class CamView {
             cutting = !this.sim.done && this.sim.current?.type !== "rapid" && tip.z < this.stock().top;
             if (this.sim.done) this.playing = false;
         }
-        if (this.spinner && this.playing && !this.reduced) {
+        if (this.spinner && this.playing && !this.reduced && !isKnife(this.cutterTool)) {
             this.spinner.rotation.z -= dt * 40;
             this.dirty = true;
         }
@@ -825,8 +894,9 @@ export class CamView {
             m.opacity = target;
             this.glow.position.set(tip.x, tip.y, Math.max(tip.z, this.sim.heightAt(tip.x, tip.y)) + 0.05);
         }
-        if (this.chips && this.chipLife.length > 0 && (cutting || this.chipLife.some((l) => l > 0))) {
-            this.stepChips(dt, cutting);
+        const chipping = cutting && !isKnife(this.cutterTool);
+        if (this.chips && this.chipLife.length > 0 && (chipping || this.chipLife.some((l) => l > 0))) {
+            this.stepChips(dt, chipping);
             this.dirty = true;
         }
         // ease the camera toward its goal

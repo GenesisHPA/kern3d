@@ -1,14 +1,15 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { CamTool } from "./camTools";
+import { type CamTool, isKnife, knifeOf } from "./camTools";
 import type { MillMove } from "./toolpath";
 
 /**
  * Material removal on a height map: the stock's top as a grid of heights (Z, mm), every cutting
  * move lowering the cells the tool's shape reaches — flat end, ball and V-bit profiles. Moves are
  * applied a bit at a time so the preview can animate the cut (`advance`), the tool's place and
- * the moves done so far known at every step.
+ * the moves done so far known at every step. A drag knife is followed by its blade's tip, which
+ * trails the holder (see `dragKnife.ts`) and cuts a line as thin as a cell.
  */
 export interface Stock {
     minX: number;
@@ -31,6 +32,8 @@ export class MillSimulation {
     private pos: { x: number; y: number; z: number };
     /** Cells changed since the last `takeDirty` (for the 3D view to update only that). */
     private dirty = { minC: Infinity, minR: Infinity, maxC: -Infinity, maxR: -Infinity };
+    /** A drag knife's blade tip (X Y), trailing the holder; undefined until it first moves. */
+    private bladeTip: { x: number; y: number } | undefined;
 
     constructor(
         readonly stock: Stock,
@@ -84,7 +87,9 @@ export class MillSimulation {
             const step = Math.min(left, remaining);
             const from = this.along / (length || 1);
             const to = (this.along + step) / (length || 1);
-            if (move.type !== "rapid") this.sweep(this.pos, { x: dx, y: dy, z: dz }, from, to, tool);
+            if (isKnife(tool))
+                this.drag(this.pos, { x: dx, y: dy, z: dz }, from, to, tool, move.type !== "rapid");
+            else if (move.type !== "rapid") this.sweep(this.pos, { x: dx, y: dy, z: dz }, from, to, tool);
             this.along += step;
             left -= step;
             if (this.along >= length - 1e-9) {
@@ -113,6 +118,11 @@ export class MillSimulation {
         return this.tipCache ?? this.pos;
     }
 
+    /** Where a drag knife's blade tip is (undefined for a cutter or before it moved). */
+    get blade(): { x: number; y: number } | undefined {
+        return isKnife(this.tool.tool) ? this.bladeTip : undefined;
+    }
+
     /** The move being made now (its type tells rapid / feed / plunge), or undefined at the end. */
     get current(): MillMove | undefined {
         return this.moves[this.moveIndex]?.move;
@@ -124,6 +134,7 @@ export class MillSimulation {
         this.moveIndex = 0;
         this.along = 0;
         this.tipCache = undefined;
+        this.bladeTip = undefined;
         const first = this.moves[0]?.move;
         this.pos = first
             ? { x: first.x, y: first.y, z: Math.max(first.z, this.stock.top + 5) }
@@ -180,6 +191,62 @@ export class MillSimulation {
             const t = from + ((to - from) * i) / samples;
             this.stamp(start.x + d.x * t, start.y + d.y * t, start.z + d.z * t, tool);
         }
+    }
+
+    /**
+     * A drag knife over part [from, to] of a segment: the holder's axis moves, the blade's tip is
+     * dragged after it at the offset (lifted: carried along), and cuts where it is below the top.
+     */
+    private drag(
+        start: { x: number; y: number; z: number },
+        d: { x: number; y: number; z: number },
+        from: number,
+        to: number,
+        tool: CamTool,
+        dragged: boolean,
+    ) {
+        const offset = knifeOf(tool).offset;
+        const flat = Math.hypot(d.x, d.y);
+        const samples = Math.max(1, Math.ceil((flat * (to - from)) / Math.min(0.05, this.cell * 0.25)));
+        let prev = { x: start.x + d.x * from, y: start.y + d.y * from };
+        if (this.bladeTip === undefined && flat > 1e-9)
+            this.bladeTip = { x: prev.x - (offset * d.x) / flat, y: prev.y - (offset * d.y) / flat };
+        for (let i = 1; i <= samples; i++) {
+            const t = from + ((to - from) * i) / samples;
+            const ax = start.x + d.x * t;
+            const ay = start.y + d.y * t;
+            const z = start.z + d.z * t;
+            const b = this.bladeTip;
+            if (b !== undefined) {
+                if (!dragged) this.bladeTip = { x: b.x + ax - prev.x, y: b.y + ay - prev.y };
+                else {
+                    const vx = ax - b.x;
+                    const vy = ay - b.y;
+                    const dist = Math.hypot(vx, vy);
+                    if (dist > offset)
+                        this.bladeTip = { x: ax - (offset * vx) / dist, y: ay - (offset * vy) / dist };
+                }
+                if (dragged) this.slit(this.bladeTip!.x, this.bladeTip!.y, z);
+            }
+            prev = { x: ax, y: ay };
+        }
+    }
+
+    /** The blade's cut at (x, y), `z` deep: the one cell under it. */
+    private slit(x: number, y: number, z: number) {
+        if (z >= this.stock.top) return;
+        const col = Math.round((x - this.stock.minX) / this.cell);
+        const row = Math.round((y - this.stock.minY) / this.cell);
+        if (col < 0 || row < 0 || col >= this.cols || row >= this.rows) return;
+        const k = row * this.cols + col;
+        const floor = Math.max(this.stock.bottom, z);
+        if (floor >= this.z[k]) return;
+        this.z[k] = floor;
+        const dd = this.dirty;
+        if (col < dd.minC) dd.minC = col;
+        if (col > dd.maxC) dd.maxC = col;
+        if (row < dd.minR) dd.minR = row;
+        if (row > dd.maxR) dd.maxR = row;
     }
 
     /** The tool's shape pressed in with its tip at (x, y, z). */

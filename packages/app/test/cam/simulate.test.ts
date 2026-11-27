@@ -81,3 +81,58 @@ describe("mill simulation", () => {
         expect(sim.progress).toBe(0);
     });
 });
+
+describe("drag knife simulation", () => {
+    const knife = defaultTools().find((x) => x.kind === "knife")!;
+    const square = [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+    ];
+    const op = {
+        id: "k",
+        name: "",
+        kind: "profile" as const,
+        toolId: knife.id,
+        depth: 0.3,
+        side: "on" as const,
+        climb: true,
+        ramp: false,
+        allowance: 0,
+        tabs: { count: 0, width: 3, height: 1 },
+        peck: 0,
+        rings: [square],
+        points: [],
+    };
+    const stock = { minX: -5, minY: -5, width: 20, height: 20, top: 0, bottom: -5 };
+
+    test("the blade's tip cuts a thin line on the outline, not the axis's path", () => {
+        const moves = operationMoves(op, knife, { safeZ: 5, clearance: 1 });
+        const sim = new MillSimulation(
+            stock,
+            moves.map((move) => ({ move, tool: knife })),
+            0.1,
+        );
+        sim.finish();
+        // on the outline: cut to the depth, the corners too
+        for (const [x, y] of [
+            [5, 0],
+            [10, 5],
+            [5, 10],
+            [0, 5],
+            [10, 0],
+            [0, 10],
+        ])
+            expect(sim.heightAt(x, y)).toBeCloseTo(-0.3, 5);
+        // a cell to either side untouched: a slit, not a groove
+        expect(sim.heightAt(5, 0.3)).toBe(0);
+        expect(sim.heightAt(5, -0.3)).toBe(0);
+        // the loops the axis makes round the corners leave no mark beyond them
+        expect(sim.heightAt(10.25, -0.2)).toBe(0);
+        expect(sim.removedVolume()).toBeLessThan(40 * 0.1 * 0.3 * 1.5);
+        // the blade ends where it trails the holder: never further than the offset
+        const b = sim.blade!;
+        expect(Math.hypot(b.x - sim.tip.x, b.y - sim.tip.y)).toBeLessThanOrEqual(0.25 + 1e-9);
+    });
+});

@@ -1,7 +1,7 @@
 // Part of the Kern3D project (based on Chili3D), under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { CamTool } from "./camTools";
+import { type CamTool, knifeOf } from "./camTools";
 
 /**
  * A cutter's shape as a half profile turned about its axis: points (r, z) from the tip (z = 0) up
@@ -25,6 +25,7 @@ export interface ToolProfile {
 
 /** A usual shank for a cutter of this size: 1/8", 6 or 8 mm, else the cutting diameter. */
 export function shankDiameter(tool: CamTool): number {
+    if (tool.kind === "knife") return KNIFE_HOLDER;
     if (tool.kind === "vbit" || tool.kind === "chamfer") return Math.max(tool.diameter, 3.175);
     const d = tool.diameter;
     if (d <= 3.175) return 3.175;
@@ -32,6 +33,11 @@ export function shankDiameter(tool: CamTool): number {
     if (d <= 8) return 8;
     return d;
 }
+
+/** A drag knife holder's body, mm (a usual one is about 11–12 mm across). */
+export const KNIFE_HOLDER = 11;
+/** How much of the blade shows below the holder, mm. */
+export const KNIFE_BLADE = 4;
 
 function halfAngle(tool: CamTool, fallback: number): number {
     const a = tool.angle > 0 ? tool.angle : fallback;
@@ -50,6 +56,26 @@ export function toolProfile(tool: CamTool, arcSegments = 10): ToolProfile {
         }
     };
     switch (tool.kind) {
+        case "knife": {
+            // a thin blade (as if turned about the axis, for the outline): no cutting width
+            const w = Math.max(0.15, knifeOf(tool).offset + 0.15);
+            pts.push({ r: w, z: KNIFE_BLADE * 0.35 }, { r: w, z: KNIFE_BLADE });
+            const holder = KNIFE_HOLDER / 2;
+            pts.push({ r: holder * 0.45, z: KNIFE_BLADE }, { r: holder * 0.45, z: KNIFE_BLADE + 3 });
+            pts.push(
+                { r: holder, z: KNIFE_BLADE + 5 },
+                { r: holder, z: KNIFE_BLADE + 40 },
+                { r: 0, z: KNIFE_BLADE + 40 },
+            );
+            return {
+                points: pts,
+                radius: w,
+                tipLength: KNIFE_BLADE * 0.35,
+                fluteEnd: KNIFE_BLADE,
+                shankRadius: holder,
+                length: KNIFE_BLADE + 40,
+            };
+        }
         case "ball":
             arc(0, r, r, -Math.PI / 2, 0);
             tip = r;
@@ -109,6 +135,7 @@ export interface ToolSvgOptions {
  * hatched like a helix, and (optionally) its dimensions. Text is numbers only, so no i18n needed.
  */
 export function toolSvg(tool: CamTool, options: ToolSvgOptions = {}): string {
+    if (tool.kind === "knife") return knifeSvg(tool, options);
     const p = toolProfile(tool, 12);
     const dims = options.dimensions ?? true;
     const W = options.width ?? 160;
@@ -197,4 +224,43 @@ export function toolSvg(tool: CamTool, options: ToolSvgOptions = {}): string {
 /** A small icon of the tool (no dimensions), for lists and badges. */
 export function toolIconSvg(tool: CamTool, size = 18): string {
     return toolSvg(tool, { width: size, height: size, dimensions: false });
+}
+
+/**
+ * A drag knife from the side: the holder's nose, the blade below it with its tip off the axis
+ * (dashed) by the offset, and (optionally) the offset and the blade's angle written by it.
+ */
+function knifeSvg(tool: CamTool, options: ToolSvgOptions): string {
+    const k = knifeOf(tool);
+    const dims = options.dimensions ?? true;
+    const W = options.width ?? 160;
+    const H = options.height ?? 200;
+    const color = options.color ?? "currentColor";
+    const cx = W / 2;
+    const bottom = H - (dims ? 34 : 2);
+    // the offset is drawn larger than true so it can be seen: at least a tenth of the width
+    const s = (bottom - (dims ? 14 : 1)) / (KNIFE_BLADE + 9);
+    const off = Math.max(k.offset * s, W * (dims ? 0.08 : 0.12));
+    const Y = (z: number) => bottom - z * s;
+    const holder = Math.min(W * 0.42, (KNIFE_HOLDER / 2) * s);
+    const nose = holder * 0.45;
+    const id = `kn${tool.id.replace(/[^a-zA-Z0-9]/g, "")}${W}`;
+    const parts = [
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="knife ${fmt(k.offset)}">`,
+        `<defs><linearGradient id="${id}g" x1="0" x2="1"><stop offset="0" stop-color="#495057"/><stop offset="0.45" stop-color="#ced4da"/><stop offset="1" stop-color="#343a40"/></linearGradient></defs>`,
+        // the holder and its nose
+        `<path d="M${fmt(cx - holder)},${fmt(Y(KNIFE_BLADE + 9))} L${fmt(cx + holder)},${fmt(Y(KNIFE_BLADE + 9))} L${fmt(cx + holder)},${fmt(Y(KNIFE_BLADE + 5))} L${fmt(cx + nose)},${fmt(Y(KNIFE_BLADE + 3))} L${fmt(cx + nose)},${fmt(Y(KNIFE_BLADE))} L${fmt(cx - nose)},${fmt(Y(KNIFE_BLADE))} L${fmt(cx - nose)},${fmt(Y(KNIFE_BLADE + 3))} L${fmt(cx - holder)},${fmt(Y(KNIFE_BLADE + 5))} Z" fill="url(#${id}g)" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`,
+        // the blade: its back on the axis, its edge sloping down to the tip, off the axis
+        `<path d="M${fmt(cx - nose * 0.35)},${fmt(Y(KNIFE_BLADE))} L${fmt(cx + nose * 0.35)},${fmt(Y(KNIFE_BLADE))} L${fmt(cx + nose * 0.35)},${fmt(Y(KNIFE_BLADE * 0.45))} L${fmt(cx - off)},${fmt(Y(0))} Z" fill="#f1f3f5" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`,
+    ];
+    if (dims) {
+        const dc = "#4dabf7";
+        parts.push(
+            `<line x1="${fmt(cx)}" y1="${fmt(Y(KNIFE_BLADE + 10))}" x2="${fmt(cx)}" y2="${fmt(bottom + 12)}" stroke="${dc}" stroke-width="1" stroke-dasharray="4 3"/>`,
+            `<line x1="${fmt(cx - off)}" y1="${fmt(bottom + 8)}" x2="${fmt(cx)}" y2="${fmt(bottom + 8)}" stroke="${dc}" stroke-width="1.5"/>`,
+            `<text x="${fmt(cx)}" y="${fmt(bottom + 24)}" font-size="10" text-anchor="middle" fill="${color}">↤ ${fmt(k.offset)}</text>`,
+        );
+    }
+    parts.push("</svg>");
+    return parts.join("");
 }
