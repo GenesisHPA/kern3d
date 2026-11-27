@@ -10,5 +10,10 @@
     opacity: 0.75;
     color: var(--foreground-color);
     min-width: 72px;
-    flex: 0 1 auto;
+    /* a long name wraps instead of running under the field beside it */
+    flex: 0 0 auto;
+    max-width: 50%;
+    padding-right: 6px;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
 }
