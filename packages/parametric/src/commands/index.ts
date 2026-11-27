@@ -30,6 +30,7 @@ import "./reselectCommand";
 import "./revolveCommand";
 import "./ribCommand";
 import "./scanDeviationCommand";
+import "./scanFitRegionCommand";
 import "./scanSectionCommand";
 import "./sewCommand";
 import "./shellCommand";

@@ -179,6 +179,12 @@ export type PlaneDefinition =
           readonly at: XYZLike;
           /** Rotation of the line of contact about the face's axis, in degrees. */
           readonly angle: number;
+      } & PlaneDefinitionBase)
+    | ({
+          /** A plane given by numbers, referencing nothing (fitted to a scan's flat region). */
+          readonly kind: "fixed";
+          readonly origin: XYZLike;
+          readonly normal: XYZLike;
       } & PlaneDefinitionBase);
 
 /**
@@ -236,6 +242,13 @@ export function resolvePlaneDefinition(
                 return curvePointDefinition(definition, document, visited);
             case "tangent":
                 return tangentDefinition(definition, document);
+            case "fixed":
+                return Result.ok(
+                    applyFlip(
+                        canonicalFrame(new XYZ(definition.origin), new XYZ(definition.normal)),
+                        definition.flip,
+                    ),
+                );
             default:
                 return Result.err(
                     `Unknown plane definition: ${String((definition as { kind?: string }).kind)}`,

@@ -56,6 +56,17 @@ export type AxisDefinition = (
           readonly point: PointRef;
           readonly plane: NeutralPlaneRef;
       }
+    | {
+          /**
+           * A line given by numbers, referencing nothing — what «Подогнать по области» fits to a
+           * scan's cylinder or cone (a mesh has no faces to name). `span`: its extent along
+           * `direction` from `point`, the stretch the fitted region covers.
+           */
+          readonly kind: "fixed";
+          readonly point: XYZLike;
+          readonly direction: XYZLike;
+          readonly span?: { readonly min: number; readonly max: number };
+      }
 ) &
     DatumDefinitionBase & {
         /** Reverses the axis direction without moving it. */
@@ -118,6 +129,8 @@ function resolveLine(
             return faceNormalLine(definition, document, visited);
         case "pointPlane":
             return pointPlaneLine(definition, document, visited);
+        case "fixed":
+            return fixedLine(definition);
         default:
             return Result.err(`Unknown axis definition: ${String((definition as { kind?: string }).kind)}`);
     }
@@ -319,6 +332,12 @@ function pointPlaneLine(
 }
 
 /** The world axis plus the drawn segment: the span widened by a margin, or a default length. */
+function fixedLine(definition: Extract<AxisDefinition, { kind: "fixed" }>): Result<AxisLine> {
+    const direction = new XYZ(definition.direction).normalize();
+    if (direction === undefined) return Result.err("Axis direction is degenerate");
+    return Result.ok({ point: new XYZ(definition.point), direction, span: definition.span });
+}
+
 function axisValue(line: AxisLine, flip: boolean): DatumAxisValue {
     const oriented = flip ? reversed(line) : line;
     const span = oriented.span ?? { min: -DEFAULT_AXIS_LENGTH / 2, max: DEFAULT_AXIS_LENGTH / 2 };

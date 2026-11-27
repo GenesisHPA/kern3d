@@ -154,6 +154,9 @@ export class PointCommand extends MultistepCommand {
         if (refs === undefined) return Result.err("Pick the point geometry first");
         const base = { anchors: refs.anchors, anchor: refs.anchor };
         switch (this.kind) {
+            // made by «Подогнать по области» from numbers, never from this command's picks
+            case "fixed":
+                return Result.err("A fixed datum is not built from picks");
             case "vertex":
                 return refs.point === undefined
                     ? Result.err("Pick a vertex")

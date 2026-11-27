@@ -133,6 +133,9 @@ export class AxisCommand extends MultistepCommand {
         if (refs === undefined) return Result.err("Pick the axis geometry first");
         const base = { anchors: refs.anchors, anchor: refs.anchor, flip: this.flip };
         switch (this.kind) {
+            // made by «Подогнать по области» from numbers, never from this command's picks
+            case "fixed":
+                return Result.err("A fixed datum is not built from picks");
             case "faceAxis":
                 return refs.face === undefined
                     ? Result.err("Pick a cylindrical face")

@@ -43,6 +43,8 @@ export type PointDefinition = (
            */
           readonly start?: XYZLike;
       }
+    /** A point given by numbers, referencing nothing (a fitted sphere's centre, say). */
+    | { readonly kind: "fixed"; readonly point: XYZLike }
 ) &
     DatumDefinitionBase;
 
@@ -72,6 +74,8 @@ function resolve(definition: PointDefinition, document: IDocument, visited: Read
             return threePlanesPoint(definition, document, visited);
         case "onEdge":
             return onEdgePoint(definition, document, visited);
+        case "fixed":
+            return Result.ok(new XYZ(definition.point));
         default:
             return Result.err(`Unknown point definition: ${String((definition as { kind?: string }).kind)}`);
     }

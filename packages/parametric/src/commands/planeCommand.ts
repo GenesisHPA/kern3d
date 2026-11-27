@@ -211,6 +211,9 @@ export class PlaneCommand extends MultistepCommand {
         if (refs === undefined) return Result.err("Pick the plane geometry first");
         const anchors = refs.anchors;
         switch (this.kind) {
+            // made by «Подогнать по области» from numbers, never from this command's picks
+            case "fixed":
+                return Result.err("A fixed datum is not built from picks");
             case "offset": {
                 if (refs.source === undefined) return Result.err("Pick a plane");
                 const rawDistance = this.distance;

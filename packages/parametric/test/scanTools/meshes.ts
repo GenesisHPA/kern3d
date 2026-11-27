@@ -73,6 +73,50 @@ export function plateWithHole(w: number, h: number, r: number, n = 64, rings = 4
     return soup;
 }
 
+/**
+ * A profile (ρ, z) revolved `n` times about z, from the axis back to the axis; counter-clockwise
+ * in (ρ, z) (ρ right, z up) gives outward normals. Each profile segment cut in `steps`.
+ */
+export function revolved(profile: readonly (readonly [number, number])[], n: number, steps = 1): number[] {
+    const fine: [number, number][] = [];
+    for (let j = 0; j + 1 < profile.length; j++) {
+        for (let s = 0; s < steps; s++) {
+            const f = s / steps;
+            const [p, q] = [profile[j], profile[j + 1]];
+            fine.push([p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f]);
+        }
+    }
+    fine.push([profile[profile.length - 1][0], profile[profile.length - 1][1]]);
+    const soup: number[] = [];
+    const at = (p: readonly [number, number], i: number) => {
+        const a = (2 * Math.PI * i) / n;
+        return [p[0] * Math.cos(a), p[0] * Math.sin(a), p[1]];
+    };
+    for (let j = 0; j + 1 < fine.length; j++) {
+        for (let i = 0; i < n; i++) {
+            const [a, b, c, d] = [
+                at(fine[j], i),
+                at(fine[j], i + 1),
+                at(fine[j + 1], i + 1),
+                at(fine[j + 1], i),
+            ];
+            // a quad touching the axis has a corner twice: welding drops the collapsed half
+            soup.push(...a, ...c, ...d, ...a, ...b, ...c);
+        }
+    }
+    return soup;
+}
+
+/** A sphere of radius `r` about the origin as a revolved semicircle (`rings` from pole to pole). */
+export function sphere(r: number, n = 48, rings = 24): number[] {
+    const profile: [number, number][] = [];
+    for (let k = 0; k <= rings; k++) {
+        const a = -Math.PI / 2 + (Math.PI * k) / rings;
+        profile.push([Math.abs(r * Math.cos(a)) < 1e-12 ? 0 : r * Math.cos(a), r * Math.sin(a)]);
+    }
+    return revolved(profile, n);
+}
+
 /** The mesh's vertices moved along their normals by N(0, σ) — a scanner's noise. */
 export function withNoise(mesh: TriMesh, sigma: number, seed = 1): TriMesh {
     const random = seeded(seed);

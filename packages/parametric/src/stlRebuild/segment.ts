@@ -351,7 +351,7 @@ export function cylinderAlong(axis: Vec3, points: readonly Vec3[]): Primitive | 
  * The point of the axis along `a` the normal lines (through `points`, along `normals`) meet
  * best — every normal of a surface of revolution meets its axis.
  */
-function axisPoint(a: Vec3, points: readonly Vec3[], normals: readonly Vec3[]): Vec3 | undefined {
+export function axisPoint(a: Vec3, points: readonly Vec3[], normals: readonly Vec3[]): Vec3 | undefined {
     const [e1, e2] = basis(a);
     let m11 = 0;
     let m12 = 0;
@@ -381,7 +381,12 @@ function axisPoint(a: Vec3, points: readonly Vec3[], normals: readonly Vec3[]): 
  * A surface of revolution about the axis through `c` along `a` fitted to the points: their
  * (height, radius) a line (cylinder, cone) or a circle (sphere, torus), whichever fits closer.
  */
-function revolutionAbout(a: Vec3, c: Vec3, points: readonly Vec3[], tol: number): Primitive | undefined {
+export function revolutionAbout(
+    a: Vec3,
+    c: Vec3,
+    points: readonly Vec3[],
+    tol: number,
+): Primitive | undefined {
     const hr = points.map((p) => {
         const d = sub(p, c);
         const h = dot(d, a);
