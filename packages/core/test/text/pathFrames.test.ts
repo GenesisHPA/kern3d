@@ -157,7 +157,7 @@ describe("pathFrames", () => {
         const frames = pathFrames(lineEdge(), XYZ.unitZ);
 
         expect(frames.isOk).toBe(false);
-        expect(frames.error).toContain("straight");
+        expect(frames.error).toContain("error.text.pathStraightSoFixesNoPlane");
     });
 
     test("the frame's axes are all perpendicular", () => {

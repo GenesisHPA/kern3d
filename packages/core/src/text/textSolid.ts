@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Logger, Result } from "../foundation";
+import { I18n } from "../i18n";
 import type { Plane, XYZ } from "../math";
 import type { IEdge, IFace, IShape, IWire } from "../shape";
 import type { FontOutline } from "./fontOutline";
@@ -101,7 +102,7 @@ export interface TextShape {
  */
 export function textShape(font: FontOutline, options: TextShapeOptions): Result<TextShape> {
     const layout = layoutLine(font, options.text, options.size);
-    if (layout.glyphs.length === 0) return Result.err("There is no text to place");
+    if (layout.glyphs.length === 0) return Result.err(I18n.translate("error.text.thereNoTextPlace"));
 
     if (layout.missing.length > 0) {
         const characters = layout.missing.map((codePoint) => String.fromCodePoint(codePoint)).join("");
@@ -123,7 +124,7 @@ export function textShape(font: FontOutline, options: TextShapeOptions): Result<
         );
     });
 
-    if (pieces.length === 0) return Result.err("The text has no shape to extrude");
+    if (pieces.length === 0) return Result.err(I18n.translate("error.text.textHasNoShapeExtrude"));
 
     const combined = shapeFactory.combine(pieces.flat());
     return combined.isOk

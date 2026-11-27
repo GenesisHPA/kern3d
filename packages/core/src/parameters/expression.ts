@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "../foundation/result";
+import { I18n } from "../i18n";
 import {
     ANGLE_UNITS,
     combineUnitSpecs,
@@ -106,8 +107,10 @@ export function evaluateExpression(source: string, scope: Scope): Result<Evaluat
     const value = parser.parseExpression();
     if (!value.isOk) return value;
     parser.skipSpaces();
-    if (!parser.atEnd()) return Result.err(`Unexpected character: ${parser.current()}`);
-    if (!Number.isFinite(value.value.value)) return Result.err("Expression result is not a finite number");
+    if (!parser.atEnd())
+        return Result.err(I18n.translate("error.expression.unexpectedCharacter{0}", parser.current()));
+    if (!Number.isFinite(value.value.value))
+        return Result.err(I18n.translate("error.expression.expressionResultNotFiniteNumber"));
     return value;
 }
 
@@ -123,7 +126,11 @@ export function resolveUnitSpec(value: ParameterValue, scope: Scope, expected: U
     const actual = evaluated.value.unit;
     if (!unitSpecEquals(actual, UNITLESS) && !unitSpecEquals(actual, expected)) {
         return Result.err(
-            `Dimension mismatch: expected ${unitSpecLabel(expected)}, got ${unitSpecLabel(actual)}`,
+            I18n.translate(
+                "error.expression.dimensionMismatchExpectedGot{0}{1}",
+                unitSpecLabel(expected),
+                unitSpecLabel(actual),
+            ),
         );
     }
     return Result.ok(evaluated.value.value);
@@ -151,7 +158,8 @@ function multiplicativeValue(
     left: EvaluatedValue,
     right: EvaluatedValue,
 ): Result<EvaluatedValue> {
-    if ((op === "/" || op === "%") && right.value === 0) return Result.err("Division by zero");
+    if ((op === "/" || op === "%") && right.value === 0)
+        return Result.err(I18n.translate("error.expression.divisionByZero"));
     if (op === "%") {
         const unit = additiveUnitSpec(left.unit, right.unit);
         if (!unit.isOk) return Result.err(unit.error);
@@ -166,7 +174,11 @@ function additiveUnitSpec(left: UnitSpec, right: UnitSpec): Result<UnitSpec> {
     const merged = mergeUnitSpecs(left, right);
     if (merged !== undefined) return Result.ok(merged);
     return Result.err(
-        `Dimension mismatch: cannot combine ${unitSpecLabel(left)} with ${unitSpecLabel(right)}`,
+        I18n.translate(
+            "error.expression.dimensionMismatchCannotCombineWith{0}{1}",
+            unitSpecLabel(left),
+            unitSpecLabel(right),
+        ),
     );
 }
 
@@ -244,11 +256,11 @@ class Parser {
     private parsePrimary(): Result<EvaluatedValue> {
         this.skipSpaces();
         const ch = this.source[this.pos];
-        if (ch === undefined) return Result.err("Unexpected end of expression");
+        if (ch === undefined) return Result.err(I18n.translate("error.expression.unexpectedEndExpression"));
         if (ch === "(") return this.parseParenthesized();
         if (/\d|\./.test(ch)) return this.parseNumber();
         if (/[A-Za-z_]/.test(ch)) return this.parseIdentifier();
-        return Result.err(`Unexpected character: ${ch}`);
+        return Result.err(I18n.translate("error.expression.unexpectedCharacter{0}", ch));
     }
 
     private parseParenthesized(): Result<EvaluatedValue> {
@@ -256,21 +268,28 @@ class Parser {
         const value = this.parseExpression();
         if (!value.isOk) return value;
         this.skipSpaces();
-        if (this.source[this.pos] !== ")") return Result.err("Missing closing parenthesis");
+        if (this.source[this.pos] !== ")")
+            return Result.err(I18n.translate("error.expression.missingClosingParenthesis"));
         this.pos++;
         return value;
     }
 
     private parseNumber(): Result<EvaluatedValue> {
         const match = /^\d*\.?\d+([eE][+-]?\d+)?/.exec(this.source.slice(this.pos));
-        if (match === null) return Result.err(`Unexpected character: ${this.source[this.pos]}`);
+        if (match === null)
+            return Result.err(
+                I18n.translate("error.expression.unexpectedCharacter{0}", this.source[this.pos]),
+            );
         this.pos += match[0].length;
         return Result.ok({ value: Number(match[0]), unit: UNITLESS });
     }
 
     private parseIdentifier(): Result<EvaluatedValue> {
         const match = /^[A-Za-z_]\w*/.exec(this.source.slice(this.pos));
-        if (match === null) return Result.err(`Unexpected character: ${this.source[this.pos]}`);
+        if (match === null)
+            return Result.err(
+                I18n.translate("error.expression.unexpectedCharacter{0}", this.source[this.pos]),
+            );
         const name = match[0];
         this.pos += name.length;
         this.skipSpaces();
@@ -278,7 +297,7 @@ class Parser {
         const scoped = this.scope.get(name);
         if (scoped !== undefined) return Result.ok(scoped);
         if (Object.hasOwn(CONSTANTS, name)) return Result.ok({ value: CONSTANTS[name], unit: UNITLESS });
-        return Result.err(`Unknown identifier: ${name}`);
+        return Result.err(I18n.translate("error.expression.unknownIdentifier{0}", name));
     }
 
     private parseFunction(name: string): Result<EvaluatedValue> {
@@ -296,11 +315,12 @@ class Parser {
                 this.skipSpaces();
             }
         }
-        if (this.source[this.pos] !== ")") return Result.err("Missing closing parenthesis");
+        if (this.source[this.pos] !== ")")
+            return Result.err(I18n.translate("error.expression.missingClosingParenthesis"));
         this.pos++;
         // `FUNCTIONS[name]` alone would find `Object.prototype.toString` and call it.
         const fn = Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name] : undefined;
-        if (fn === undefined) return Result.err(`Unknown function: ${name}`);
+        if (fn === undefined) return Result.err(I18n.translate("error.expression.unknownFunction{0}", name));
         const unit = functionUnitSpec(name, args);
         if (!unit.isOk) return Result.err(unit.error);
         return Result.ok({ value: fn(...args.map((x) => x.value)), unit: unit.value });
@@ -311,26 +331,42 @@ class Parser {
 function functionUnitSpec(name: string, args: readonly EvaluatedValue[]): Result<UnitSpec> {
     const arity = FUNCTION_ARITY[name];
     if (arity !== undefined && (args.length < arity[0] || args.length > arity[1])) {
-        return Result.err(`${name}() expects ${describeArity(arity)}, got ${args.length}`);
+        return Result.err(
+            I18n.translate("error.expression.expectsGot{0}{1}{2}", name, describeArity(arity), args.length),
+        );
     }
     if (ROOT_FUNCTIONS.has(name)) {
         const root = unitSpecRoot(args[0].unit);
         if (root === undefined) {
-            return Result.err(`${name}() expects even unit exponents, got ${unitSpecLabel(args[0].unit)}`);
+            return Result.err(
+                I18n.translate(
+                    "error.expression.expectsEvenUnitExponentsGot{0}{1}",
+                    name,
+                    unitSpecLabel(args[0].unit),
+                ),
+            );
         }
         return Result.ok(root);
     }
     if (TRIG_FUNCTIONS.has(name)) {
         const argument = args[0].unit;
         if (!unitSpecEquals(argument, ANGLE_UNITS) && !unitSpecEquals(argument, UNITLESS)) {
-            return Result.err(`${name}() expects an angle, got ${unitSpecLabel(argument)}`);
+            return Result.err(
+                I18n.translate("error.expression.expectsAngleGot{0}{1}", name, unitSpecLabel(argument)),
+            );
         }
         return Result.ok(UNITLESS);
     }
     if (INVERSE_TRIG_FUNCTIONS.has(name)) {
         const argument = args[0].unit;
         if (!unitSpecEquals(argument, UNITLESS)) {
-            return Result.err(`${name}() expects a unitless ratio, got ${unitSpecLabel(argument)}`);
+            return Result.err(
+                I18n.translate(
+                    "error.expression.expectsUnitlessRatioGot{0}{1}",
+                    name,
+                    unitSpecLabel(argument),
+                ),
+            );
         }
         return Result.ok(ANGLE_UNITS);
     }
@@ -340,7 +376,11 @@ function functionUnitSpec(name: string, args: readonly EvaluatedValue[]): Result
         // is not.
         if (mergeUnitSpecs(args[0].unit, args[1].unit) === undefined) {
             return Result.err(
-                `atan2() mixes ${unitSpecLabel(args[0].unit)} with ${unitSpecLabel(args[1].unit)}`,
+                I18n.translate(
+                    "error.expression.atan2MixesWith{0}{1}",
+                    unitSpecLabel(args[0].unit),
+                    unitSpecLabel(args[1].unit),
+                ),
             );
         }
         return Result.ok(ANGLE_UNITS);
@@ -351,7 +391,14 @@ function functionUnitSpec(name: string, args: readonly EvaluatedValue[]): Result
         for (const arg of args) {
             const next = mergeUnitSpecs(merged, arg.unit);
             if (next === undefined) {
-                return Result.err(`${name}() mixes ${unitSpecLabel(merged)} with ${unitSpecLabel(arg.unit)}`);
+                return Result.err(
+                    I18n.translate(
+                        "error.expression.mixesWith{0}{1}{2}",
+                        name,
+                        unitSpecLabel(merged),
+                        unitSpecLabel(arg.unit),
+                    ),
+                );
             }
             merged = next;
         }
@@ -363,7 +410,15 @@ function functionUnitSpec(name: string, args: readonly EvaluatedValue[]): Result
 
 /** A count range as the error message says it: `1 argument`, `at least 1 argument`, `2 arguments`. */
 function describeArity([min, max]: readonly [number, number]): string {
-    if (min === max) return `${min} argument${min === 1 ? "" : "s"}`;
-    if (max === Number.POSITIVE_INFINITY) return `at least ${min} argument${min === 1 ? "" : "s"}`;
-    return `${min} to ${max} arguments`;
+    if (min === max) {
+        return min === 1
+            ? I18n.translate("error.expression.arityOne{0}", min)
+            : I18n.translate("error.expression.arityMany{0}", min);
+    }
+    if (max === Number.POSITIVE_INFINITY) {
+        return min === 1
+            ? I18n.translate("error.expression.arityAtLeastOne{0}", min)
+            : I18n.translate("error.expression.arityAtLeastMany{0}", min);
+    }
+    return I18n.translate("error.expression.arityRange{0}{1}", min, max);
 }

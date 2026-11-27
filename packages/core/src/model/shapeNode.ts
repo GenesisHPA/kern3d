@@ -37,7 +37,7 @@ export abstract class ShapeNode extends GeometryNode {
             return this._shape.error;
         }
 
-        return ShapeTypeUtils.stringValue(this._shape.value.shapeType);
+        return ShapeTypeUtils.displayName(this._shape.value.shapeType);
     }
 
     /**

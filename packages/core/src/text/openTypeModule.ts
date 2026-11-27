@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "../foundation";
+import { I18n } from "../i18n";
 
 /**
  * The subset of opentype.js this feature uses, written out here because the
@@ -74,9 +75,9 @@ async function load(): Promise<Result<OpenTypeModule>> {
         const module = (await import(/* webpackIgnore: true */ OPEN_TYPE_URL)) as OpenTypeModule;
         return typeof module.parse === "function"
             ? Result.ok(module)
-            : Result.err(`opentype.js at ${OPEN_TYPE_URL} has no parse() function`);
+            : Result.err(I18n.translate("error.text.opentypeJsAtHasNoParse{0}", OPEN_TYPE_URL));
     } catch (error) {
         loading = undefined;
-        return Result.err(`Failed to load opentype.js: ${error}`);
+        return Result.err(I18n.translate("error.text.failedLoadOpentypeJs{0}", error));
     }
 }

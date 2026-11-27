@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Logger, Result } from "../foundation";
+import { I18n } from "../i18n";
 import type { XYZ } from "../math";
 import type { IEdge, IFace, IWire } from "../shape";
 import { type ContourGroup, flattenContour, groupContours } from "./contourRegions";
@@ -90,7 +91,7 @@ function wireOf(contour: Contour2D, toWorld: ToWorld) {
 
 /** Edges chaining the contour's points, a straight one per line and a curve per curve. */
 export function contourEdges(contour: Contour2D, toWorld: ToWorld): Result<IEdge[]> {
-    if (contour.segments.length === 0) return Result.err("the contour has no segments");
+    if (contour.segments.length === 0) return Result.err(I18n.translate("error.text.contourHasNoSegments"));
 
     const edges: IEdge[] = [];
     // Each point is mapped once and shared with the segment before it: `wire`

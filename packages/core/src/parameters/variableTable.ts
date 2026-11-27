@@ -4,6 +4,7 @@
 import type { IDocument } from "../document";
 import { Logger } from "../foundation/logger";
 import { HistoryObservable, type IPropertyChanged } from "../foundation/observer";
+import { I18n } from "../i18n";
 import { type EvaluatedValue, isConstantName, resolveUnitSpec, type Scope } from "./expression";
 import { isVariableType, unitSpecOfType, type VariableType } from "./unitSpec";
 
@@ -57,12 +58,15 @@ function evaluateVariable(
     // The fields are typed by the interface but arrive from JSON — a hand-edited or
     // truncated table entry must report on its own row, not throw on `name.length`.
     if (typeof item.name !== "string" || !NAME_PATTERN.test(item.name)) {
-        return `Invalid variable name: ${String(item.name)}`;
+        return I18n.translate("error.expression.invalidVariableName{0}", String(item.name));
     }
-    if (isConstantName(item.name)) return `Variable name shadows a constant: ${item.name}`;
-    if (defined.has(item.name)) return `Duplicate variable name: ${item.name}`;
-    if (!isVariableType(item.type)) return `Unknown variable type: ${String(item.type)}`;
-    if (typeof item.expression !== "string") return `Missing expression: ${item.name}`;
+    if (isConstantName(item.name))
+        return I18n.translate("error.expression.variableNameShadowsConstant{0}", item.name);
+    if (defined.has(item.name)) return I18n.translate("error.expression.duplicateVariableName{0}", item.name);
+    if (!isVariableType(item.type))
+        return I18n.translate("error.expression.unknownVariableType{0}", String(item.type));
+    if (typeof item.expression !== "string")
+        return I18n.translate("error.expression.missingExpression{0}", item.name);
 
     // The declared unit, not the expression's — `w = 5` is a length because the
     // user said so, which is what makes `sin(a)` work when `a` is declared an angle.

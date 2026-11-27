@@ -128,7 +128,7 @@ async function chosen(installed: readonly LocalFontEntry[], value: string): Prom
 
     const font = FontCatalog.find((candidate) => candidate.url === value);
     return font === undefined
-        ? Result.err(`Unknown font: ${value}`)
+        ? Result.err(I18n.translate("error.text.unknownFont{0}", value))
         : Result.ok({ name: font.family, url: font.url });
 }
 
@@ -145,7 +145,7 @@ async function readInstalled(entry: LocalFontEntry): Promise<Result<PickedFont>>
         const bytes = await entry.read();
         return Result.ok({ name: `${entry.family} ${entry.style}`, data: dataUrlOf(bytes) });
     } catch (error) {
-        return Result.err(`Could not read ${entry.family}: ${error}`);
+        return Result.err(I18n.translate("error.text.couldNotRead{0}{1}", entry.family, error));
     }
 }
 

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "../foundation";
+import { I18n } from "../i18n";
 import { connectedFaceGroups } from "./faceGroups";
 import type { IFace, IShape } from "./shape";
 
@@ -19,8 +20,8 @@ import type { IFace, IShape } from "./shape";
  * shape should group in that node's local space and transform the result for display.
  */
 export function thickenFaces(faces: readonly IFace[], plan: readonly number[]): Result<IShape> {
-    if (faces.length === 0) return Result.err("No faces to thicken");
-    if (plan.length === 0) return Result.err("No thickness to apply");
+    if (faces.length === 0) return Result.err(I18n.translate("error.core.noFacesThicken"));
+    if (plan.length === 0) return Result.err(I18n.translate("error.core.noThicknessApply"));
 
     const shapes: IShape[] = [];
     const discard = () => shapes.forEach((x) => x.dispose());

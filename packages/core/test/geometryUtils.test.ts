@@ -207,7 +207,7 @@ describe("GeometryUtils", () => {
             const result = GeometryUtils.findNextEdge(wire, edge1);
 
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Cannot find next edge");
+            expect(result.error).toBe("error.core.cannotFindNextEdge");
         });
     });
 

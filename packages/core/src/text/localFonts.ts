@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "../foundation";
+import { I18n } from "../i18n";
 
 /**
  * The Local Font Access API, declared here because TypeScript's DOM library does
@@ -48,7 +49,7 @@ export function hasLocalFontAccess(): boolean {
  */
 export async function listLocalFonts(): Promise<Result<LocalFontEntry[]>> {
     const query = localFontAccess().queryLocalFonts;
-    if (query === undefined) return Result.err("This browser cannot list local fonts");
+    if (query === undefined) return Result.err(I18n.translate("error.text.thisBrowserCannotListLocalFonts"));
 
     try {
         const fonts = await query.call(localFontAccess());
@@ -66,6 +67,6 @@ export async function listLocalFonts(): Promise<Result<LocalFontEntry[]>> {
                 ),
         );
     } catch (error) {
-        return Result.err(`Could not list local fonts: ${error}`);
+        return Result.err(I18n.translate("error.text.couldNotListLocalFonts{0}", error));
     }
 }

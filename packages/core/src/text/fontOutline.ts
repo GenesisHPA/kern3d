@@ -13,6 +13,7 @@
  */
 
 import { Result } from "../foundation";
+import { I18n } from "../i18n";
 import { loadOpenType, type OpenTypeModule } from "./openTypeModule";
 import { familyNameOf, outlineFromOpenType } from "./openTypeOutline";
 import type { PickedFont } from "./pickFont";
@@ -153,7 +154,7 @@ export async function outlineOfPicked(picked: PickedFont): Promise<Result<FontOu
     if (picked.data === undefined) return outlineFor(picked.name, url);
 
     const bytes = decodeDataUrl(picked.data);
-    if (bytes === undefined) return Result.err(`"${picked.name}" is not readable`);
+    if (bytes === undefined) return Result.err(I18n.translate("error.text.notReadable{0}", picked.name));
 
     const outline = await parseFont(bytes, picked.name);
     if (outline.isOk) rememberOutline(picked.name, url, outline.value);
@@ -173,11 +174,11 @@ export async function outlineFor(name: string, url: string): Promise<Result<Font
     if (known !== undefined) return Result.ok(known);
 
     if (url.length === 0) {
-        return Result.err(`The font "${name}" is not at hand — pick it again to change the text`);
+        return Result.err(I18n.translate("error.text.fontNotAtHandPickAgain{0}", name));
     }
 
     const key = keyOf(name, url);
-    if (pending.has(key)) return Result.err(`The font "${name}" is still being read`);
+    if (pending.has(key)) return Result.err(I18n.translate("error.text.fontStillBeingRead{0}", name));
 
     pending.add(key);
     try {
@@ -197,9 +198,9 @@ async function fetchBytes(name: string, url: string): Promise<Result<ArrayBuffer
         const response = await fetch(url);
         return response.ok
             ? Result.ok(await response.arrayBuffer())
-            : Result.err(`Could not fetch "${name}": ${response.status}`);
+            : Result.err(I18n.translate("error.text.couldNotFetch{0}{1}", name, response.status));
     } catch (error) {
-        return Result.err(`Could not fetch "${name}": ${error}`);
+        return Result.err(I18n.translate("error.text.couldNotFetch{0}{1}", name, error));
     }
 }
 
@@ -239,6 +240,6 @@ export async function parseFont(
         const font = openType.value.parse(buffer);
         return Result.ok(outlineFromOpenType(font, familyNameOf(font) ?? name));
     } catch (error) {
-        return Result.err(`Failed to read the font: ${error}`);
+        return Result.err(I18n.translate("error.text.failedReadFont{0}", error));
     }
 }

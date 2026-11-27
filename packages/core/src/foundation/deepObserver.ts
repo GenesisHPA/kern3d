@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { I18n } from "../i18n";
 import { type IPropertyChanged, isPropertyChanged } from "./observer";
 import { Result } from "./result";
 
@@ -27,7 +28,7 @@ export class DeepObserver {
         for (let i = 0; i < parts.length; i++) {
             value = (value as any)[parts[i]];
             if (i < parts.length - 1 && !isPropertyChanged(value)) {
-                return Result.err(`Path ${path} is not valid`);
+                return Result.err(I18n.translate("error.core.pathNotValid{0}", path));
             }
         }
 

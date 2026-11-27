@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Precision, Result } from "../foundation";
+import { I18n } from "../i18n";
 import type { XYZ } from "../math";
 import { type ICurve, type IEdge, type IWire, ShapeTypes } from "../shape";
 
@@ -49,23 +50,24 @@ interface Sample {
  */
 export function pathFrames(path: IEdge | IWire, facing: XYZ): Result<PathFrames> {
     const edge = firstEdge(path);
-    if (edge === undefined) return Result.err("The path has no edge to follow");
+    if (edge === undefined) return Result.err(I18n.translate("error.text.pathHasNoEdgeFollow"));
 
     const curve = edge.curve;
     const length = curve.length();
-    if (length <= Precision.Distance) return Result.err("The path has no length");
+    if (length <= Precision.Distance) return Result.err(I18n.translate("error.text.pathHasNoLength"));
 
     const points = curve.uniformAbscissaByCount(SAMPLES);
-    if (points.length < 3) return Result.err("The path is too short to place text along");
+    if (points.length < 3) return Result.err(I18n.translate("error.text.pathTooShortPlaceTextAlong"));
 
     const plane = planeNormal(points);
     if (plane === undefined) {
-        return Result.err("The path is straight, so it fixes no plane — place the text on a plane instead");
+        return Result.err(I18n.translate("error.text.pathStraightSoFixesNoPlane"));
     }
     const normal = plane.dot(facing) < 0 ? plane.reverse() : plane;
 
     const samples = buildSamples(curve, points, length);
-    if (samples === undefined) return Result.err("The path could not be measured along its length");
+    if (samples === undefined)
+        return Result.err(I18n.translate("error.text.pathCouldNotMeasuredAlongLength"));
 
     return Result.ok({
         length,

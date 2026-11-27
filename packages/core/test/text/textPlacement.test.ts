@@ -103,6 +103,6 @@ describe("pathPlacement", () => {
         const placement = pathPlacement(frames, layoutOf([0], 10));
 
         expect(placement.isOk).toBe(false);
-        expect(placement.error).toContain("no direction");
+        expect(placement.error).toContain("error.text.pathHasNoDirectionWhereText");
     });
 });

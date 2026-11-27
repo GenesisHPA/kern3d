@@ -58,14 +58,14 @@ describe("evaluateExpression", () => {
     });
 
     test.each([
-        { source: "", error: "Unexpected end of expression" },
-        { source: "1 +", error: "Unexpected end of expression" },
-        { source: "unknown", error: "Unknown identifier: unknown" },
-        { source: "foo(1)", error: "Unknown function: foo" },
-        { source: "(1 + 2", error: "Missing closing parenthesis" },
-        { source: "1 / 0", error: "Division by zero" },
-        { source: "1 2", error: "Unexpected character: 2" },
-        { source: "1 + @", error: "Unexpected character: @" },
+        { source: "", error: "error.expression.unexpectedEndExpression" },
+        { source: "1 +", error: "error.expression.unexpectedEndExpression" },
+        { source: "unknown", error: "error.expression.unknownIdentifierunknown" },
+        { source: "foo(1)", error: "error.expression.unknownFunctionfoo" },
+        { source: "(1 + 2", error: "error.expression.missingClosingParenthesis" },
+        { source: "1 / 0", error: "error.expression.divisionByZero" },
+        { source: "1 2", error: "error.expression.unexpectedCharacter2" },
+        { source: "1 + @", error: "error.expression.unexpectedCharacter@" },
     ])("rejects `$source` with `$error`", ({ source, error }) => {
         expect(expectError(source)).toBe(error);
     });
@@ -73,12 +73,12 @@ describe("evaluateExpression", () => {
     // A missing argument used to reach `args[0].unit` and throw a TypeError straight out of
     // `evaluateExpression`, which returns a `Result` — the caller has no catch for it.
     test.each([
-        { source: "sin()", error: "sin() expects 1 argument, got 0" },
-        { source: "sqrt()", error: "sqrt() expects 1 argument, got 0" },
-        { source: "abs()", error: "abs() expects 1 argument, got 0" },
-        { source: "sin(1, 2)", error: "sin() expects 1 argument, got 2" },
-        { source: "atan2(1)", error: "atan2() expects 2 arguments, got 1" },
-        { source: "min()", error: "min() expects at least 1 argument, got 0" },
+        { source: "sin()", error: "error.expression.expectsGotsinerror.expression.arityOne10" },
+        { source: "sqrt()", error: "error.expression.expectsGotsqrterror.expression.arityOne10" },
+        { source: "abs()", error: "error.expression.expectsGotabserror.expression.arityOne10" },
+        { source: "sin(1, 2)", error: "error.expression.expectsGotsinerror.expression.arityOne12" },
+        { source: "atan2(1)", error: "error.expression.expectsGotatan2error.expression.arityMany21" },
+        { source: "min()", error: "error.expression.expectsGotminerror.expression.arityAtLeastOne10" },
     ])("rejects `$source` for its argument count", ({ source, error }) => {
         expect(expectError(source)).toBe(error);
     });
@@ -95,10 +95,10 @@ describe("names that collide with Object.prototype", () => {
     });
 
     test.each([
-        { source: "valueOf(1)", error: "Unknown function: valueOf" },
-        { source: "toString(1)", error: "Unknown function: toString" },
-        { source: "toString", error: "Unknown identifier: toString" },
-        { source: "constructor", error: "Unknown identifier: constructor" },
+        { source: "valueOf(1)", error: "error.expression.unknownFunctionvalueOf" },
+        { source: "toString(1)", error: "error.expression.unknownFunctiontoString" },
+        { source: "toString", error: "error.expression.unknownIdentifiertoString" },
+        { source: "constructor", error: "error.expression.unknownIdentifierconstructor" },
     ])("`$source` reads as unknown, not as a prototype member", ({ source, error }) => {
         expect(expectError(source)).toBe(error);
     });
@@ -136,15 +136,19 @@ describe("unit propagation", () => {
     });
 
     test("adding incompatible quantities is rejected", () => {
-        expect(expectError("w + a", scope)).toBe("Dimension mismatch: cannot combine length with angle");
-        expect(expectError("a - w", scope)).toBe("Dimension mismatch: cannot combine angle with length");
+        expect(expectError("w + a", scope)).toBe(
+            "error.expression.dimensionMismatchCannotCombineWithlengthangle",
+        );
+        expect(expectError("a - w", scope)).toBe(
+            "error.expression.dimensionMismatchCannotCombineWithanglelength",
+        );
     });
 
     test("trigonometry takes an angle (or a literal) and yields a ratio", () => {
         expect(evaluate("sin(a)", scope).unit).toEqual(UNITLESS);
         expect(evaluate("cos(60)").unit).toEqual(UNITLESS);
         expect(evaluate("tan(a) * w", scope).unit).toEqual(LENGTH_UNITS);
-        expect(expectError("sin(w)", scope)).toBe("sin() expects an angle, got length");
+        expect(expectError("sin(w)", scope)).toBe("error.expression.expectsAngleGotsinlength");
     });
 
     test("inverse trigonometry takes a ratio and yields degrees", () => {
@@ -157,8 +161,8 @@ describe("unit propagation", () => {
     test("inverse trigonometry yields an angle and refuses anything but a ratio", () => {
         expect(evaluate("asin(h / w)", scope).unit).toEqual(ANGLE_UNITS);
         expect(evaluate("atan2(w, h)", scope).unit).toEqual(ANGLE_UNITS);
-        expect(expectError("asin(w)", scope)).toBe("asin() expects a unitless ratio, got length");
-        expect(expectError("atan2(w, a)", scope)).toBe("atan2() mixes length with angle");
+        expect(expectError("asin(w)", scope)).toBe("error.expression.expectsUnitlessRatioGotasinlength");
+        expect(expectError("atan2(w, a)", scope)).toBe("error.expression.atan2MixesWithlengthangle");
     });
 
     test("abs and rounding pass the unit through", () => {
@@ -170,13 +174,13 @@ describe("unit propagation", () => {
     test("min and max need their arguments to agree", () => {
         expect(evaluate("min(w, h)", scope).unit).toEqual(LENGTH_UNITS);
         expect(evaluate("max(w, 10)", scope).unit).toEqual(LENGTH_UNITS);
-        expect(expectError("min(w, a)", scope)).toBe("min() mixes length with angle");
+        expect(expectError("min(w, a)", scope)).toBe("error.expression.mixesWithminlengthangle");
     });
 
     test("sqrt halves even exponents and refuses odd ones", () => {
         expect(evaluate("sqrt(w * h)", scope).unit).toEqual(LENGTH_UNITS);
         // `length^0.5` is not a quantity a parameter could carry — same line Onshape draws.
-        expect(expectError("sqrt(w)", scope)).toBe("sqrt() expects even unit exponents, got length");
+        expect(expectError("sqrt(w)", scope)).toBe("error.expression.expectsEvenUnitExponentsGotsqrtlength");
     });
 });
 
@@ -203,10 +207,12 @@ describe("resolveUnitSpec", () => {
     test("rejects a unit that does not fit the slot", () => {
         const result = resolveUnitSpec("a", scoped, LENGTH_UNITS);
         expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Dimension mismatch: expected length, got angle");
+        expect(result.error).toBe("error.expression.dimensionMismatchExpectedGotlengthangle");
     });
 
     test("reports the expression's own error", () => {
-        expect(resolveUnitSpec("oops", scoped, LENGTH_UNITS).error).toBe("Unknown identifier: oops");
+        expect(resolveUnitSpec("oops", scoped, LENGTH_UNITS).error).toBe(
+            "error.expression.unknownIdentifieroops",
+        );
     });
 });

@@ -95,7 +95,7 @@ describe("outlineOfPicked", () => {
         const outline = await outlineOfPicked({ name: "Mine.ttf", data: "not a data url" });
 
         expect(outline.isOk).toBe(false);
-        expect(outline.error).toContain("not readable");
+        expect(outline.error).toContain("error.text.notReadable");
     });
 
     test("draws in the outline already parsed for a font it has seen", async () => {
@@ -131,7 +131,7 @@ describe("outlineFor", () => {
         const outline = await outlineFor("Mine.ttf", "");
 
         expect(outline.isOk).toBe(false);
-        expect(outline.error).toContain("not at hand");
+        expect(outline.error).toContain("error.text.fontNotAtHandPickAgain");
     });
 
     test("reports an address that would not hand the font over", async () => {
@@ -215,7 +215,7 @@ describe("parseFont", () => {
     });
 
     test("reports the loader's failure", async () => {
-        loadOpenTypeMock.mockResolvedValue(Result.err("Failed to load opentype.js: offline"));
+        loadOpenTypeMock.mockResolvedValue(Result.err("error.text.failedLoadOpentypeJsoffline"));
 
         const result = await parseFont(bytes, "Picked", loadOpenTypeMock);
 
@@ -235,7 +235,7 @@ describe("parseFont", () => {
         const result = await parseFont(bytes, "Picked", loadOpenTypeMock);
 
         expect(result.isOk).toBe(false);
-        expect(result.error).toContain("Failed to read the font");
+        expect(result.error).toContain("error.text.failedReadFont");
         expect(result.error).toContain("Unsupported OpenType signature");
     });
 });

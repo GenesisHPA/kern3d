@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Precision, Result } from "../foundation";
+import { I18n } from "../i18n";
 import { Plane, XYZ } from "../math";
 import { CurveUtils, type ICurve } from "./curve";
 import type { IEdge, IFace, IWire } from "./shape";
@@ -102,7 +103,7 @@ export class GeometryUtils {
                 return Result.ok(e as IEdge);
             }
         }
-        return Result.err("Cannot find next edge");
+        return Result.err(I18n.translate("error.core.cannotFindNextEdge"));
     }
 
     /**

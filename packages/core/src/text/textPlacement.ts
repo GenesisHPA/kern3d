@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Logger, Result } from "../foundation";
+import { I18n } from "../i18n";
 import type { Plane, XYZ } from "../math";
 import type { TextLayout } from "./layout";
 import type { ToWorld } from "./outlineToShape";
@@ -59,7 +60,7 @@ export function pathPlacement(frames: PathFrames, layout: TextLayout): Result<Te
 
     for (const glyph of layout.glyphs) {
         const frame = frames.at(start + glyph.offset);
-        if (frame === undefined) return Result.err("The path has no direction where the text would sit");
+        if (frame === undefined) return Result.err(I18n.translate("error.text.pathHasNoDirectionWhereText"));
 
         glyphs.push((point) =>
             frame.point

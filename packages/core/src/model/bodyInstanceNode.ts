@@ -148,7 +148,9 @@ export class BodyInstanceNode extends ShapeNode {
         // A disposed `ShapeNode` can hold `null` rather than a `Result`; never leak that
         // through this getter — callers read `.isOk` unconditionally.
         const shape = this.source?.shape;
-        return shape instanceof Result ? shape : Result.err("Instance source not found");
+        return shape instanceof Result
+            ? shape
+            : Result.err(I18n.translate("error.core.instanceSourceNotFound"));
     }
 
     /** The source owns its shape; an instance never replaces it. */

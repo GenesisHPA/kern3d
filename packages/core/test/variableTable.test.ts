@@ -50,7 +50,7 @@ describe("evaluateVariables", () => {
     test("reports a forward reference instead of resolving it", () => {
         const { document } = tableWith(variable("v1", "h", "w / 2"), variable("v2", "w", "50"));
         const { scope, errors } = document.variables.evaluate();
-        expect(errors.get("v1")).toBe("Unknown identifier: w");
+        expect(errors.get("v1")).toBe("error.expression.unknownIdentifierw");
         expect(scope.has("h")).toBe(false);
         // The rest of the table still resolves — one bad row is not fatal.
         expect(scope.get("w")?.value).toBe(50);
@@ -58,18 +58,22 @@ describe("evaluateVariables", () => {
 
     test("rejects a name that is not an identifier", () => {
         const { document } = tableWith(variable("v1", "1bad", "10"));
-        expect(document.variables.evaluate().errors.get("v1")).toBe("Invalid variable name: 1bad");
+        expect(document.variables.evaluate().errors.get("v1")).toBe(
+            "error.expression.invalidVariableName1bad",
+        );
     });
 
     test("rejects shadowing a constant", () => {
         const { document } = tableWith(variable("v1", "pi", "3.2"));
-        expect(document.variables.evaluate().errors.get("v1")).toBe("Variable name shadows a constant: pi");
+        expect(document.variables.evaluate().errors.get("v1")).toBe(
+            "error.expression.variableNameShadowsConstantpi",
+        );
     });
 
     test("rejects a duplicate name", () => {
         const { document } = tableWith(variable("v1", "w", "1"), variable("v2", "w", "2"));
         const { scope, errors } = document.variables.evaluate();
-        expect(errors.get("v2")).toBe("Duplicate variable name: w");
+        expect(errors.get("v2")).toBe("error.expression.duplicateVariableNamew");
         expect(scope.get("w")?.value).toBe(1);
     });
 
@@ -79,7 +83,7 @@ describe("evaluateVariables", () => {
             variable("v2", "bad", "a", { type: "length" }),
         );
         const { errors } = document.variables.evaluate();
-        expect(errors.get("v2")).toBe("Dimension mismatch: expected length, got angle");
+        expect(errors.get("v2")).toBe("error.expression.dimensionMismatchExpectedGotlengthangle");
     });
 
     test("accepts a unitless expression for any declared unit", () => {
@@ -125,13 +129,19 @@ describe("a table that arrives malformed", () => {
     });
 
     test.each<{ row: Record<string, unknown>; error: string }>([
-        { row: { id: "v1", name: "a", type: "length" }, error: "Missing expression: a" },
-        { row: { id: "v2", name: "b", expression: "10" }, error: "Unknown variable type: undefined" },
+        { row: { id: "v1", name: "a", type: "length" }, error: "error.expression.missingExpressiona" },
+        {
+            row: { id: "v2", name: "b", expression: "10" },
+            error: "error.expression.unknownVariableTypeundefined",
+        },
         {
             row: { id: "v3", name: "c", expression: "10", type: "Length" },
-            error: "Unknown variable type: Length",
+            error: "error.expression.unknownVariableTypeLength",
         },
-        { row: { id: "v4", expression: "10", type: "length" }, error: "Invalid variable name: undefined" },
+        {
+            row: { id: "v4", expression: "10", type: "length" },
+            error: "error.expression.invalidVariableNameundefined",
+        },
     ])("reports `$error` on its own row", ({ row, error }) => {
         const evaluated = rawTable(JSON.stringify([good, row])).evaluate();
         expect(evaluated.errors.get(String(row["id"]))).toBe(error);

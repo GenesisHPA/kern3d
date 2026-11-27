@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { I18n } from "../../i18n";
 import { Result } from "../result";
 
 const isIOS =
@@ -21,7 +22,11 @@ export async function readFilesAsync(accept: string, multiple: boolean): Promise
 
         input.onchange = () => {
             cleanup();
-            resolve(input.files ? Result.ok(input.files) : Result.err("no files selected"));
+            resolve(
+                input.files
+                    ? Result.ok(input.files)
+                    : Result.err(I18n.translate("error.core.noFilesSelected")),
+            );
         };
 
         input.oncancel = () => {
@@ -79,7 +84,7 @@ async function readInputedFiles(
     const fileDataPromises = Array.from(files).map(async (file) => {
         const data = await readFileDataAsync(file, method);
         if (!data) {
-            throw new Error(`Error occurred reading file: ${file.name}`);
+            throw new Error(I18n.translate("error.core.errorOccurredReadingFile{0}", file.name));
         }
         return { fileName: file.name, data };
     });

@@ -1,6 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { I18n } from "../i18n";
+
 export const ShapeTypes = {
     shape: 0b0,
     compound: 0b1,
@@ -47,6 +49,35 @@ export class ShapeTypeUtils {
                 return "Vertex";
             default:
                 return "Unknown";
+        }
+    }
+
+    /**
+     * The type as a user reads it — a tree name ("Тело 1"), a property value. `stringValue`
+     * stays the fixed English identifier (the assistant and tests read it).
+     */
+    public static displayName(type: ShapeType): string {
+        switch (type) {
+            case ShapeTypes.shape:
+                return I18n.translate("shapeType.shape");
+            case ShapeTypes.compound:
+                return I18n.translate("shapeType.compound");
+            case ShapeTypes.compoundSolid:
+                return I18n.translate("shapeType.compoundSolid");
+            case ShapeTypes.solid:
+                return I18n.translate("shapeType.solid");
+            case ShapeTypes.shell:
+                return I18n.translate("shapeType.shell");
+            case ShapeTypes.face:
+                return I18n.translate("shapeType.face");
+            case ShapeTypes.wire:
+                return I18n.translate("shapeType.wire");
+            case ShapeTypes.edge:
+                return I18n.translate("shapeType.edge");
+            case ShapeTypes.vertex:
+                return I18n.translate("shapeType.vertex");
+            default:
+                return I18n.translate("shapeType.unknown");
         }
     }
 
