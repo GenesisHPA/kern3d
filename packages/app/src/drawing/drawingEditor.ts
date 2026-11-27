@@ -966,6 +966,13 @@ export class DrawingEditor {
         const target = e.target as HTMLElement;
         const typing =
             target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
+        // a non-modal dialog (`show()`) gets no "cancel" event: Esc is handled here
+        if (e.key === "Escape") {
+            e.preventDefault();
+            if (typing) target.blur();
+            else this.escape();
+            return;
+        }
         if (typing) return;
         if (typeof e.key !== "string") return; // autofill keydowns carry no key
         const key = e.key.toLowerCase();
