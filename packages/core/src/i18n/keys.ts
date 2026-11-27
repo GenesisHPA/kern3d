@@ -2756,6 +2756,7 @@ export const I18N_KEYS = [
     "body.sketchUnresolvedExternalRefs",
     "error.kernel.operation.fillet",
     "error.kernel.operation.chamfer",
+    "act.defaultName",
 ] as const;
 
 export type I18nKeys = (typeof I18N_KEYS)[number];

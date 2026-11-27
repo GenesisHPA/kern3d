@@ -2966,5 +2966,6 @@ export default {
         "body.sketchUnresolvedExternalRefs": "Sketch has unresolved external references",
         "error.kernel.operation.fillet": "fillet",
         "error.kernel.operation.chamfer": "chamfer",
+        "act.defaultName": "Act",
     },
 } satisfies Locale;

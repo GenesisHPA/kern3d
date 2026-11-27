@@ -16,7 +16,7 @@ export class ActAlignCameraCommand implements ICommand {
 
         view.document.acts.push(
             new Act({
-                name: `${I18n.translate("ribbon.group.act")} ${index++}`,
+                name: `${I18n.translate("act.defaultName")} ${index++}`,
                 cameraPosition: view.cameraController.cameraPosition,
                 cameraTarget: view.cameraController.cameraTarget,
                 cameraUp: view.cameraController.cameraUp,

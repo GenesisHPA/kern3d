@@ -2991,5 +2991,6 @@ export default {
         "body.sketchUnresolvedExternalRefs": "В эскизе есть потерянные внешние ссылки",
         "error.kernel.operation.fillet": "Скругление",
         "error.kernel.operation.chamfer": "Фаска",
+        "act.defaultName": "Вид",
     },
 } satisfies Locale;
