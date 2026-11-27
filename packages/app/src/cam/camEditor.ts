@@ -10,14 +10,32 @@ import { type MillJob, type MillNode, parseMillJob } from "./camData";
 import style from "./camEditor.module.css";
 import { millProgram, POST_KINDS } from "./camGcode";
 import { toolIconSvg, toolSvg } from "./camToolShape";
-import { type CamTool, loadTools, newToolId, storeTools, TOOL_KINDS } from "./camTools";
+import {
+    type CamTool,
+    defaultKnife,
+    defaultTools,
+    isKnife,
+    knifeOf,
+    loadTools,
+    newToolId,
+    storeTools,
+    TOOL_KINDS,
+} from "./camTools";
 import { CamView } from "./camView";
+import { knifeCanDo } from "./dragKnife";
 import type { Pt } from "./offset";
 import { ringArea } from "./offset";
 import { type CamOperation, OPERATION_KINDS, type OperationKind, PROFILE_SIDES } from "./toolpath";
 import { commandFrames, VFD_PRESETS, VfdSpindle, type VfdTransport } from "./vfd";
 
 type Panel = "ops" | "tools" | "machine" | "spindle";
+
+/** A number field of a tool: its label key, how to read the value, how to set it. */
+type ToolField = (
+    key: string,
+    get: (x: CamTool) => number,
+    set: (x: CamTool, v: number) => void,
+) => HTMLElement;
 
 /** Kinds that work on hole centres rather than outlines. */
 const POINT_KINDS: OperationKind[] = ["drill", "helix", "thread"];
@@ -96,6 +114,7 @@ export class MillEditor {
             return { bounds: p.bounds, seconds: p.seconds };
         },
         vfd: () => (this.data.vfd.enabled ? this.vfd : undefined),
+        knife: () => this.program().knife,
     });
     private stage!: HTMLElement;
     private mode: "prepare" | "control" = "prepare";
@@ -198,7 +217,11 @@ export class MillEditor {
         const min = Math.floor(p.seconds / 60);
         const sec = Math.round(p.seconds % 60);
         this.programText = t("mill.estimate", `${min}:${String(sec).padStart(2, "0")}`);
-        if (p.skipped.length > 0) this.programText += ` · ${t("mill.skipped", p.skipped.length)}`;
+        const knifeSkips = p.skipped.filter((x) => x.reason === "knifeOp" || x.reason === "knifeJob").length;
+        if (p.skipped.length > knifeSkips)
+            this.programText += ` · ${t("mill.skipped", p.skipped.length - knifeSkips)}`;
+        if (knifeSkips > 0) this.programText += ` · ${t("mill.knife.skipped", knifeSkips)}`;
+        if (p.knife) this.programText += ` · ✂ ${t("mill.knife.job")}`;
         this.showStatus();
         await this.view.show(this.data, p);
     }
@@ -431,6 +454,7 @@ export class MillEditor {
                 ...OPERATION_KINDS.map((k) =>
                     button(`mill.op.${k}`, () => this.addOperation(k), `mill.op.${k}.hint`),
                 ),
+                button("mill.op.knife", () => this.addKnifeCut(), "mill.op.knife.hint"),
             ),
         );
         this.data.operations.forEach((op, i) => {
@@ -484,8 +508,20 @@ export class MillEditor {
         this.commit();
     }
 
+    /** A knife cut along the last shape: the job's knife (the library's one brought in if none). */
+    private addKnifeCut() {
+        let knife = this.data.tools.find(isKnife);
+        if (!knife) {
+            const n = Math.max(0, ...this.data.tools.map((x) => x.number)) + 1;
+            knife = { ...defaultTools().find(isKnife)!, id: newToolId(), number: n };
+            this.data.tools.push(knife);
+        }
+        const op = this.newOperation("profile", knife);
+        Object.assign(op, { side: "on", ramp: false, depth: knifeOf(knife).cutDepth });
+        this.pushOperation(op);
+    }
+
     private addOperation(kind: OperationKind) {
-        const shape = this.data.shapes.at(-1);
         const tool =
             this.data.tools.find((x) =>
                 kind === "drill"
@@ -493,7 +529,18 @@ export class MillEditor {
                     : kind === "chamfer" || kind === "vcarve"
                       ? x.kind === "vbit" || x.kind === "chamfer"
                       : x.kind === "flat",
-            ) ?? this.data.tools[0];
+            ) ??
+            this.data.tools.find((x) => !isKnife(x)) ??
+            this.data.tools[0];
+        if (isKnife(tool) && !knifeCanDo(kind)) {
+            // only knives in the job: a pocket, drilling… cannot be done with one
+            PubSub.default.pub("showToast", "mill.knife.refused" as never, t(`mill.op.${kind}`));
+            return;
+        }
+        this.pushOperation(this.newOperation(kind, tool));
+    }
+
+    private newOperation(kind: OperationKind, tool: CamTool | undefined): CamOperation {
         const op: CamOperation = {
             id: Id.generate(),
             name: "",
@@ -522,7 +569,14 @@ export class MillEditor {
                     { x: s.minX, y: s.minY + s.height },
                 ],
             ];
-        } else if (shape) this.useShape(op, shape.id);
+        } else {
+            const shape = this.data.shapes.at(-1);
+            if (shape) this.useShape(op, shape.id);
+        }
+        return op;
+    }
+
+    private pushOperation(op: CamOperation) {
         this.data.operations.push(op);
         this.selected = op.id;
         this.commit();
@@ -551,6 +605,9 @@ export class MillEditor {
             this.commit();
         };
         const tool = this.data.tools.find((x) => x.id === op.toolId);
+        const knife = isKnife(tool);
+        // a knife is offered only where it can cut (outlines, lines), never for a pocket or a hole
+        const tools = this.data.tools.filter((x) => knifeCanDo(op.kind) || !isKnife(x) || x.id === op.toolId);
         const optional = (
             key: string,
             value: number | undefined,
@@ -573,12 +630,21 @@ export class MillEditor {
             row(
                 "mill.tool",
                 select(
-                    this.data.tools.map((x) => ({ value: x.id, label: `T${x.number} ${x.name}` })),
+                    tools.map((x) => ({ value: x.id, label: `T${x.number} ${x.name}` })),
                     op.toolId,
                     (v) => edit(() => (op.toolId = v)),
                 ),
             ),
         ];
+        if (knife)
+            rows.push(
+                el("div", {
+                    className: knifeCanDo(op.kind) ? style.muted : style.warning,
+                    textContent: knifeCanDo(op.kind)
+                        ? `✂ ${t("mill.knife.hint")}`
+                        : `⚠ ${t("mill.knife.refused", t(`mill.op.${op.kind}`))}`,
+                }),
+            );
         if (op.kind !== "facing")
             rows.push(
                 row(
@@ -610,14 +676,24 @@ export class MillEditor {
                     ),
                 ),
             );
-        if (op.kind === "profile" || op.kind === "pocket" || op.kind === "chamfer" || op.kind === "vcarve")
+        if (
+            !knife &&
+            (op.kind === "profile" || op.kind === "pocket" || op.kind === "chamfer" || op.kind === "vcarve")
+        )
             rows.push(
                 row(
                     "mill.climb",
                     checkbox(op.climb, (v) => edit(() => (op.climb = v))),
                 ),
             );
-        if (op.kind === "profile" || op.kind === "pocket")
+        if (knife && op.kind === "profile")
+            rows.push(
+                row(
+                    "mill.knife.allowance",
+                    numberField(op.allowance, (v) => edit(() => (op.allowance = Math.max(0, v))), { min: 0 }),
+                ),
+            );
+        else if (op.kind === "profile" || op.kind === "pocket")
             rows.push(
                 row(
                     "mill.ramp",
@@ -628,7 +704,7 @@ export class MillEditor {
                     numberField(op.allowance, (v) => edit(() => (op.allowance = v))),
                 ),
             );
-        if (op.kind === "profile")
+        if (op.kind === "profile" && !knife)
             rows.push(
                 el(
                     "div",
@@ -684,7 +760,7 @@ export class MillEditor {
             el(
                 "div",
                 { className: style.pair },
-                optional("mill.rpm", op.rpm, tool?.rpm, (v) => (op.rpm = v)),
+                ...(knife ? [] : [optional("mill.rpm", op.rpm, tool?.rpm, (v) => (op.rpm = v))]),
                 optional("mill.feed", op.feed, tool?.feed, (v) => (op.feed = v)),
             ),
             el(
@@ -692,7 +768,9 @@ export class MillEditor {
                 { className: style.pair },
                 optional("mill.plunge", op.plunge, tool?.plunge, (v) => (op.plunge = v)),
                 optional("mill.stepDown", op.stepDown, tool?.stepDown, (v) => (op.stepDown = v)),
-                optional("mill.stepOver", op.stepOver, tool?.stepOver, (v) => (op.stepOver = v)),
+                ...(knife
+                    ? []
+                    : [optional("mill.stepOver", op.stepOver, tool?.stepOver, (v) => (op.stepOver = v))]),
             ),
             el(
                 "div",
@@ -783,76 +861,15 @@ export class MillEditor {
                         select(
                             TOOL_KINDS.map((k) => ({ value: k, label: t(`mill.tool.kind.${k}`) })),
                             tool.kind,
-                            (v) => edit((x) => (x.kind = v)),
+                            (v) =>
+                                edit((x) => {
+                                    x.kind = v;
+                                    if (v === "knife") x.knife ??= defaultKnife();
+                                }),
                         ),
                     ),
                 ),
-                el(
-                    "div",
-                    { className: style.pair },
-                    num(
-                        "mill.tool.diameter",
-                        (x) => x.diameter,
-                        (x, v) => (x.diameter = Math.max(0.01, v)),
-                    ),
-                    num(
-                        "mill.tool.flutes",
-                        (x) => x.flutes,
-                        (x, v) => (x.flutes = Math.max(1, Math.round(v))),
-                    ),
-                    num(
-                        "mill.tool.fluteLength",
-                        (x) => x.fluteLength,
-                        (x, v) => (x.fluteLength = v),
-                    ),
-                ),
-                el(
-                    "div",
-                    { className: style.pair },
-                    num(
-                        "mill.tool.angle",
-                        (x) => x.angle,
-                        (x, v) => (x.angle = v),
-                    ),
-                    num(
-                        "mill.tool.corner",
-                        (x) => x.cornerRadius,
-                        (x, v) => (x.cornerRadius = v),
-                    ),
-                ),
-                el(
-                    "div",
-                    { className: style.pair },
-                    num(
-                        "mill.rpm",
-                        (x) => x.rpm,
-                        (x, v) => (x.rpm = v),
-                    ),
-                    num(
-                        "mill.feed",
-                        (x) => x.feed,
-                        (x, v) => (x.feed = v),
-                    ),
-                    num(
-                        "mill.plunge",
-                        (x) => x.plunge,
-                        (x, v) => (x.plunge = v),
-                    ),
-                ),
-                el(
-                    "div",
-                    { className: style.pair },
-                    num(
-                        "mill.stepDown",
-                        (x) => x.stepDown,
-                        (x, v) => (x.stepDown = v),
-                    ),
-                    num(
-                        "mill.stepOver",
-                        (x) => x.stepOver,
-                        (x, v) => (x.stepOver = v),
-                    ),
-                ),
+                ...(isKnife(tool) ? this.knifeFields(tool, edit, num) : this.cutterFields(num)),
                 el(
                     "div",
                     { className: style.buttons },
@@ -865,6 +882,155 @@ export class MillEditor {
             );
         }
         return out;
+    }
+
+    /** A milling cutter's fields: its size and shape, its cutting data. */
+    private cutterFields(num: ToolField): HTMLElement[] {
+        return [
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "mill.tool.diameter",
+                    (x) => x.diameter,
+                    (x, v) => (x.diameter = Math.max(0.01, v)),
+                ),
+                num(
+                    "mill.tool.flutes",
+                    (x) => x.flutes,
+                    (x, v) => (x.flutes = Math.max(1, Math.round(v))),
+                ),
+                num(
+                    "mill.tool.fluteLength",
+                    (x) => x.fluteLength,
+                    (x, v) => (x.fluteLength = v),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "mill.tool.angle",
+                    (x) => x.angle,
+                    (x, v) => (x.angle = v),
+                ),
+                num(
+                    "mill.tool.corner",
+                    (x) => x.cornerRadius,
+                    (x, v) => (x.cornerRadius = v),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "mill.rpm",
+                    (x) => x.rpm,
+                    (x, v) => (x.rpm = v),
+                ),
+                num(
+                    "mill.feed",
+                    (x) => x.feed,
+                    (x, v) => (x.feed = v),
+                ),
+                num(
+                    "mill.plunge",
+                    (x) => x.plunge,
+                    (x, v) => (x.plunge = v),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "mill.stepDown",
+                    (x) => x.stepDown,
+                    (x, v) => (x.stepDown = v),
+                ),
+                num(
+                    "mill.stepOver",
+                    (x) => x.stepOver,
+                    (x, v) => (x.stepOver = v),
+                ),
+            ),
+        ];
+    }
+
+    /**
+     * A drag knife's fields: the blade's offset, the cut depth, the overcut, the corners — and its
+     * feeds and passes; no size, no shape, no rpm (it never turns).
+     */
+    private knifeFields(
+        tool: CamTool,
+        edit: (f: (x: CamTool) => void) => void,
+        num: ToolField,
+    ): HTMLElement[] {
+        const knife = (x: CamTool) => {
+            x.knife ??= defaultKnife();
+            return x.knife;
+        };
+        const k = knifeOf(tool);
+        return [
+            el("div", { className: style.muted, textContent: `✂ ${t("mill.knife.toolHint")}` }),
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "mill.knife.offset",
+                    () => k.offset,
+                    (x, v) => (knife(x).offset = Math.max(0, v)),
+                ),
+                num(
+                    "mill.knife.cutDepth",
+                    () => k.cutDepth,
+                    (x, v) => (knife(x).cutDepth = Math.max(0, v)),
+                ),
+                num(
+                    "mill.knife.overcut",
+                    () => k.overcut,
+                    (x, v) => (knife(x).overcut = Math.max(0, v)),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "mill.knife.cornerAngle",
+                    () => k.cornerAngle,
+                    (x, v) => (knife(x).cornerAngle = Math.max(0, Math.min(179, v))),
+                ),
+                row(
+                    "mill.knife.corners",
+                    select(
+                        (["loop", "lift"] as const).map((v) => ({
+                            value: v,
+                            label: t(`mill.knife.corners.${v}`),
+                        })),
+                        k.corners,
+                        (v) => edit((x) => (knife(x).corners = v)),
+                    ),
+                ),
+            ),
+            el(
+                "div",
+                { className: style.pair },
+                num(
+                    "mill.feed",
+                    (x) => x.feed,
+                    (x, v) => (x.feed = v),
+                ),
+                num(
+                    "mill.plunge",
+                    (x) => x.plunge,
+                    (x, v) => (x.plunge = v),
+                ),
+                num(
+                    "mill.stepDown",
+                    (x) => x.stepDown,
+                    (x, v) => (x.stepDown = v),
+                ),
+            ),
+        ];
     }
 
     private machinePanel(): HTMLElement[] {

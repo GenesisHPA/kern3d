@@ -381,6 +381,16 @@
     color: color-mix(in srgb, var(--m-fg) 60%, transparent);
 }
 
+/* a refusal right in the card: the operation cannot be done with this tool */
+.warning {
+    margin: 6px 0;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: var(--m-radius);
+    color: #e8590c;
+    background: color-mix(in srgb, #fd7e14 14%, transparent);
+}
+
 /* a list entry (shape) as a small card */
 .item {
     display: flex;

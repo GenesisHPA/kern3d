@@ -11,7 +11,15 @@ import { levelProgram } from "./camLevel";
 import { GamepadJog, WebSocketConnection } from "./camNet";
 import { correctedSteps, type ProgramSegment, splitAtToolChanges } from "./camProbe";
 import { ProbeWorkflow } from "./camProbePanel";
-import { clock, frameLines, outsideTravel, parseOffsetLine, runFromLine, timeLeft } from "./camRun";
+import {
+    clock,
+    frameLines,
+    outsideTravel,
+    parseOffsetLine,
+    runFromLine,
+    timeLeft,
+    withoutSpindle,
+} from "./camRun";
 import type { CamTool } from "./camTools";
 import {
     AXES,
@@ -40,6 +48,11 @@ export interface ControlHost {
     };
     /** The inverter when it is on and connected. */
     vfd(): VfdSpindle | undefined;
+    /**
+     * The job cuts with a drag knife: the spindle must never start — the program is run with
+     * every spindle word taken out, the inverter is not followed, the spindle buttons refuse.
+     */
+    knife(): boolean;
 }
 
 const PREFS = "kern3d.cam.panel";
@@ -153,7 +166,21 @@ export class MachineControl {
     /** Built on first show: the job is not loaded yet when the panel is made. */
     show() {
         if (this.element.childElementCount === 0) this.build();
+        this.showKnife();
     }
+
+    private readonly knifeNote = el("div");
+
+    /** The knife's note over the spindle controls (and the spindle buttons off) while it is on. */
+    private showKnife() {
+        const knife = this.host.knife();
+        this.knifeNote.className = style.note;
+        this.knifeNote.textContent = knife ? `✂ ${t("cnc.knife.noSpindle")}` : "";
+        this.knifeNote.hidden = !knife;
+        for (const b of this.spindleButtons) b.disabled = knife;
+    }
+
+    private spindleButtons: HTMLButtonElement[] = [];
 
     dispose() {
         this.gamepad.stop();
@@ -328,7 +355,7 @@ export class MachineControl {
     }
 
     private async followSpindle() {
-        const vfd = this.host.vfd();
+        const vfd = this.host.knife() ? undefined : this.host.vfd();
         if (!vfd) return;
         while (this.spindleAt < Math.min(this.acked, this.running.length)) {
             await vfd.onLine(this.running[this.spindleAt]);
@@ -346,6 +373,7 @@ export class MachineControl {
             return;
         }
         this.started = 0;
+        this.showKnife();
         this.segments = splitAtToolChanges(this.host.programLines());
         this.workflow.current ??= this.host.tools()[0]?.number;
         this.startSegment(this.segments.shift());
@@ -354,7 +382,9 @@ export class MachineControl {
     private startSegment(seg: ProgramSegment | undefined) {
         if (!seg || !this.grbl) return;
         const map = this.workflow.heightMap;
-        this.running = map && this.workflow.applyMap ? levelProgram(seg.lines, map) : seg.lines;
+        const lines = map && this.workflow.applyMap ? levelProgram(seg.lines, map) : seg.lines;
+        // a knife's job: whatever the lines say, nothing that turns the spindle goes to the machine
+        this.running = this.host.knife() ? withoutSpindle(lines) : lines;
         this.acked = 0;
         this.spindleAt = 0;
         this.grbl.startJob(this.running);
@@ -426,6 +456,11 @@ export class MachineControl {
 
     private spindle(kind: "cw" | "ccw" | "stop") {
         const vfd = this.host.vfd();
+        if (kind !== "stop" && this.host.knife()) {
+            this.addLog(`✂ ${t("cnc.knife.noSpindle")}`);
+            PubSub.default.pub("showToast", "cnc.knife.noSpindle" as never);
+            return;
+        }
         if (kind === "stop") {
             this.send("M5");
             void vfd?.stop();
@@ -789,11 +824,14 @@ export class MachineControl {
         };
         const set = el("label", {}, el("span", { textContent: t("cnc.setRpm") }), rpm);
         set.className = style.slider;
+        this.spindleButtons = [
+            btn(`⟳ ${t("cnc.cw")}`, () => this.spindle("cw"), style.go),
+            btn(`⟲ ${t("cnc.ccw")}`, () => this.spindle("ccw"), style.go),
+        ];
         const spin = el(
             "div",
             {},
-            btn(`⟳ ${t("cnc.cw")}`, () => this.spindle("cw"), style.go),
-            btn(`⟲ ${t("cnc.ccw")}`, () => this.spindle("ccw"), style.go),
+            ...this.spindleButtons,
             btn(`■ ${t("cnc.spindleStop")}`, () => this.spindle("stop"), style.halt),
         );
         spin.className = style.row;
@@ -817,8 +855,10 @@ export class MachineControl {
             this.ovText.rapid,
         );
         rapid.className = style.override;
+        this.showKnife();
         return card(
             t("cnc.spindle"),
+            this.knifeNote,
             this.spindleText,
             this.vfdText,
             this.feedText,
