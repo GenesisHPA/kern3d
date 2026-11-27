@@ -442,7 +442,7 @@ describe("ParametricBodyNode", () => {
 
         expect(mocks.prism).not.toHaveBeenCalled();
         expect(body.shape.unchecked()).toBe(lastGood);
-        expect(body.featureItems()[0].error).toBe("Sketch profile is not closed");
+        expect(body.featureItems()[0].error).toBe(I18n.translate("error.sketch.notClosed"));
     });
 
     test("keeps unrelated feature warnings when the chain fails", () => {

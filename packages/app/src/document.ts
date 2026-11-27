@@ -146,9 +146,7 @@ export class Document extends Observable implements IDocument {
 
     static async load(app: IApplication, data: Serialized): Promise<IDocument | undefined> {
         if ((data as any).version !== __DOCUMENT_VERSION__) {
-            alert(
-                "The file version has been upgraded, no compatibility treatment was done in the development phase",
-            );
+            alert(I18n.translate("error.document.version"));
             return undefined;
         }
         const document = new Document(app, data["name"], data["id"]);

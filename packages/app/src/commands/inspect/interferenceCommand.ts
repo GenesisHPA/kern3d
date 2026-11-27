@@ -99,7 +99,7 @@ export class InterferenceCommand extends CancelableCommand {
                 : found.map((item) =>
                       panelRow(
                           `${nodes[item.first].name} ↔ ${nodes[item.second].name}`,
-                          `${formatNumber(item.volume)} mm³`,
+                          `${formatNumber(item.volume)} ${I18n.translate("unit.mm3")}`,
                           inspectStyle.warning,
                       ),
                   );

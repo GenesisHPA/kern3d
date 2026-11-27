@@ -54,16 +54,12 @@ export class DetachCommand extends MultistepCommand {
     protected override executeMainTask(): void {
         const picked = this.stepDatas[0].nodes?.[0];
         if (!isInstanceNode(picked) || picked.source === undefined) {
-            PubSub.default.pub("showToast", "error.default:{0}", "Select an instance");
+            PubSub.default.pub("showToast", "toast.detach.selectInstance");
             return;
         }
         const instance = picked as INode & IInstanceNode & VisualNode;
         if (!isRigidTransform(instance.transform)) {
-            PubSub.default.pub(
-                "showToast",
-                "error.default:{0}",
-                "The instance placement is not a rigid transform; it cannot be detached",
-            );
+            PubSub.default.pub("showToast", "toast.detach.notRigid");
             return;
         }
 
@@ -78,11 +74,7 @@ export class DetachCommand extends MultistepCommand {
         } else if (instance.source instanceof ShapeNode || instance.source instanceof MeshNode) {
             this.detachClone(instance, instance.source);
         } else {
-            PubSub.default.pub(
-                "showToast",
-                "error.default:{0}",
-                "This instance source cannot be made independent",
-            );
+            PubSub.default.pub("showToast", "toast.detach.unsupportedSource");
         }
     }
 
@@ -102,7 +94,7 @@ export class DetachCommand extends MultistepCommand {
     private detachParametric(instance: BodyInstanceNode, source: ParametricBodyNode): void {
         const visible = this.visibleFeatures(source);
         if (visible.length === 0) {
-            PubSub.default.pub("showToast", "error.default:{0}", "The source has no visible features");
+            PubSub.default.pub("showToast", "toast.detach.noVisibleFeatures");
             return;
         }
 

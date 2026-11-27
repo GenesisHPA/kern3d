@@ -4,6 +4,7 @@
 import {
     command,
     EditableShapeNode,
+    I18n,
     type IApplication,
     type ICommand,
     type IDocument,
@@ -18,7 +19,7 @@ export abstract class PerformanceTestCommand implements ICommand {
     protected rowCols = 20;
 
     async execute(app: IApplication): Promise<void> {
-        const document = await app.newDocument("OCC Performace Test");
+        const document = await app.newDocument(I18n.translate("performanceTest.document"));
 
         const start = performance.now();
         const distance = this.gap + this.size;
@@ -34,9 +35,8 @@ export abstract class PerformanceTestCommand implements ICommand {
             }
         }
         document.visual.update();
-        alert(
-            `Create ${this.rowCols * this.rowCols * this.rowCols} shapes, Time: ${performance.now() - start} ms`,
-        );
+        const count = this.rowCols * this.rowCols * this.rowCols;
+        alert(I18n.translate("performanceTest.result{0}{1}", count, Math.round(performance.now() - start)));
     }
 
     protected abstract createShape(document: IDocument, material: Material, position: XYZ): void;

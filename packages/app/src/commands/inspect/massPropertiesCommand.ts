@@ -134,12 +134,21 @@ export class MassPropertiesCommand extends CancelableCommand {
         const c = body.centroid;
         return [
             ...(heading ? [panelHeading(body.name)] : []),
-            panelRow(I18n.translate("inspect.mass"), `${formatNumber(body.mass)} g`),
-            panelRow(I18n.translate("common.volume"), `${formatNumber(body.volume)} mm³`),
-            panelRow(I18n.translate("common.area"), `${formatNumber(body.area)} mm²`),
+            panelRow(
+                I18n.translate("inspect.mass"),
+                `${formatNumber(body.mass)} ${I18n.translate("unit.g")}`,
+            ),
+            panelRow(
+                I18n.translate("common.volume"),
+                `${formatNumber(body.volume)} ${I18n.translate("unit.mm3")}`,
+            ),
+            panelRow(
+                I18n.translate("common.area"),
+                `${formatNumber(body.area)} ${I18n.translate("unit.mm2")}`,
+            ),
             panelRow(
                 I18n.translate("inspect.boundingBox"),
-                `${formatNumber(size.x)} × ${formatNumber(size.y)} × ${formatNumber(size.z)} mm`,
+                `${formatNumber(size.x)} × ${formatNumber(size.y)} × ${formatNumber(size.z)} ${I18n.translate("unit.mm")}`,
             ),
             panelRow(
                 I18n.translate("inspect.centerOfMass"),

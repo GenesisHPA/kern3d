@@ -7,6 +7,7 @@ import {
     type AsyncController,
     CancelableCommand,
     EditableShapeNode,
+    I18n,
     type IApplication,
     type IDocument,
     type INode,
@@ -122,13 +123,13 @@ describe("MassPropertiesCommand", () => {
         await cmd.execute(h.app);
 
         const [pla, steel] = text.split("|");
-        expect(pla).toContain(`${((8000 / 1000) * 1.24).toFixed(2)} g`);
-        expect(pla).toContain("8000.00 mm³");
-        expect(pla).toContain("2400.00 mm²");
-        expect(pla).toContain("20.00 × 20.00 × 20.00 mm");
+        expect(pla).toContain(`${((8000 / 1000) * 1.24).toFixed(2)} ${I18n.translate("unit.g")}`);
+        expect(pla).toContain(`8000.00 ${I18n.translate("unit.mm3")}`);
+        expect(pla).toContain(`2400.00 ${I18n.translate("unit.mm2")}`);
+        expect(pla).toContain(`20.00 × 20.00 × 20.00 ${I18n.translate("unit.mm")}`);
         expect(pla).toContain("10.00, 10.00, 10.00");
         expect(cmd.density).toBe(DENSITY_PRESETS.steel);
-        expect(steel).toContain(`${(8 * 7.85).toFixed(2)} g`);
+        expect(steel).toContain(`${(8 * 7.85).toFixed(2)} ${I18n.translate("unit.g")}`);
 
         const marker = h.displayMesh.mock.calls[0][0][0] as { position: Float32Array };
         expect([...marker.position]).toEqual([10, 10, 10]);
@@ -153,7 +154,7 @@ describe("InterferenceCommand", () => {
         await new InterferenceCommand().execute(h.app);
 
         expect(text).toContain("box1 ↔ box2");
-        expect(text).toContain("24.00 mm³");
+        expect(text).toContain(`24.00 ${I18n.translate("unit.mm3")}`);
         expect(text).not.toContain("box3 ↔");
         expect(h.displayMesh).toHaveBeenCalledTimes(1);
         // The highlight is removed when the tool ends — the model is never touched.

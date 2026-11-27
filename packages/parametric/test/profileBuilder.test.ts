@@ -3,6 +3,7 @@
 
 import {
     BoundingBox,
+    I18n,
     type IEdge,
     type IFace,
     Plane,
@@ -291,7 +292,7 @@ describe("sketchProfiles", () => {
             const result = sketchProfiles(sketchWith(squareEdges()));
 
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Sketch profile is not closed");
+            expect(result.error).toBe(I18n.translate("error.sketch.notClosed"));
         } finally {
             restore();
         }
@@ -334,7 +335,7 @@ describe("sketchProfiles", () => {
             const result = sketchProfiles(sketchWith([]));
 
             expect(result.isOk).toBe(false);
-            expect(result.error).toBe("Sketch has no entities");
+            expect(result.error).toBe(I18n.translate("error.sketch.empty"));
         } finally {
             restore();
         }

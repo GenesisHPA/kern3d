@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IEdge,
     type IFace,
     type IShape,
@@ -112,7 +113,7 @@ export function sketchProfiles(sketch: SketchNode): Result<SketchProfileSet> {
 
 function buildProfiles(sketch: SketchNode, shape: IShape): Result<SketchProfileSet> {
     const edges = collectEdges(shape);
-    if (edges.length === 0) return Result.err("Sketch has no entities");
+    if (edges.length === 0) return Result.err(I18n.translate("error.sketch.empty"));
 
     // Edge i was generated from sketch entity shapeEntityIds[i] (generateShape combines
     // the entities' edges in `data.entities` order — one edge per entity, one per contour
@@ -289,7 +290,7 @@ function buildWires(
             ].sort((a, b) => a - b),
         );
     }
-    if (wires.length === 0) return Result.err("Sketch profile is not closed");
+    if (wires.length === 0) return Result.err(I18n.translate("error.sketch.notClosed"));
     return Result.ok({ wires, polygons, wireEntities, wireEdges });
 }
 
