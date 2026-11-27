@@ -211,3 +211,34 @@ describe("state and telegram client", () => {
         assert.deepEqual(waits, [3000]);
     });
 });
+
+describe("/stats", () => {
+    it("answers the owner in private with the summary, nobody else", async () => {
+        const { formatStats } = await import("../src/stats.mjs");
+        const summary = {
+            today: "2026-11-27",
+            all_installs: 12,
+            periods: {
+                day: { users: 2, new: 1, opens: 3, minutes: 75, platforms: { web: 2 } },
+                week: { users: 5, new: 2, opens: 9, minutes: 300, platforms: { web: 3, windows: 2 } },
+                month: { users: 9, new: 4, opens: 20, minutes: 900, platforms: { web: 6, linux: 3 } },
+            },
+            versions: [{ version: "0.9.13", users: 4 }],
+            downloads: [
+                { release: "v0.9.13", name: "Kern3D-Setup.exe", count: 7 },
+                { release: "v0.9.13", name: "Kern3D-x86_64.AppImage", count: 2 },
+                { release: "v0.9.12", name: "Kern3D-Setup.exe", count: 10 },
+            ],
+        };
+        const html = formatStats(summary);
+        assert.match(html, /Сегодня:<\/b> пользователей 2 \(новых 1\), запусков 3, в работе 1 ч 15 мин/);
+        assert.match(html, /Всего: Windows 17, Linux 2/);
+        assert.match(html, /v0\.9\.13: Windows 7, Linux 2/);
+        const fetchImpl = async () => ({ ok: true, status: 200, json: async () => summary });
+        const ctx = { owners: [42], statsToken: "t", fetchImpl, me: { username: "kern3D_bot" } };
+        const owner = await replyFor(ctx, { text: "/stats", chat: { id: 42, type: "private" }, from: { id: 42 } });
+        assert.match(owner, /Kern3D — статистика/);
+        const other = await replyFor(ctx, { text: "/stats", chat: { id: 7, type: "private" }, from: { id: 7 } });
+        assert.doesNotMatch(other, /статистика/);
+    });
+});

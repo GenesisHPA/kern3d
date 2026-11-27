@@ -82,7 +82,11 @@ async function releaseLoop() {
 }
 
 async function updateLoop(me) {
-    const ctx = { tg, kb, state, me, save, log };
+    const owners = (process.env.OWNER_IDS ?? "")
+        .split(/[\s,;]+/)
+        .map(Number)
+        .filter(Boolean);
+    const ctx = { tg, kb, state, me, save, log, owners, statsToken: process.env.K3_STATS_TOKEN?.trim() };
     let delay = 1000;
     while (!stopping.signal.aborted) {
         let updates;

@@ -2,6 +2,7 @@
 import { faqEntryHtml, GUIDES, guideUrl, WIKI } from "./knowledge.mjs";
 import { fitMarkdown, latestReleased, TELEGRAM_LIMIT } from "./markdown.mjs";
 import { formatDate, LINKS, linksHtml, versionOf } from "./releases.mjs";
+import { statsText } from "./stats.mjs";
 import { escapeHtml } from "./telegram.mjs";
 
 export const COMMANDS = [
@@ -283,6 +284,12 @@ export async function replyFor(ctx, message) {
                 return subscribe(ctx, message, true);
             case "stop":
                 return subscribe(ctx, message, false);
+            case "stats":
+                // the owner's private chat only; for anyone else the command does not exist
+                if (!isGroup(message.chat) && ctx.owners?.includes(message.from?.id)) {
+                    return statsText({ token: ctx.statsToken, fetchImpl: ctx.fetchImpl });
+                }
+                return isGroup(message.chat) ? null : "Не знаю такой команды. Список команд — /help";
             default:
                 return isGroup(message.chat) ? null : "Не знаю такой команды. Список команд — /help";
         }
