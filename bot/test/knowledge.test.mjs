@@ -74,7 +74,7 @@ describe("search over the bundled knowledge base", () => {
     it("a full FAQ answer points to the guide section for the details", () => {
         const html = kb.answer("левая резьба");
         assert.match(html, /^<b>/);
-        assert.match(html, /Подробно: <a href="https:\/\/github\.com\/[^"]+docs\/guide\/[^"]+#[^"]+">/);
+        assert.match(html, /Подробно: <a href="https:\/\/github\.com\/GenesisHPA\/kern3d\/wiki\/[^"#]+#[^"]+">/);
     });
 
     it("every manual page is bundled and split into sections", async () => {
@@ -123,5 +123,6 @@ it("guides: one chunk per section, linked to its GitHub anchor, pictures dropped
     );
     assert.equal(chunks[0].text, "Текст");
     assert.equal(githubAnchor("6.3. Сечение сетки → эскиз"), "63-сечение-сетки--эскиз");
-    assert.ok(chunks[0].url.endsWith("docs/guide/g.md#63-сечение-сетки--эскиз"));
+    // the wiki page is the guide's «# title» (as ~/tools/kern3d-wiki-sync.py names it)
+    assert.equal(decodeURIComponent(chunks[0].url), "https://github.com/GenesisHPA/kern3d/wiki/T#63-сечение-сетки--эскиз");
 });

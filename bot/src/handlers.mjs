@@ -1,5 +1,5 @@
 // Command routing and the "when do we answer" rules.
-import { faqEntryHtml, GUIDES, guideUrl } from "./knowledge.mjs";
+import { faqEntryHtml, GUIDES, guideUrl, WIKI } from "./knowledge.mjs";
 import { fitMarkdown, latestReleased, TELEGRAM_LIMIT } from "./markdown.mjs";
 import { formatDate, LINKS, linksHtml, versionOf } from "./releases.mjs";
 import { escapeHtml } from "./telegram.mjs";
@@ -134,9 +134,9 @@ function helpText(me, where = "private") {
 
 function guideText() {
     return [
-        "<b>Руководства Kern3D</b>",
+        `<b>Справка Kern3D</b> — <a href="${WIKI}">вики</a>: все разделы, FAQ и указатель команд`,
         "",
-        ...GUIDES.map((g) => `📖 <a href="${guideUrl(g.file)}">${escapeHtml(g.title)}</a>`),
+        ...GUIDES.map((g) => `📖 <a href="${guideUrl(g)}">${escapeHtml(g.title)}</a>`),
         "",
         "Поиск идёт и по ним: просто напишите вопрос, например <i>карта отклонений</i>.",
     ].join("\n");

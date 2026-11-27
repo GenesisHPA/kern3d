@@ -30,7 +30,22 @@ export const GUIDES = [
     { file: "docs/guide/15-phone-and-desktop.md", title: "Телефон и программа для компьютера" },
 ];
 
-export const guideUrl = (file, anchor = "") => `${BLOB}${file}${anchor ? `#${anchor}` : ""}`;
+export const WIKI = "https://github.com/GenesisHPA/kern3d/wiki/";
+
+/** The wiki page a guide is published as (~/tools/kern3d-wiki-sync.py): its «# title», URL-safe. */
+export function wikiPage(markdown) {
+    const title = /^#\s+(.+)$/m.exec(markdown)?.[1]?.trim() ?? "";
+    return title
+        .replace(/[\/:*?"<>|#%→—–«»()[\],.!]+/g, " ")
+        .trim()
+        .replace(/\s+/g, "-");
+}
+
+/** A guide's link: its wiki page (and section) once known, else the file on GitHub. */
+export const guideUrl = (guide, anchor = "") =>
+    guide.page
+        ? `${WIKI}${encodeURIComponent(guide.page)}${anchor ? `#${encodeURIComponent(anchor)}` : ""}`
+        : `${BLOB}${guide.file}${anchor ? `#${anchor}` : ""}`;
 
 /** GitHub's heading anchor: lowercase, punctuation dropped, spaces → «-». */
 export function githubAnchor(heading) {
@@ -43,6 +58,7 @@ export function githubAnchor(heading) {
 
 /** A guide → one chunk per `##` / `###` section, with the link to that section. */
 export function guideChunks(markdown, guide) {
+    if (!guide.page) guide.page = wikiPage(markdown) || undefined;
     const chunks = [];
     let current = null;
     let inCode = false;
@@ -64,7 +80,7 @@ export function guideChunks(markdown, guide) {
                 .join("\n")
                 .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
                 .trim(),
-            url: guideUrl(guide.file, githubAnchor(c.title)),
+            url: guideUrl(guide, githubAnchor(c.title)),
             guide: guide.title,
         }))
         .filter((c) => plainText(c.text) !== "" && c.title !== "Содержание");
