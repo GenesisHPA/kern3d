@@ -8,6 +8,50 @@ import { escapeHtml } from "./telegram.mjs";
 
 export const KB_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "kb");
 const RAW = "https://raw.githubusercontent.com/GenesisHPA/kern3d/main/";
+const BLOB = "https://github.com/GenesisHPA/kern3d/blob/main/";
+
+/** Long guides in the repo's docs: searched by section, each answer links to its section on GitHub. */
+export const GUIDES = [{ file: "docs/guide/stl-and-scans.md", title: "STL и сканы → CAD" }];
+
+export const guideUrl = (file, anchor = "") => `${BLOB}${file}${anchor ? `#${anchor}` : ""}`;
+
+/** GitHub's heading anchor: lowercase, punctuation dropped, spaces → «-». */
+export function githubAnchor(heading) {
+    return plainText(heading)
+        .trim()
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+        .replace(/\s/g, "-");
+}
+
+/** A guide → one chunk per `##` / `###` section, with the link to that section. */
+export function guideChunks(markdown, guide) {
+    const chunks = [];
+    let current = null;
+    let inCode = false;
+    for (const line of markdown.split(/\r?\n/)) {
+        if (line.startsWith("```")) inCode = !inCode;
+        const heading = inCode ? null : /^#{2,3}\s+(.*)$/.exec(line);
+        if (heading) {
+            current = { title: heading[1].trim(), lines: [] };
+            chunks.push(current);
+        } else if (current) {
+            current.lines.push(line);
+        }
+    }
+    return chunks
+        .map((c) => ({
+            title: c.title,
+            // pictures are no use in a chat message
+            text: c.lines
+                .join("\n")
+                .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+                .trim(),
+            url: guideUrl(guide.file, githubAnchor(c.title)),
+            guide: guide.title,
+        }))
+        .filter((c) => plainText(c.text) !== "" && c.title !== "Содержание");
+}
 
 const STOPWORDS = new Set(
     [
@@ -159,8 +203,19 @@ export function changelogChunks(sections) {
 }
 
 /** Builds the chunk list from the raw sources. */
-export function buildChunks({ faq = "", readme = "", changelog = "", commands = [] }) {
+export function buildChunks({ faq = "", readme = "", changelog = "", commands = [], guides = [] }) {
     const chunks = [];
+    for (const { guide, markdown } of guides) {
+        for (const chunk of guideChunks(markdown, guide)) {
+            chunks.push({
+                source: "guide",
+                title: `${chunk.guide} · ${chunk.title}`,
+                text: chunk.text,
+                url: chunk.url,
+                index: `${chunk.title} ${chunk.title} ${chunk.text}`,
+            });
+        }
+    }
     parseFaq(faq).forEach((entry, index) => {
         chunks.push({
             source: "faq",
@@ -206,7 +261,7 @@ export function buildChunks({ faq = "", readme = "", changelog = "", commands = 
 
 const K1 = 1.2;
 const B = 0.75;
-const BOOST = { faq: 1.6, readme: 1, changelog: 0.9, commands: 0.8 };
+const BOOST = { faq: 1.6, guide: 1.3, readme: 1, changelog: 0.9, commands: 0.8 };
 
 /** BM25 index over chunks; FAQ entries are boosted. */
 export function createIndex(chunks) {
@@ -242,7 +297,7 @@ export function createIndex(chunks) {
     return { search, size: n };
 }
 
-const LABELS = { faq: "FAQ", readme: "README", changelog: "Изменения", commands: "Команда" };
+const LABELS = { faq: "FAQ", guide: "Руководство", readme: "README", changelog: "Изменения", commands: "Команда" };
 
 function snippet(text, max = 300) {
     const plain = plainText(text).replace(/\s+/g, " ");
@@ -267,7 +322,8 @@ export function answer(index, query) {
         const c = r.chunk;
         if (c.source === "commands") return `<b>[${LABELS.commands}]</b> ${escapeHtml(c.text)}`;
         const ref = c.source === "faq" ? ` (/faq ${c.number})` : "";
-        return `<b>[${LABELS[c.source]}]</b> ${escapeHtml(plainText(c.title))}${ref}\n${escapeHtml(snippet(c.text))}`;
+        const more = c.url ? `\n<a href="${escapeHtml(c.url)}">Читать полностью</a>` : "";
+        return `<b>[${LABELS[c.source]}]</b> ${escapeHtml(plainText(c.title))}${ref}\n${escapeHtml(snippet(c.text))}${more}`;
     });
     return `Вот что нашлось:\n\n${lines.join("\n\n")}`;
 }
@@ -299,13 +355,15 @@ export function createKnowledge({ fetchImpl = fetch, kbDir = KB_DIR, log = conso
                 }
                 return local(name).catch(() => "");
             };
-            const [changelog, readme, faq, commandsJson] = await Promise.all([
+            const [changelog, readme, faq, commandsJson, ...guideTexts] = await Promise.all([
                 source("CHANGELOG.md"),
                 source("README.md"),
                 local("faq.md").catch(() => ""),
                 local("commands.json").catch(() => "[]"),
+                ...GUIDES.map((g) => source(g.file)),
             ]);
-            const chunks = buildChunks({ faq, readme, changelog, commands: JSON.parse(commandsJson) });
+            const guides = GUIDES.map((guide, i) => ({ guide, markdown: guideTexts[i] }));
+            const chunks = buildChunks({ faq, readme, changelog, commands: JSON.parse(commandsJson), guides });
             kb.index = createIndex(chunks);
             kb.faq = chunks.filter((c) => c.source === "faq");
             kb.changelog = parseChangelog(changelog);

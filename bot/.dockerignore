@@ -4,3 +4,4 @@ test
 scripts
 *.md
 !kb/*.md
+!kb/docs/guide/*.md

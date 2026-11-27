@@ -1,5 +1,5 @@
 // Command routing and the "when do we answer" rules.
-import { faqEntryHtml } from "./knowledge.mjs";
+import { faqEntryHtml, GUIDES, guideUrl } from "./knowledge.mjs";
 import { fitMarkdown, latestReleased, TELEGRAM_LIMIT } from "./markdown.mjs";
 import { formatDate, LINKS, linksHtml, versionOf } from "./releases.mjs";
 import { escapeHtml } from "./telegram.mjs";
@@ -12,6 +12,7 @@ export const COMMANDS = [
     ["download", "Скачать Kern3D"],
     ["changes", "Что нового (можно указать версию)"],
     ["faq", "Частые вопросы"],
+    ["guide", "Подробные руководства"],
     ["search", "Поиск по документации"],
 ];
 
@@ -34,6 +35,7 @@ export const SUGGESTED = [
     ["🕳 Отверстие", "сделать отверстие"],
     ["🔩 Резьба", "сделать резьбу"],
     ["📦 Импорт STL", "импортировать stl"],
+    ["🧊 STL и сканы → модель", "скан"],
     ["📐 Чертёж", "сделать чертёж"],
     ["🐞 Сообщить об ошибке", "сообщить об ошибке"],
 ];
@@ -115,7 +117,8 @@ function helpText(me, where = "private") {
         "/download — скачать для Windows и Linux, онлайн-версия",
         "/changes — что нового; <code>/changes 0.9.5</code> — изменения версии",
         "/faq — частые вопросы; <code>/faq 3</code> — один ответ",
-        "/search <i>текст</i> — поиск по документации",
+        "/guide — подробные руководства (STL и сканы → CAD…)",
+        "/search <i>текст</i> — поиск по документации и руководствам",
         ...(where === "private"
             ? ["/here — присылать мне новости о релизах", "/stop — не присылать новости"]
             : where === "admin"
@@ -126,6 +129,16 @@ function helpText(me, where = "private") {
         `В группе бот отвечает, если упомянуть ${escapeHtml(name)}, ответить на его сообщение или начать сообщение со знака «?».`,
         "",
         `Нашли ошибку? <a href="${LINKS.issues}">GitHub Issues</a> или напишите в группу.`,
+    ].join("\n");
+}
+
+function guideText() {
+    return [
+        "<b>Руководства Kern3D</b>",
+        "",
+        ...GUIDES.map((g) => `📖 <a href="${guideUrl(g.file)}">${escapeHtml(g.title)}</a>`),
+        "",
+        "Поиск идёт и по ним: просто напишите вопрос, например <i>карта отклонений</i>.",
     ].join("\n");
 }
 
@@ -260,6 +273,8 @@ export async function replyFor(ctx, message) {
                 return changesText(ctx, command.args);
             case "faq":
                 return command.args ? faqText(ctx, command.args) : withQuestions(ctx, faqText(ctx, ""));
+            case "guide":
+                return guideText();
             case "search":
                 return command.args
                     ? ctx.kb.answer(command.args)

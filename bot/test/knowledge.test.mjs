@@ -93,3 +93,16 @@ describe("snippet answers", () => {
         assert.match(kb.answer("телепорт"), /\[Изменения\]<\/b> 9\.9\.9/);
     });
 });
+
+it("guides: one chunk per section, linked to its GitHub anchor, pictures dropped", async () => {
+    const { guideChunks, githubAnchor } = await import("../src/knowledge.mjs");
+    const md = "# T\n\n## Содержание\n\n1. x\n\n## 6.3. Сечение сетки → эскиз\n\nТекст ![img](a.png)\n\n### Б. Скан\n\nШаги\n";
+    const chunks = guideChunks(md, { file: "docs/guide/g.md", title: "G" });
+    assert.deepEqual(
+        chunks.map((c) => c.title),
+        ["6.3. Сечение сетки → эскиз", "Б. Скан"],
+    );
+    assert.equal(chunks[0].text, "Текст");
+    assert.equal(githubAnchor("6.3. Сечение сетки → эскиз"), "63-сечение-сетки--эскиз");
+    assert.ok(chunks[0].url.endsWith("docs/guide/g.md#63-сечение-сетки--эскиз"));
+});
