@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { before, describe, it } from "node:test";
 import {
     answer,
     buildChunks,
     createIndex,
     createKnowledge,
+    GUIDES,
+    guideChunks,
+    KB_DIR,
     parseFaq,
     stem,
     tokenize,
@@ -62,8 +67,22 @@ describe("search over the bundled knowledge base", () => {
     });
 
     it("has a sensible FAQ and the CHANGELOG", () => {
-        assert.ok(kb.faq.length >= 25 && kb.faq.length <= 40, `FAQ entries: ${kb.faq.length}`);
+        assert.ok(kb.faq.length >= 25 && kb.faq.length <= 50, `FAQ entries: ${kb.faq.length}`);
         assert.ok(kb.changelog.length > 0);
+    });
+
+    it("a full FAQ answer points to the guide section for the details", () => {
+        const html = kb.answer("левая резьба");
+        assert.match(html, /^<b>/);
+        assert.match(html, /Подробно: <a href="https:\/\/github\.com\/[^"]+docs\/guide\/[^"]+#[^"]+">/);
+    });
+
+    it("every manual page is bundled and split into sections", async () => {
+        for (const guide of GUIDES) {
+            const markdown = await readFile(join(KB_DIR, guide.file), "utf8");
+            const chunks = guideChunks(markdown, guide);
+            assert.ok(chunks.length >= 5, `${guide.file}: ${chunks.length} sections`);
+        }
     });
 });
 

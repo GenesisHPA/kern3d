@@ -11,7 +11,24 @@ const RAW = "https://raw.githubusercontent.com/GenesisHPA/kern3d/main/";
 const BLOB = "https://github.com/GenesisHPA/kern3d/blob/main/";
 
 /** Long guides in the repo's docs: searched by section, each answer links to its section on GitHub. */
-export const GUIDES = [{ file: "docs/guide/stl-and-scans.md", title: "STL и сканы → CAD" }];
+export const GUIDES = [
+    { file: "docs/guide/01-start-and-interface.md", title: "Начало работы и интерфейс" },
+    { file: "docs/guide/02-files-and-projects.md", title: "Файлы и проекты" },
+    { file: "docs/guide/03-view-and-selection.md", title: "Вид, выбор и рабочая плоскость" },
+    { file: "docs/guide/04-sketch.md", title: "Эскиз" },
+    { file: "docs/guide/05-body-parametric.md", title: "Тело: параметрическое моделирование" },
+    { file: "docs/guide/stl-and-scans.md", title: "STL и сканы → CAD" },
+    { file: "docs/guide/06-direct-modeling.md", title: "Прямое моделирование" },
+    { file: "docs/guide/07-modify-and-measure.md", title: "Перемещение, измерения, анализ и аннотации" },
+    { file: "docs/guide/08-assembly.md", title: "Сборка" },
+    { file: "docs/guide/09-drawings.md", title: "Чертежи" },
+    { file: "docs/guide/10-laser.md", title: "Лазер" },
+    { file: "docs/guide/11-laser-rotary.md", title: "Лазер: поворотная ось" },
+    { file: "docs/guide/12-milling-cam.md", title: "Фрезеровка (тестовый режим)" },
+    { file: "docs/guide/13-machine-station.md", title: "Kern3D Станок (в разработке)" },
+    { file: "docs/guide/14-settings.md", title: "Настройки" },
+    { file: "docs/guide/15-phone-and-desktop.md", title: "Телефон и программа для компьютера" },
+];
 
 export const guideUrl = (file, anchor = "") => `${BLOB}${file}${anchor ? `#${anchor}` : ""}`;
 
@@ -315,8 +332,15 @@ export function answer(index, query) {
         return `Ничего не нашёл по запросу «${escapeHtml(query.trim())}». Попробуйте сказать иначе или загляните в /faq и /help.`;
     }
     const [top, second] = results;
-    if (top.chunk.source === "faq" && (!second || top.score >= second.score * 1.3)) {
-        return `${faqEntryHtml(top.chunk)}\n\n<i>Другие вопросы: /faq</i>`;
+    // A clear FAQ hit is answered in full. Against another FAQ entry it has to stand out more
+    // than against a guide section, which is long and only partly about the question.
+    const margin = second?.chunk.source === "faq" ? 1.25 : 1.15;
+    if (top.chunk.source === "faq" && (!second || top.score >= second.score * margin)) {
+        const guide = results.find((r) => r.chunk.source === "guide");
+        const more = guide
+            ? `\n\nПодробно: <a href="${escapeHtml(guide.chunk.url)}">${escapeHtml(plainText(guide.chunk.title))}</a>`
+            : "";
+        return `${faqEntryHtml(top.chunk)}${more}\n\n<i>Другие вопросы: /faq</i>`;
     }
     const lines = results.slice(0, 3).map((r) => {
         const c = r.chunk;
