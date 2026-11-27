@@ -2108,6 +2108,11 @@ export const I18N_KEYS = [
     "toast.scan.section.empty",
     "toast.scan.section.unfitted",
     "toast.scan.section{0}{1}{2}",
+    "command.scan.deviationMap",
+    "prompt.select.scanBody",
+    "prompt.select.scanReference",
+    "toast.scan.deviation.noReference",
+    "scan.deviation.legend{0}{1}{2}{3}{4}",
 ] as const;
 
 export type I18nKeys = (typeof I18N_KEYS)[number];

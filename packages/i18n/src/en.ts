@@ -2242,5 +2242,11 @@ export default {
             "The plane does not cut the mesh (or the section does not close: fill the holes with «Scan clean-up»)",
         "toast.scan.section.unfitted": "The section could not be fitted to lines and arcs",
         "toast.scan.section{0}{1}{2}": "Section sketch: {0} loop(s), tolerance {1} mm, not fitted: {2}",
+        "command.scan.deviationMap": "Deviation Map",
+        "prompt.select.scanBody": "Select the body to colour by its deviation",
+        "prompt.select.scanReference": "Select the reference mesh (the scan)",
+        "toast.scan.deviation.noReference": "No reference mesh to compare with",
+        "scan.deviation.legend{0}{1}{2}{3}{4}":
+            "Deviation, mm\nmax {0} / {1}\nmean |d| {2}\nwithin ±{4}: {3}%",
     },
 } satisfies Locale;
