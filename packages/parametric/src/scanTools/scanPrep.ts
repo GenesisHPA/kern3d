@@ -272,10 +272,18 @@ export function decimate(mesh: TriMesh, target: number): TriMesh {
 
 /**
  * Taubin smoothing (λ|μ): a shrinking Laplacian step then an inflating one, so the mesh loses
- * its noise but not its size. `iterations` pairs of steps; boundary vertices stay put.
+ * its noise but not its size. `iterations` pairs of steps; boundary vertices stay put. No vertex
+ * ends further than `maxShift` from where it was: smoothing a clean, coarse mesh (a CAD export's
+ * long thin triangles) would otherwise drag its sharp edges by millimetres.
  */
-export function smoothMesh(mesh: TriMesh, iterations = 2, lambda = 0.5, mu = -0.53): TriMesh {
-    if (iterations <= 0) return mesh;
+export function smoothMesh(
+    mesh: TriMesh,
+    iterations = 2,
+    lambda = 0.5,
+    mu = -0.53,
+    maxShift = Number.POSITIVE_INFINITY,
+): TriMesh {
+    if (iterations <= 0 || !(maxShift > 0)) return mesh;
     const { neighbours } = vertexRings(mesh);
     const boundary = boundaryVertices(mesh);
     let p = Float64Array.from(mesh.positions);
@@ -295,6 +303,20 @@ export function smoothMesh(mesh: TriMesh, iterations = 2, lambda = 0.5, mu = -0.
     for (let i = 0; i < iterations; i++) {
         step(lambda);
         step(mu);
+    }
+    if (Number.isFinite(maxShift)) {
+        const o = mesh.positions;
+        for (let v = 0; v < p.length / 3; v++) {
+            const dx = p[3 * v] - o[3 * v];
+            const dy = p[3 * v + 1] - o[3 * v + 1];
+            const dz = p[3 * v + 2] - o[3 * v + 2];
+            const d = Math.hypot(dx, dy, dz);
+            if (d <= maxShift) continue;
+            const f = maxShift / d;
+            p[3 * v] = o[3 * v] + dx * f;
+            p[3 * v + 1] = o[3 * v + 1] + dy * f;
+            p[3 * v + 2] = o[3 * v + 2] + dz * f;
+        }
     }
     return meshFrom(p, mesh.triangles);
 }
@@ -419,7 +441,8 @@ export function prepareScan(
         options.maxHoleEdges > 0
             ? fillHoles(mesh, options.maxHoleEdges)
             : { mesh, filled: 0, left: boundaryLoops(mesh).length };
-    let out = smoothMesh(holes.mesh, options.smoothing);
+    // a vertex moves no further than the noise could have put it: a clean mesh (noise 0) stays as it is
+    let out = smoothMesh(holes.mesh, options.smoothing, 0.5, -0.53, SHIFT_PER_NOISE * noiseBefore);
     if (options.targetTriangles > 0 && out.areas.length > options.targetTriangles) {
         out = decimate(out, options.targetTriangles);
         // only tears the decimation made: holes the scan had and were left open stay open
@@ -437,6 +460,9 @@ export function prepareScan(
         },
     };
 }
+
+/** The smoothing's reach, in noise σ: the noise is gone, an edge is not rounded off further. */
+const SHIFT_PER_NOISE = 3;
 
 /** A hole the decimation tore is a few edges round; a hole the scan had and was left open is larger. */
 const TEAR_EDGES = 12;

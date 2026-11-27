@@ -34,7 +34,7 @@ describe("scan clean-up's result", () => {
         expect(node.name).toContain("scan");
         expect(node.mesh.index!.length / 3).toBe(mesh.areas.length);
         const roundTrip = weldSoup(worldTriangles(node));
-        expect(Math.abs(meshVolume(roundTrip) - meshVolume(raw)) / meshVolume(raw)).toBeLessThan(0.01);
+        expect(Math.abs(meshVolume(roundTrip) - meshVolume(mesh)) / meshVolume(mesh)).toBeLessThan(1e-6);
         // the welded soup has as many triangles as the node shows
         expect(soupOf(roundTrip).length / 9).toBe(mesh.areas.length);
     });

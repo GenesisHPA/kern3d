@@ -57,6 +57,30 @@ describe("smoothMesh", () => {
     });
 });
 
+describe("prepareScan: a clean CAD export", () => {
+    test("is not smoothed: no noise, so its sharp edges stay where they are", () => {
+        const cad = weldTriangles(plateWithHole(40, 10, 6, 32, 2, 2));
+        expect(estimateNoise(cad)).toBe(0);
+        const { mesh } = prepareScan(cad, { targetTriangles: 200_000, smoothing: 2, maxHoleEdges: 100 });
+        expect(Array.from(mesh.positions)).toEqual(Array.from(cad.positions));
+    });
+
+    test("smoothMesh moves no vertex further than maxShift", () => {
+        const noisy = withNoise(dense(), 0.04, 2);
+        const out = smoothMesh(noisy, 3, 0.5, -0.53, 0.05);
+        let worst = 0;
+        for (let i = 0; i < out.positions.length; i += 3) {
+            const d = Math.hypot(
+                out.positions[i] - noisy.positions[i],
+                out.positions[i + 1] - noisy.positions[i + 1],
+                out.positions[i + 2] - noisy.positions[i + 2],
+            );
+            worst = Math.max(worst, d);
+        }
+        expect(worst).toBeLessThanOrEqual(0.05 + 1e-9);
+    });
+});
+
 describe("fillHoles", () => {
     test("closes a punched hole facing the right way; a hole too big is left", () => {
         const holed = withHole(weldTriangles(plateWithHole(40, 10, 6, 128, 12, 12)), [12, 12, 10], 2.5);
